@@ -1,7 +1,7 @@
 import React, { ReactNode } from 'react';
 import Head from 'next/head';
 import { useLanguage } from '../../hooks/useLanguage';
-import Navigation from './Navigation';
+import Navigation from './navigation';
 
 interface LayoutProps {
   children: ReactNode;

@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ProjectStats as ProjectStatsType } from '../../types';
 import { useLanguage } from '../../hooks/useLanguage';
-import styles from './ProjectStats.module.css';
+import styles from './projectStats.module.css';
 
 interface ProjectStatsProps {
   stats: ProjectStatsType;

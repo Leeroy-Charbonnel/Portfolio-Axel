@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Project } from '../../types';
 import { useLanguage } from '../../hooks/useLanguage';
-import ProjectStats from './ProjectStats';
+import ProjectStats from '../projects/projectStats';
 import styles from './MainProject.module.css';
 
 interface MainProjectProps {

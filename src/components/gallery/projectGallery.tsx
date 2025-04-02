@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../hooks/useLanguage';
-import GalleryItem from './GalleryItem';
+import GalleryItem from './galleryItem';
 import styles from './ProjectGallery.module.css';
 
 interface GalleryProject {

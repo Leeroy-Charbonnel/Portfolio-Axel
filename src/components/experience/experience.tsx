@@ -2,8 +2,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Experience as ExperienceType } from '../../types';
 import { useLanguage } from '../../hooks/useLanguage';
-import ExperienceItem from './ExperienceItem';
-import About from './About';
+import ExperienceItem from './experienceItem';
+import About from './about';
 import styles from './Experience.module.css';
 
 interface ExperienceProps {

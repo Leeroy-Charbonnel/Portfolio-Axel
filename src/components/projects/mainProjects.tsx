@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../hooks/useLanguage';
-import MainProject from './MainProject';
+import MainProject from './mainProject';
 import { Project } from '../../types';
 import styles from './MainProjects.module.css';
 
