@@ -1,0 +1,218 @@
+{
+  "mainProjects": [
+    {
+      "id": "porte-clef",
+      "title": {
+        "en": "Key Holder",
+        "fr": "Porte Clef"
+      },
+      "description": {
+        "en": "A 3D model of a fantastical key holder with special effects.",
+        "fr": "Un modèle 3D d'un porte-clefs fantastique avec des effets spéciaux."
+      },
+      "mainImage": "/images/projects/porte-clef-main.png",
+      "thumbnails": [
+        {
+          "src": "/images/projects/porte-clef-thumb1.png",
+          "alt": "Key holder detail 1"
+        },
+        {
+          "src": "/images/projects/porte-clef-thumb2.png",
+          "alt": "Key holder detail 2"
+        },
+        {
+          "src": "/images/projects/porte-clef-thumb3.png",
+          "alt": "Key holder detail 3"
+        }
+      ],
+      "stats": {
+        "vertices": 46091,
+        "edges": 92096,
+        "faces": 46060,
+        "triangles": 92064
+      },
+      "software": ["Ai", "Ps", "Blender"],
+      "template": "template1",
+      "wireframeImage": "/images/projects/porte-clef-wireframe.png"
+    },
+    {
+      "id": "pixel-art",
+      "title": {
+        "en": "Dystopian Pixel Art",
+        "fr": "Pixel Art Dystopique"
+      },
+      "description": {
+        "en": "A dystopian scene created with pixel art techniques.",
+        "fr": "Une scène dystopique créée avec des techniques de pixel art."
+      },
+      "mainImage": "/images/projects/pixel-art-main.png",
+      "thumbnails": [
+        {
+          "src": "/images/projects/pixel-art-thumb1.png",
+          "alt": "Pixel art detail 1"
+        },
+        {
+          "src": "/images/projects/pixel-art-thumb2.png",
+          "alt": "Pixel art detail 2"
+        },
+        {
+          "src": "/images/projects/pixel-art-thumb3.png",
+          "alt": "Pixel art detail 3"
+        }
+      ],
+      "stats": {
+        "vertices": 25600,
+        "edges": 51200,
+        "faces": 25550,
+        "triangles": 51100
+      },
+      "software": ["Ps", "Blender"],
+      "template": "template2",
+      "wireframeImage": "/images/projects/pixel-art-wireframe.png"
+    },
+    {
+      "id": "dinosaures",
+      "title": {
+        "en": "Dinosaurs",
+        "fr": "Dinosaures"
+      },
+      "description": {
+        "en": "3D models of various dinosaur species with realistic textures.",
+        "fr": "Modèles 3D de diverses espèces de dinosaures avec des textures réalistes."
+      },
+      "mainImage": "/images/projects/dinosaures-main.png",
+      "thumbnails": [
+        {
+          "src": "/images/projects/dinosaures-thumb1.png",
+          "alt": "Dinosaur model detail 1"
+        },
+        {
+          "src": "/images/projects/dinosaures-thumb2.png",
+          "alt": "Dinosaur model detail 2"
+        },
+        {
+          "src": "/images/projects/dinosaures-thumb3.png",
+          "alt": "Dinosaur model detail 3"
+        }
+      ],
+      "stats": {
+        "vertices": 85700,
+        "edges": 171400,
+        "faces": 85650,
+        "triangles": 171300
+      },
+      "software": ["Blender", "Substance"],
+      "template": "template1",
+      "wireframeImage": "/images/projects/dinosaures-wireframe.png"
+    },
+    {
+      "id": "space-marine",
+      "title": {
+        "en": "Space Marine",
+        "fr": "Space Marine"
+      },
+      "description": {
+        "en": "A detailed 3D model of a futuristic space marine character.",
+        "fr": "Un modèle 3D détaillé d'un personnage futuriste de marine spatiale."
+      },
+      "mainImage": "/images/projects/space-marine-main.png",
+      "thumbnails": [
+        {
+          "src": "/images/projects/space-marine-thumb1.png",
+          "alt": "Space marine detail 1"
+        },
+        {
+          "src": "/images/projects/space-marine-thumb2.png",
+          "alt": "Space marine detail 2"
+        },
+        {
+          "src": "/images/projects/space-marine-thumb3.png",
+          "alt": "Space marine detail 3"
+        }
+      ],
+      "stats": {
+        "vertices": 120500,
+        "edges": 241000,
+        "faces": 120480,
+        "triangles": 240960
+      },
+      "software": ["ZBrush", "Blender", "Substance"],
+      "template": "template2",
+      "wireframeImage": "/images/projects/space-marine-wireframe.png"
+    }
+  ],
+  "galleryProjects": [
+    {
+      "id": "project1",
+      "title": {
+        "en": "Sci-Fi Helmet",
+        "fr": "Casque Sci-Fi"
+      },
+      "thumbnail": "/images/gallery/project1.png",
+      "stats": {
+        "vertices": 32000,
+        "edges": 64000
+      }
+    },
+    {
+      "id": "project2",
+      "title": {
+        "en": "Fantasy Sword",
+        "fr": "Épée de Fantasy"
+      },
+      "thumbnail": "/images/gallery/project2.png",
+      "stats": {
+        "vertices": 18500,
+        "edges": 37000
+      }
+    },
+    {
+      "id": "project3",
+      "title": {
+        "en": "Futuristic City",
+        "fr": "Ville Futuriste"
+      },
+      "thumbnail": "/images/gallery/project3.png",
+      "stats": {
+        "vertices": 250000,
+        "edges": 500000
+      }
+    },
+    {
+      "id": "project4",
+      "title": {
+        "en": "Robot Character",
+        "fr": "Personnage Robot"
+      },
+      "thumbnail": "/images/gallery/project4.png",
+      "stats": {
+        "vertices": 75000,
+        "edges": 150000
+      }
+    },
+    {
+      "id": "project5",
+      "title": {
+        "en": "Fantasy Environment",
+        "fr": "Environnement Fantasy"
+      },
+      "thumbnail": "/images/gallery/project5.png",
+      "stats": {
+        "vertices": 180000,
+        "edges": 360000
+      }
+    },
+    {
+      "id": "project6",
+      "title": {
+        "en": "Alien Creature",
+        "fr": "Créature Alien"
+      },
+      "thumbnail": "/images/gallery/project6.png",
+      "stats": {
+        "vertices": 45000,
+        "edges": 90000
+      }
+    }
+  ]
+}

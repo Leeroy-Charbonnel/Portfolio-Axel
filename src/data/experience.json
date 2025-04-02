@@ -1,0 +1,96 @@
+{
+  "experiences": [
+    {
+      "period": "06.2023-ACT.",
+      "title": {
+        "en": "3D Technical Artist",
+        "fr": "Artist Technique 3D"
+      },
+      "company": "Alivesim",
+      "location": "Helsinki",
+      "description": {
+        "en": [
+          "Mastery of Unreal Engine (Blueprints, Material Editor, Sequencer, Niagara, etc.)",
+          "Optimization of assets for real-time (LOD, texture atlasing, occlusion culling)",
+          "Integration and management of 3D assets in Unreal Engine",
+          "Knowledge of production pipelines",
+          "Use of Lumen, Nanite and Ray Tracing for advanced rendering"
+        ],
+        "fr": [
+          "Maîtrise d'Unreal Engine (Blueprints, Material Editor, Sequencer, Niagara, etc.)",
+          "Optimisation des assets pour temps réel (LOD, atlasing de textures, occlusion culling)",
+          "Intégration et gestion des assets 3D dans Unreal Engine",
+          "Connaissance des pipelines de production",
+          "Utilisation de Lumen, Nanite et Ray Tracing pour le rendu avancé"
+        ]
+      }
+    },
+    {
+      "period": "12.2022-04.2023",
+      "title": {
+        "en": "Multimedia Generalist",
+        "fr": "Generalist Multimédia"
+      },
+      "company": "Polyverse Life",
+      "location": "Denizli",
+      "description": {
+        "en": [
+          "Low poly/high poly modeling for video games, animation, architecture",
+          "Creation of 3D environments and scenes",
+          "3D animation of characters, objects and cameras with shape keys, drivers and custom rigs",
+          "Mastery of Cycles and Eevee render engines"
+        ],
+        "fr": [
+          "Modélisation low poly/high poly pour jeux vidéo, animation, architecture",
+          "Création d'environnements 3D et de scènes",
+          "Animation 3D personnages, objets et caméras avec shape keys, drivers et des rigs custom",
+          "Maîtrise des moteurs de rendu Cycles et Eevee"
+        ]
+      }
+    },
+    {
+      "period": "01.2022-12.2022",
+      "title": {
+        "en": "3D Artist",
+        "fr": "Artiste 3D"
+      },
+      "company": "Funika Games",
+      "location": "Denizli",
+      "description": {
+        "en": [
+          "Mastery of Unity (Editor, Prefabs, Timeline, Shader Graph, VFX Graph)",
+          "Low poly/high poly modeling for video games",
+          "Animation and rigging in Unity (Animator, IK, Mocap)",
+          "Retopology and texture baking (normal maps, AO, roughness)"
+        ],
+        "fr": [
+          "Maîtrise d'Unity (Editor, Prefabs, Timeline, Shader Graph, VFX Graph)",
+          "Modélisation et Rigging low poly/high poly modèles pour jeux vidéo",
+          "Animation et rigging dans Unity (Animator, IK, Mocap)",
+          "Retopologie et baking de textures (normal maps, AO, roughness)"
+        ]
+      }
+    }
+  ],
+  "contact": {
+    "phone": "+33 6 51 63 50 08",
+    "email": "AXEL.OFFRET@GMAIL.COM",
+    "instagram": "AXEL.OFFRET"
+  },
+  "interests": {
+    "games": [
+      "BOARDS GAMES",
+      "VIDEO GAMES",
+      "TTRPG"
+    ],
+    "art": [
+      "DRAWING",
+      "PAINTING",
+      "MODELLING"
+    ]
+  },
+  "about": {
+    "en": "Hey!\nI am an Artist with experience in the field of graphic design and 3D modelling. I have a strong passion for creating 3D models, and I am always striving to improve my skills and knowledge in this field.",
+    "fr": "Salut!\nJe suis un Artiste avec de l'expérience dans le domaine du design graphique et de la modélisation 3D. J'ai une forte passion pour la création de modèles 3D, et je m'efforce toujours d'améliorer mes compétences et mes connaissances dans ce domaine."
+  }
+}

@@ -1,0 +1,136 @@
+.aboutContainer {
+  background-color: rgba(20, 20, 20, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  margin-top: 3rem;
+}
+
+.sectionTitle {
+  font-size: 1.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1.5rem;
+  position: relative;
+  display: inline-block;
+}
+
+.sectionTitle::after {
+  content: '';
+  position: absolute;
+  width: 40%;
+  height: 2px;
+  background-color: #ffffff;
+  bottom: -0.5rem;
+  left: 0;
+}
+
+.aboutSection {
+  margin-bottom: 2rem;
+}
+
+.aboutContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.aboutText {
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
+.infoColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.contactList {
+  list-style: none;
+  padding: 0;
+}
+
+.contactItem {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.contactLabel {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 0.25rem;
+}
+
+.contactValue {
+  font-size: 1rem;
+}
+
+.interestsColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.interestTitle {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 0.75rem;
+}
+
+.interestList {
+  list-style: none;
+  padding: 0;
+}
+
+.interestItem {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1024px) {
+  .aboutContent {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .aboutSection {
+    text-align: center;
+  }
+  
+  .sectionTitle::after {
+    left: 30%;
+  }
+}
+
+@media (max-width: 768px) {
+  .infoColumns {
+    grid-template-columns: 1fr;
+  }
+  
+  .interestsColumns {
+    grid-template-columns: 1fr;
+  }
+  
+  .aboutContainer {
+    padding: 1.5rem;
+  }
+}
