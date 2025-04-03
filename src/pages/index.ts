@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GetStaticProps } from 'next';
+import type { GetStaticProps, NextPage } from 'next';
 import fs from 'fs';
 import path from 'path';
 
@@ -11,12 +11,20 @@ import Experience from '../components/experience/experience';
 import { LanguageProvider } from '../hooks/useLanguage';
 import { Project, Experience as ExperienceType } from '../types';
 
-// Explicitly use the imported components to prevent greying out
-const _componentCheck = [Layout, Home, MainProjects, ProjectGallery, Experience];
-
 interface HomePageProps {
   mainProjects: Project[];
-  galleryProjects: any[];
+  galleryProjects: {
+    id: string;
+    title: {
+      en: string;
+      fr: string;
+    };
+    thumbnail: string;
+    stats: {
+      vertices: number;
+      edges: number;
+    };
+  }[];
   experiences: ExperienceType[];
   about: {
     en: string;
@@ -33,7 +41,7 @@ interface HomePageProps {
   };
 }
 
-const HomePage: React.FC<HomePageProps> = ({
+const HomePage: NextPage<HomePageProps> = ({
   mainProjects,
   galleryProjects,
   experiences,
@@ -43,32 +51,32 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   return (
     <LanguageProvider>
-      <Layout>
-        <Home />
-        <MainProjects projects={mainProjects} />
-        <ProjectGallery projects={galleryProjects} />
-        <Experience
-          experiences={experiences}
-          about={about}
-          contact={contact}
-          interests={interests}
-        />
-      </Layout>
+    <Layout>
+    <Home />
+    < MainProjects projects = { mainProjects } />
+      <ProjectGallery projects={ galleryProjects } />
+        < Experience
+  experiences = { experiences }
+  about = { about }
+  contact = { contact }
+  interests = { interests }
+    />
+    </Layout>
     </LanguageProvider>
   );
 };
 
-export const getStaticProps: GetStaticProps = async () => {
+export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
   try {
     const projectsPath = path.join(process.cwd(), 'src/data/projects.json');
     const experiencePath = path.join(process.cwd(), 'src/data/experience.json');
-   
+
     const projectsContent = fs.readFileSync(projectsPath, 'utf8');
     const experienceContent = fs.readFileSync(experiencePath, 'utf8');
-   
+
     const projectsData = JSON.parse(projectsContent);
     const experienceData = JSON.parse(experienceContent);
-   
+
     return {
       props: {
         mainProjects: projectsData.mainProjects || [],
