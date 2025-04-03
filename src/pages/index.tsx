@@ -1,0 +1,114 @@
+import React, { JSX } from 'react';
+import type { GetStaticProps } from 'next';
+import fs from 'fs';
+import path from 'path';
+
+import Layout from '../components/layout/layout';
+import Home from '../components/home/home';
+import MainProjects from '../components/projects/mainProjects';
+import ProjectGallery from '../components/gallery/projectGallery';
+import Experience from '../components/experience/experience';
+import { LanguageProvider } from '../components/languageProvider';
+import { Project, Experience as ExperienceType } from '../types';
+
+//Explicitly define props interface
+interface HomePageProps {
+  mainProjects: Project[];
+  galleryProjects: {
+    id: string;
+    title: {
+      en: string;
+      fr: string;
+    };
+    thumbnail: string;
+    stats: {
+      vertices: number;
+      edges: number;
+    };
+  }[];
+  experiences: ExperienceType[];
+  about: {
+    en: string;
+    fr: string;
+  };
+  contact: {
+    phone: string;
+    email: string;
+    instagram: string;
+  };
+  interests: {
+    games: string[];
+    art: string[];
+  };
+}
+
+//Home page component using function declaration
+function HomePage(props: HomePageProps): JSX.Element {
+  return (
+    <LanguageProvider>
+      <Layout>
+        <Home />
+
+
+        <div>
+          <h2>The name Attribute</h2>
+
+
+          <p>If you click the "Submit" button, the form-data will be sent to a page called "/action_page.php".</p>
+
+          <p>Notice that the value of the "First name" field will not be submitted, because the input element does not have a name attribute.</p>
+        </div>
+
+
+        <Home />
+        {/*
+        <MainProjects projects={props.mainProjects} />
+        <ProjectGallery projects={props.galleryProjects} />
+        <Experience
+          experiences={props.experiences}
+          about={props.about}
+          contact={props.contact}
+          interests={props.interests}
+        /> */}
+      </Layout>
+    </LanguageProvider>
+  );
+}
+
+export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
+  try {
+    const projectsPath = path.join(process.cwd(), 'src/data/projects.json');
+    const experiencePath = path.join(process.cwd(), 'src/data/experience.json');
+
+    const projectsContent = fs.readFileSync(projectsPath, 'utf8');
+    const experienceContent = fs.readFileSync(experiencePath, 'utf8');
+
+    const projectsData = JSON.parse(projectsContent);
+    const experienceData = JSON.parse(experienceContent);
+
+    return {
+      props: {
+        mainProjects: projectsData.mainProjects || [],
+        galleryProjects: projectsData.galleryProjects || [],
+        experiences: experienceData.experiences || [],
+        about: experienceData.about || { en: '', fr: '' },
+        contact: experienceData.contact || { phone: '', email: '', instagram: '' },
+        interests: experienceData.interests || { games: [], art: [] }
+      },
+    };
+  } catch (error) {
+    console.error('Error loading JSON files:', error);
+    return {
+      props: {
+        mainProjects: [],
+        galleryProjects: [],
+        experiences: [],
+        about: { en: '', fr: '' },
+        contact: { phone: '', email: '', instagram: '' },
+        interests: { games: [], art: [] }
+      },
+    };
+  }
+};
+
+export default HomePage;

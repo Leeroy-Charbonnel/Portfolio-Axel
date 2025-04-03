@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import { Experience as ExperienceType } from '../../types';
-import { useLanguage } from '../../hooks/useLanguage';
+import { LanguageContextType } from '../languageProvider';
 import ExperienceItem from './experienceItem';
 import About from './about';
 import styles from './Experience.module.css';
+
+//Context consumer for class components
+import { LanguageContext } from '../languageProvider';
 
 interface ExperienceProps {
   experiences: ExperienceType[];
@@ -23,46 +26,48 @@ interface ExperienceProps {
   };
 }
 
-const Experience: React.FC<ExperienceProps> = ({ 
-  experiences, 
-  about, 
-  contact, 
-  interests 
-}) => {
-  const { t } = useLanguage();
+class Experience extends Component<ExperienceProps> {
+  static contextType = LanguageContext;
+  context!: React.ContextType<typeof LanguageContext>;
 
-  return (
-    <section id="experience" className={`section ${styles.experienceSection}`}>
-      <div className="container">
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true, margin: "-100px" }}
-        >
-          <h2 className={styles.sectionTitle}>{t('experience.title')}</h2>
-        </motion.div>
-        
-        <div className={styles.experienceContent}>
-          <div className={styles.experienceTimeline}>
-            {experiences.map((experience, index) => (
-              <ExperienceItem 
-                key={index}
-                experience={experience}
-                index={index}
-              />
-            ))}
-          </div>
+  render() {
+    const { experiences, about, contact, interests } = this.props;
+    //Get translation function from context
+    const { t } = this.context as LanguageContextType;
+
+    return (
+      <section id="experience" className={`section ${styles.experienceSection}`}>
+        <div className="container">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true, margin: "-100px" }}
+          >
+            <h2 className={styles.sectionTitle}>{t('experience.title')}</h2>
+          </motion.div>
           
-          <About 
-            about={about}
-            contact={contact}
-            interests={interests}
-          />
+          <div className={styles.experienceContent}>
+            <div className={styles.experienceTimeline}>
+              {experiences.map((experience, index) => (
+                <ExperienceItem 
+                  key={index}
+                  experience={experience}
+                  index={index}
+                />
+              ))}
+            </div>
+            
+            <About 
+              about={about}
+              contact={contact}
+              interests={interests}
+            />
+          </div>
         </div>
-      </div>
-    </section>
-  );
-};
+      </section>
+    );
+  }
+}
 
 export default Experience;

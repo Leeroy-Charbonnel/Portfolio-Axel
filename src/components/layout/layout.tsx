@@ -1,42 +1,40 @@
-import React, { ReactNode } from 'react';
+import React, { Component, ReactNode } from 'react';
 import Head from 'next/head';
-import { useLanguage } from '../../hooks/useLanguage';
 import Navigation from './navigation';
+import { LanguageContext, LanguageContextType } from '../languageProvider';
 
 interface LayoutProps {
   children: ReactNode;
   title?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ 
-  children, 
-  title = 'Axel Offret - 3D Artist Portfolio' 
-}) => {
-  const { toggleLanguage, language } = useLanguage();
-  const sections = ['home', 'projects', 'gallery', 'experience'];
+class Layout extends Component<LayoutProps> {
+  static contextType = LanguageContext;
+  context!: React.ContextType<typeof LanguageContext>;
 
-  return (
-    <>
-      <Head>
-        <title>{title}</title>
-        <meta name="description" content="Portfolio of Axel Offret, 3D Artist" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
 
-      <button 
-        className="language-switch" 
-        onClick={toggleLanguage}
-        aria-label="Toggle language"
-      >
-        {language === 'en' ? 'FR' : 'EN'} / {language === 'en' ? 'EN' : 'FR'}
-      </button>
+  render() {
+    const { children } = this.props;
+    const { toggleLanguage, language, t } = this.context as LanguageContextType;
+    const title = this.props.title || t("title");
+    const sections = ['home', 'projects', 'gallery', 'experience'];
 
-      <Navigation sections={sections} />
+    return (
+      <div>
+        <Head>
+          <title>{title}</title>
+          <meta name="description" content="Portfolio of Axel Offret, 3D Artist" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <link rel="icon" href="/favicon.ico" />
+        </Head>
 
-      <main>{children}</main>
-    </>
-  );
-};
+        <button className="language-switch" onClick={toggleLanguage} aria-label="Toggle language">{language === 'en' ? 'FR / EN' : 'EN / FR'}</button>
+
+        <Navigation sections={sections} />
+        <main>{children}</main>
+      </div>
+    );
+  }
+}
 
 export default Layout;

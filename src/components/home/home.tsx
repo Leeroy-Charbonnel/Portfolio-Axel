@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { JSX } from 'react';
 import { motion } from 'framer-motion';
-import { useLanguage } from '../../hooks/useLanguage';
+import { useLanguage } from '../languageProvider';
 import styles from './Home.module.css';
 
-const Home: React.FC = () => {
+function Home(): JSX.Element {
   const { t } = useLanguage();
 
   return (
@@ -38,6 +38,6 @@ const Home: React.FC = () => {
       <div className={styles.gridOverlay}></div>
     </section>
   );
-};
+}
 
 export default Home;

@@ -1,5 +1,6 @@
 export const translations = {
   en: {
+    title : "Axel Offret - 3D Artist",
     nav: {
       home: "Home",
       projects: "Projects",
@@ -38,6 +39,7 @@ export const translations = {
     summary: "SUMMARY"
   },
   fr: {
+    title : "Axel Offret - Artiste 3D",
     nav: {
       home: "Accueil",
       projects: "Projets",
