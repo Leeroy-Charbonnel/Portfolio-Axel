@@ -1,16 +1,18 @@
 .navigation {
   position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  width: 200px;
+  top: 50%;
+  left: 20px; /* Space from left edge */
+  transform: translateY(-50%);
   background-color: rgba(0, 0, 0, 0.8);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   z-index: 100;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  border-radius: 8px;
+  padding: 1rem 0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .navList {
@@ -20,23 +22,35 @@
 }
 
 .navItem {
-  margin: 1rem 0;
-  padding: 0 2rem;
+  margin: 0.8rem 0;
+  padding: 0 1.5rem;
 }
 
 .navButton {
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
-  padding: 0.5rem 0;
+  padding: 0.4rem 0;
   width: 100%;
   text-align: left;
   transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.navIcon {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.navButton:hover .navIcon {
+  opacity: 1;
 }
 
 .navButton:hover {
@@ -52,9 +66,9 @@
 .active .navButton::before {
   content: '';
   position: absolute;
-  left: -1.5rem;
+  left: -1rem;
   top: 50%;
-  width: 10px;
+  width: 8px;
   height: 2px;
   background-color: #ffffff;
   transform: translateY(-50%);
@@ -62,7 +76,7 @@
 
 @media (max-width: 768px) {
   .navigation {
-    width: 150px;
+    left: 10px;
   }
   
   .navItem {
@@ -70,6 +84,6 @@
   }
   
   .navButton {
-    font-size: 1rem;
+    font-size: 0.9rem;
   }
 }

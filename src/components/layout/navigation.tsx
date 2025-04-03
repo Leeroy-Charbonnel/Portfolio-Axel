@@ -1,11 +1,12 @@
 import React, { Component } from 'react';
 import { motion } from 'framer-motion';
+import * as LucideIcons from 'lucide-react';
 import styles from './Navigation.module.css';
 
 import { LanguageContext, LanguageContextType } from '../languageProvider';
 
 interface NavigationProps {
-  sections: string[];
+  sections: Array<[string, string]>;
 }
 
 interface NavigationState {
@@ -27,25 +28,27 @@ class Navigation extends Component<NavigationProps, NavigationState> {
 
   componentDidMount() {
     window.addEventListener('scroll', this.handleScroll);
+    document.addEventListener('mousemove', this.handleMouseMove);
   }
 
   componentWillUnmount() {
     window.removeEventListener('scroll', this.handleScroll);
+    document.removeEventListener('mousemove', this.handleMouseMove);
   }
 
-  handleScroll = () => {
-    const { sections } = this.props;
-    const scrollPosition = window.scrollY;
-    
-    //Show/hide navigation
-    if (scrollPosition > 100) {
+  handleMouseMove = (event: MouseEvent) => {
+    if (event.clientX <= 50) {
       this.setState({ isVisible: true });
-    } else {
-      this.setState({ isVisible: false });
+    } else if (event.clientX > 200) {
+      this.setState({ isVisible: event.clientX <= 50 });
     }
-    
+  };
+
+  handleScroll = () => {
+    const scrollPosition = window.scrollY;
+
     //Update active section
-    for (const section of sections) {
+    for (const [section] of this.props.sections) {
       const element = document.getElementById(section);
       if (element) {
         const { offsetTop, offsetHeight } = element;
@@ -71,32 +74,38 @@ class Navigation extends Component<NavigationProps, NavigationState> {
     }
   };
 
+  renderIcon = (iconName: string) => {
+    const Icon = (LucideIcons as any)[iconName];
+    if (Icon) {
+      return <Icon size={18} className={styles.navIcon} />;
+    }
+    return null;
+  };
+
   render() {
     const { sections } = this.props;
     const { activeSection, isVisible } = this.state;
-    //Get translation function from context
     const { t } = this.context as LanguageContextType;
 
     return (
-      <motion.nav 
+      <motion.nav
         className={styles.navigation}
-        initial={{ x: '-100%' }}
-        animate={{ x: isVisible ? 0 : '-100%' }}
-        transition={{ duration: 0.5 }}
+        initial={{ x: '-100%', y: '-50%' }}
+        animate={{ x: isVisible ? 0 : '-100%', y: '-50%' }}
+        transition={{ duration: 0.3 }}
       >
         <ul className={styles.navList}>
-          {sections.map((section) => (
-            <motion.li 
+          {sections.map(([section, iconName]) => (
+            <motion.li
               key={section}
               className={`${styles.navItem} ${activeSection === section ? styles.active : ''}`}
-              whileHover={{ x: 10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <button 
+              transition={{ duration: 0.2 }}>
+
+              <button
                 onClick={() => this.scrollToSection(section)}
-                className={styles.navButton}
-              >
-                {t(`nav.${section}`)}
+                className={styles.navButton}>
+                <span className={styles.navText}>{t(`nav.${section}`)}</span>
+                {this.renderIcon(iconName)}
               </button>
             </motion.li>
           ))}

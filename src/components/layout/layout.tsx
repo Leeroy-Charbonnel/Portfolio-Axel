@@ -12,12 +12,16 @@ class Layout extends Component<LayoutProps> {
   static contextType = LanguageContext;
   context!: React.ContextType<typeof LanguageContext>;
 
-
   render() {
     const { children } = this.props;
     const { toggleLanguage, language, t } = this.context as LanguageContextType;
     const title = this.props.title || t("title");
-    const sections = ['home', 'projects', 'gallery', 'experience'];
+    const sections: Array<[string, string]> = [
+      ['home', 'Home'], 
+      ['projects', 'Move3d'], 
+      ['gallery', 'LayoutGrid'], 
+      ['experience', 'FileUser']
+    ];
 
     return (
       <div>
