@@ -50,17 +50,7 @@ function HomePage(props: HomePageProps): JSX.Element {
         <Home />
 
 
-        <div>
-          <h2>The name Attribute</h2>
 
-
-          <p>If you click the "Submit" button, the form-data will be sent to a page called "/action_page.php".</p>
-
-          <p>Notice that the value of the "First name" field will not be submitted, because the input element does not have a name attribute.</p>
-        </div>
-
-
-        <Home />
         {/*
         <MainProjects projects={props.mainProjects} />
         <ProjectGallery projects={props.galleryProjects} />

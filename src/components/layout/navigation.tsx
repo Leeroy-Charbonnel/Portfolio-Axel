@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import * as LucideIcons from 'lucide-react';
-import styles from './Navigation.module.css';
+import styles from './navigation.module.css';
 
 import { LanguageContext, LanguageContextType } from '../languageProvider';
 
@@ -11,10 +11,10 @@ interface NavigationProps {
 
 interface NavigationState {
   activeSection: string;
-  isVisible: boolean;
+  isExpanded: boolean;
 }
 
-class Navigation extends Component<NavigationProps, NavigationState> {
+export default class Navigation extends Component<NavigationProps, NavigationState> {
   static contextType = LanguageContext;
   context!: React.ContextType<typeof LanguageContext>;
 
@@ -22,26 +22,24 @@ class Navigation extends Component<NavigationProps, NavigationState> {
     super(props);
     this.state = {
       activeSection: 'home',
-      isVisible: false
+      isExpanded: true
     };
   }
 
   componentDidMount() {
     window.addEventListener('scroll', this.handleScroll);
-    document.addEventListener('mousemove', this.handleMouseMove);
   }
 
   componentWillUnmount() {
     window.removeEventListener('scroll', this.handleScroll);
-    document.removeEventListener('mousemove', this.handleMouseMove);
   }
 
-  handleMouseMove = (event: MouseEvent) => {
-    if (event.clientX <= 50) {
-      this.setState({ isVisible: true });
-    } else if (event.clientX > 200) {
-      this.setState({ isVisible: event.clientX <= 50 });
-    }
+  handleMouseEnter = () => {
+    this.setState({ isExpanded: true });
+  };
+
+  handleMouseLeave = () => {
+    this.setState({ isExpanded: false });
   };
 
   handleScroll = () => {
@@ -63,7 +61,7 @@ class Navigation extends Component<NavigationProps, NavigationState> {
     }
   };
 
-  //Scroll to section when nav item is clicked
+
   scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
@@ -76,43 +74,51 @@ class Navigation extends Component<NavigationProps, NavigationState> {
 
   renderIcon = (iconName: string) => {
     const Icon = (LucideIcons as any)[iconName];
-    if (Icon) {
-      return <Icon size={18} className={styles.navIcon} />;
-    }
+    if (Icon) return <Icon size={18} className={styles.navIcon} />;
     return null;
   };
 
   render() {
     const { sections } = this.props;
-    const { activeSection, isVisible } = this.state;
+    const { activeSection, isExpanded } = this.state;
     const { t } = this.context as LanguageContextType;
 
     return (
-      <motion.nav
-        className={styles.navigation}
-        initial={{ x: '-100%', y: '-50%' }}
-        animate={{ x: isVisible ? 0 : '-100%', y: '-50%' }}
+      <motion.div
+        initial={{ x: -100, y: '-50%' }}
+        animate={{ x: 0, y: '-50%' }}
         transition={{ duration: 0.3 }}
+        onMouseEnter={this.handleMouseEnter}
+        onMouseLeave={this.handleMouseLeave}
+        className={`${styles.navItemHover} ${isExpanded ? styles.expanded : ''}`}
       >
-        <ul className={styles.navList}>
-          {sections.map(([section, iconName]) => (
-            <motion.li
-              key={section}
-              className={`${styles.navItem} ${activeSection === section ? styles.active : ''}`}
-              transition={{ duration: 0.2 }}>
 
-              <button
-                onClick={() => this.scrollToSection(section)}
-                className={styles.navButton}>
-                <span className={styles.navText}>{t(`nav.${section}`)}</span>
-                {this.renderIcon(iconName)}
-              </button>
-            </motion.li>
-          ))}
-        </ul>
-      </motion.nav>
+        <nav
+          className={styles.navigation}
+        >
+
+          <ul className={styles.navList}>
+            {sections.map(([section, iconName]) => (
+
+              <li key={section}
+                className={`${styles.navItem} ${activeSection === section ? styles.active : ''}`}
+                title={section}
+                aria-label={section}
+              >
+                <button
+                  onClick={() => this.scrollToSection(section)}
+                  className={styles.navButton}>
+                  <div className={styles.navItemContent}>
+                    {this.renderIcon(iconName)}
+                  </div>
+                </button>
+              </li>
+
+            ))}
+          </ul>
+        </nav >
+      </motion.div >
+
     );
   }
 }
-
-export default Navigation;

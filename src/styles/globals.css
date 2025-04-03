@@ -8,7 +8,84 @@
   --color-gray-light: #666666;
   --grid-size: 1rem;
   --border-width: 1px;
+
+
+
+
+  /* Colors */
+  --color-text: #ffffff;
+  --color-text-hover: #f0f0f0;
+  --color-text-secondary: rgba(255, 255, 255, 0.7);
+  --color-text-tertiary: rgba(255, 255, 255, 0.5);
+
+  --color-background: #000000;
+  --color-background-secondary: #111111;
+  --color-background-tertiary: rgba(20, 20, 20, 0.7);
+
+  /* Accent */
+  --color-accent-neutral: #ffffff;
+  --color-accent: #d42d2d;
+  --color-accent-hover: #f0f0f0;
+
+  /* Border colors */
+  --color-border-primary: rgb(223, 223, 223);
+  --color-border-muted: rgb(211, 211, 211);
+  --color-border-accent: #ffffff;
+
+  /* Gradients */
+  --gradient-background-primary: linear-gradient(to bottom, #000000, #111111);
+  --gradient-background-secondary: linear-gradient(to bottom, #111111, #000000);
+  --gradient-background-accent: linear-gradient(135deg, #111111, #000000);
+
+  /* Font */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  --font-size-xs: 0.8rem;
+  --font-size-sm: 0.9rem;
+  --font-size-base: 1rem;
+  --font-size-md: 1.2rem;
+  --font-size-lg: 1.5rem;
+  --font-size-xl: 2rem;
+  --font-size-2xl: 2.5rem;
+  --font-size-3xl: 3rem;
+  --font-size-4xl: 4rem;
+  --font-size-5xl: 5rem;
+
+  --letter-spacing-tight: 0.05em;
+  --letter-spacing-normal: 0.1em;
+  --letter-spacing-wide: 0.2em;
+
+  /* Spacing */
+  --spacing-xxs: 0.25rem;
+  --spacing-xs: 0.4rem;
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+  --spacing-4xl: 5rem;
+  --spacing-5xl: 8rem;
+  --spacing-6xl: 10rem;
+
+  /* Borders */
+  --border-width-sm: 1px;
+  --border-width-md: 2px;
+  --border-width-lg: 3px;
+  --border-width-xl: 4px;
+
+  /* Border Radius */
+  --border-radius-sm: 3px;
+  --border-radius-md: 4px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 15px;
+  --border-radius-full: 100vh;
+
 }
+
+
 
 * {
   box-sizing: border-box;
@@ -38,7 +115,12 @@ a {
   text-decoration: none;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: 700;
   letter-spacing: 0.05em;
 }
@@ -60,7 +142,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .grid-background {
   background-image: linear-gradient(to right, var(--color-gray-dark) 1px, transparent 1px),
-                    linear-gradient(to bottom, var(--color-gray-dark) 1px, transparent 1px);
+    linear-gradient(to bottom, var(--color-gray-dark) 1px, transparent 1px);
   background-size: var(--grid-size) var(--grid-size);
 }
 
@@ -105,8 +187,30 @@ h1, h2, h3, h4, h5, h6 {
   .container {
     padding: 0 1rem;
   }
-  
+
   .section {
     padding: 3rem 0;
   }
+}
+
+button {
+  background: transparent;
+  border: none;
+}
+
+
+
+
+
+
+
+
+
+/* Tooltip */
+
+
+
+[title]:hover::after {
+  background-color: rgba(20, 20, 20, 0.9);
+  padding: 0.3rem 0.6rem;
 }

@@ -17,10 +17,10 @@ class Layout extends Component<LayoutProps> {
     const { toggleLanguage, language, t } = this.context as LanguageContextType;
     const title = this.props.title || t("title");
     const sections: Array<[string, string]> = [
-      ['home', 'Home'], 
-      ['projects', 'Move3d'], 
-      ['gallery', 'LayoutGrid'], 
-      ['experience', 'FileUser']
+      [t('nav.home'), 'Home'], 
+      [t('nav.projects'), 'Move3d'], 
+      [t('nav.gallery'), 'LayoutGrid'], 
+      [t('nav.experience'), 'FileUser']
     ];
 
     return (
