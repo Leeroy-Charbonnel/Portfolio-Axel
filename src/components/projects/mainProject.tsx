@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Project } from '../../types';
 import { LanguageContextType } from '../languageProvider';
 import ProjectStats from '../projects/projectStats';
-import styles from './MainProject.module.css';
+import styles from './mainProject.module.css';
 
 //Context consumer for class components
 import { LanguageContext } from '../languageProvider';

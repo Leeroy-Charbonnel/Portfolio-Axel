@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import { Experience } from '../../types';
 import { LanguageContextType } from '../languageProvider';
-import styles from './ExperienceItem.module.css';
+import styles from './experienceItem.module.css';
 
 //Context consumer for class components
 import { LanguageContext } from '../languageProvider';

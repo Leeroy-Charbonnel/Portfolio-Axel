@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(135deg, #111111, #000000);
+  background: linear-gradient(308deg, rgb(0, 0, 0) 11%, rgb(47, 47, 47) 79%, rgb(115, 115, 115) 100%);
 }
 
 .homeContainer {
@@ -46,11 +46,19 @@
   gap: 1rem;
 }
 
+
 .subtitle {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   margin: 0;
+}
+
+.part2 {
+  color: var(--color-accent);
 }
 
 .role {
@@ -66,7 +74,7 @@
   right: 0;
   bottom: 0;
   background-image: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
   background-size: 50px 50px;
   z-index: 1;
   pointer-events: none;
@@ -76,11 +84,11 @@
   .title {
     font-size: 3rem;
   }
-  
+
   .subtitle {
     font-size: 1.5rem;
   }
-  
+
   .titleWrapper {
     margin-bottom: 2rem;
     padding: 1.5rem;
@@ -91,11 +99,11 @@
   .title {
     font-size: 2rem;
   }
-  
+
   .subtitle {
     font-size: 1.2rem;
   }
-  
+
   .role {
     font-size: 1rem;
   }

@@ -102,8 +102,6 @@ export default class Navigation extends Component<NavigationProps, NavigationSta
 
               <li key={section}
                 className={`${styles.navItem} ${activeSection === section ? styles.active : ''}`}
-                title={section}
-                aria-label={section}
               >
                 <button
                   onClick={() => this.scrollToSection(section)}
@@ -112,6 +110,7 @@ export default class Navigation extends Component<NavigationProps, NavigationSta
                     {this.renderIcon(iconName)}
                   </div>
                 </button>
+                <div className={styles.tooltip}>{section}</div>
               </li>
 
             ))}

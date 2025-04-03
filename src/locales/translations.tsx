@@ -10,7 +10,7 @@ export const translations = {
     home: {
       title: "PORTFOLIO",
       subtitle: "3D ARTIST",
-      name: "AXEL OFFRET"
+      name: "AXEL TEST OFFRET"
     },
     projects: {
       title: "MAIN PROJECTS",

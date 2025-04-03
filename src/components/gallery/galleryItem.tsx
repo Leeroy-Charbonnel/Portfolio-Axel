@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
-import styles from './GalleryItem.module.css';
+import styles from './galleryItem.module.css';
 
 //Context consumer for class components
 import { LanguageContext } from '../languageProvider';

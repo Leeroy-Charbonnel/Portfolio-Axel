@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
-import styles from './About.module.css';
+import styles from './about.module.css';
 
 //Context consumer for class components
 import { LanguageContext } from '../languageProvider';

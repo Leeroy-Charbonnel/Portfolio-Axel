@@ -83,6 +83,10 @@
   --border-radius-xl: 15px;
   --border-radius-full: 100vh;
 
+
+  /* Tooltip */
+  --tootip-delay:0.7s;
+
 }
 
 
@@ -198,19 +202,3 @@ button {
   border: none;
 }
 
-
-
-
-
-
-
-
-
-/* Tooltip */
-
-
-
-[title]:hover::after {
-  background-color: rgba(20, 20, 20, 0.9);
-  padding: 0.3rem 0.6rem;
-}

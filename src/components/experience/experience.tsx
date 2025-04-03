@@ -4,7 +4,7 @@ import { Experience as ExperienceType } from '../../types';
 import { LanguageContextType } from '../languageProvider';
 import ExperienceItem from './experienceItem';
 import About from './about';
-import styles from './Experience.module.css';
+import styles from './experience.module.css';
 
 //Context consumer for class components
 import { LanguageContext } from '../languageProvider';
