@@ -4,12 +4,21 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(308deg, rgb(0, 0, 0) 11%, rgb(47, 47, 47) 79%, rgb(115, 115, 115) 100%);
+  background-size: 100% 100%;
+  background-position: 0px 0px, 0px 0px, 0px 0px;
+  background-image: radial-gradient(60% 60% at 100% 0%, #FFFFFF85 0%, #F000 100%),
+    radial-gradient(80% 80% at 0% 100%, #FFFFFF85 0%, #F000 100%),
+    radial-gradient(142% 91% at 111% 84%, #000 0%, #0B0B0B 100%);
+  height: 100vh;
 }
 
 .homeContainer {
+  --margin : 170px;
   position: relative;
   z-index: 10;
+  height: calc(100% - var(--margin));
+  width: calc(100% - var(--margin));
+  border: var(--border-width-md) solid var(--color-border-primary);
 }
 
 .content {
@@ -22,9 +31,6 @@
 }
 
 .titleWrapper {
-  margin-bottom: 4rem;
-  border: 2px solid #ffffff;
-  padding: 2rem;
   position: relative;
   max-width: 800px;
   width: 100%;
@@ -78,6 +84,21 @@
   background-size: 50px 50px;
   z-index: 1;
   pointer-events: none;
+}
+
+.grainOverlay {
+  /* display: none; */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/textures/grain.png');
+  background-size: var(--grain-size);
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: var(--grain-opacity);
 }
 
 @media (max-width: 768px) {

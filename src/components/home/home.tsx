@@ -9,16 +9,10 @@ function Home(): JSX.Element {
 
   return (
     <section id="home" className={`section ${styles.homeSection}`}>
-
-      {/* 
-     {
-        mix-blend-mode: color-dodge;
-        position: absolute; 
-        <img src="/textures/grain.png" alt="noise" className={styles.noise} />
-  */}
-
+      <div className={styles.grainOverlay}></div>
 
       <div className={`container ${styles.homeContainer}`}>
+
         <motion.div
           className={styles.content}
           initial={{ opacity: 0 }}
@@ -40,6 +34,8 @@ function Home(): JSX.Element {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8, duration: 0.8 }}
           >
+            <div className={styles.gridOverlay}></div>
+
             <div className={styles.subtitle}>
               <div className={styles.part1}>{name.slice(0, name.length - 1).join(' ')}</div>
               <div className={styles.part2}>{name[name.length - 1]}</div>
@@ -48,7 +44,6 @@ function Home(): JSX.Element {
           </motion.div>
         </motion.div>
       </div>
-      <div className={styles.gridOverlay}></div>
     </section>
   );
 }

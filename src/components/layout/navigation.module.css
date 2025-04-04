@@ -15,13 +15,14 @@
 
 .navigation {
   border: var(--border-width-sm) solid var(--color-gray-medium);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--filter-blur));
+  background-color: var(--semi-transparent-dark);
   display: flex;
   flex-direction: column;
   justify-content: center;
   border-top-right-radius: var(--border-radius-lg);
   border-bottom-right-radius: var(--border-radius-lg);
-  transition: border 0.3s;
+  transition: border-radius 0.3s;
 }
 
 .navItem {
@@ -87,12 +88,13 @@
   transition: opacity 0.3s, transform 0.3s;
   margin-left: 10px;
   z-index: 101;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(var(--filter-blur));
   border: var(--border-width-sm) solid var(--color-gray-medium);
   letter-spacing: var(--letter-spacing-normal);
   text-transform: uppercase;
   transition-delay: var(--tootip-delay);
   visibility: hidden;
+  background-color: var(--semi-transparent-dark);
 }
 
 .tooltip::before {
@@ -103,5 +105,5 @@
   transform: translateY(-50%);
   border-width: 5px 5px 5px 0;
   border-style: solid;
-  border-color: transparent rgba(0, 0, 0, 0.8) transparent transparent;
+  border-color: transparent var(--color-gray-medium) transparent transparent;
 }

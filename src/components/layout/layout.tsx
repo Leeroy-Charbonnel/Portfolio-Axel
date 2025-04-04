@@ -32,7 +32,7 @@ class Layout extends Component<LayoutProps> {
           <link rel="icon" href="/favicon.ico" />
         </Head>
 
-        <button className="language-switch" onClick={toggleLanguage} aria-label="Toggle language">{language === 'en' ? 'FR / EN' : 'EN / FR'}</button>
+        <button className="language-switch" onClick={toggleLanguage} aria-label="Toggle language">{language === 'en' ? 'EN / FR' : 'FR / EN'}</button>
 
         <Navigation sections={sections} />
         <main>{children}</main>

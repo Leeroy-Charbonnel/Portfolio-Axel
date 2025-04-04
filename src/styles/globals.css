@@ -9,8 +9,11 @@
   --grid-size: 1rem;
   --border-width: 1px;
 
+  --grain-size: 150px;
+  --grain-opacity: 0.8;
 
-
+  --semi-transparent-dark: #0000003d;
+  --filter-blur: 6px;
 
   /* Colors */
   --color-text: #ffffff;
@@ -85,21 +88,19 @@
 
 
   /* Tooltip */
-  --tootip-delay:0.7s;
+  --tootip-delay: 0.7s;
 
 }
 
 
 
 * {
-  box-sizing: border-box;
   padding: 0;
   margin: 0;
 }
 
 html,
 body {
-  max-width: 100vw;
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--color-gray-light) var(--color-background);
@@ -108,64 +109,12 @@ body {
 body {
   color: var(--color-text);
   background-color: var(--color-background);
-  background-image: url('/textures/grain.png');
-  background-repeat: repeat;
   font-family: 'Montserrat', sans-serif;
   line-height: 1.6;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
 
-.container {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-.section {
-  min-height: 100vh;
-  padding: 5rem 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.grid-background {
-  background-image: linear-gradient(to right, var(--color-gray-dark) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--color-gray-dark) 1px, transparent 1px);
-  background-size: var(--grid-size) var(--grid-size);
-}
-
-.border-white {
-  border: var(--border-width) solid var(--color-text);
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-}
-
-/* Section specific styles */
-#home {
-  position: relative;
-}
-
-/* Language switch button */
 .language-switch {
   position: fixed;
   top: 2rem;
@@ -186,19 +135,8 @@ h6 {
   color: var(--color-background);
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .container {
-    padding: 0 1rem;
-  }
-
-  .section {
-    padding: 3rem 0;
-  }
-}
 
 button {
   background: transparent;
   border: none;
 }
-

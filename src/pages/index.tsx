@@ -49,10 +49,10 @@ function HomePage(props: HomePageProps): JSX.Element {
       <Layout>
         <Home />
 
+        <MainProjects projects={props.mainProjects} />
 
 
         {/*
-        <MainProjects projects={props.mainProjects} />
         <ProjectGallery projects={props.galleryProjects} />
         <Experience
           experiences={props.experiences}

@@ -22,7 +22,7 @@ export default class Navigation extends Component<NavigationProps, NavigationSta
     super(props);
     this.state = {
       activeSection: 'home',
-      isExpanded: true
+      isExpanded: false
     };
   }
 

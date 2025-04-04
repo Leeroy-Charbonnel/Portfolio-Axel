@@ -1,63 +1,80 @@
 {
+  "software": {
+    "Blender": {
+      "logo": "/images/logos/blender-logo.png",
+      "url": "https://www.blender.org/"
+    },
+    "Substance": {
+      "logo": "/images/logos/substance-logo.png",
+      "url": "https://www.substance3d.com/"
+    },
+    "Photoshop": {
+      "logo": "/images/logos/photoshop-logo.png",
+      "url": "https://www.adobe.com/products/photoshop.html"
+    }
+  },
   "mainProjects": [
     {
-      "id": "porte-clef",
+      "id": "sample-project-1",
+      "imageFolder": "sample-project-1",
       "title": {
-        "en": "Key Holder",
-        "fr": "Porte Clef"
+        "en": "Sample Project 1",
+        "fr": "Projet Exemple 1"
       },
       "description": {
-        "en": "A 3D model of a fantastical key holder with special effects.",
-        "fr": "Un modèle 3D d'un porte-clefs fantastique avec des effets spéciaux."
+        "en": "Incredibly amazing description of a 3D model, what a sick description  .",
+        "fr": "Description incroyable d'un modele 3D de folie, si ca c'est pas une description de fou"
       },
-      "mainImage": "/images/projects/porte-clef-main.png",
+      "3DModelLink": "https://sketchfab.com/3d-models/small-shop-diorama-722948cf9eac4c8e9fa9be16485bce8e",
       "thumbnails": [
         {
-          "src": "/images/projects/porte-clef-thumb1.png",
-          "alt": "Key holder detail 1"
+          "src": "thumbnail1.png",
+          "alt": "Sample project 1 detail 1"
         },
         {
-          "src": "/images/projects/porte-clef-thumb2.png",
-          "alt": "Key holder detail 2"
+          "src": "thumbnail2.png",
+          "alt": "Sample project 1 detail 2"
         },
         {
-          "src": "/images/projects/porte-clef-thumb3.png",
-          "alt": "Key holder detail 3"
+          "src": "thumbnail3.png",
+          "alt": "Sample project 1 detail 3"
         }
       ],
       "stats": {
         "vertices": 46091,
         "edges": 92096,
-        "faces": 46060,
-        "triangles": 92064
+        "faces": 46060
       },
-      "software": ["Ai", "Ps", "Blender"],
-      "template": "template1",
-      "wireframeImage": "/images/projects/porte-clef-wireframe.png"
+      "software": [
+        "Blender",
+        "Substance",
+        "Photoshop"
+      ],
+      "template": "template1"
     },
     {
-      "id": "pixel-art",
+      "id": "sample-project-2",
       "title": {
-        "en": "Dystopian Pixel Art",
-        "fr": "Pixel Art Dystopique"
+        "en": "Sample Project 2",
+        "fr": "Projet Exemple 2"
       },
       "description": {
-        "en": "A dystopian scene created with pixel art techniques.",
-        "fr": "Une scène dystopique créée avec des techniques de pixel art."
+        "en": "Still an awesome description, i'm a fine writter",
+        "fr": "Toujours une description de fantastiqeu, je suis un auteur"
       },
-      "mainImage": "/images/projects/pixel-art-main.png",
+      "3DModelLink": "https://sketchfab.com/3d-models/stylized-ice-coffees-pack-67c75da8e9fa43429a7437e883297f43",
       "thumbnails": [
         {
-          "src": "/images/projects/pixel-art-thumb1.png",
-          "alt": "Pixel art detail 1"
+          "src": "thumbnail1.png",
+          "alt": "Sample project 2 detail 1"
         },
         {
-          "src": "/images/projects/pixel-art-thumb2.png",
-          "alt": "Pixel art detail 2"
+          "src": "thumbnail2.png",
+          "alt": "Sample project 2 detail 2"
         },
         {
-          "src": "/images/projects/pixel-art-thumb3.png",
-          "alt": "Pixel art detail 3"
+          "src": "thumbnail3.png",
+          "alt": "Sample project 2 detail 3"
         }
       ],
       "stats": {
@@ -66,33 +83,35 @@
         "faces": 25550,
         "triangles": 51100
       },
-      "software": ["Ps", "Blender"],
-      "template": "template2",
-      "wireframeImage": "/images/projects/pixel-art-wireframe.png"
+      "software": [
+        "Photoshop",
+        "Blender"
+      ],
+      "template": "template2"
     },
     {
-      "id": "dinosaures",
+      "id": "sample-project-3",
       "title": {
-        "en": "Dinosaurs",
-        "fr": "Dinosaures"
+        "en": "Sample Project 3",
+        "fr": "Projet Exemple 3"
       },
       "description": {
-        "en": "3D models of various dinosaur species with realistic textures.",
-        "fr": "Modèles 3D de diverses espèces de dinosaures avec des textures réalistes."
+        "en": "Last but not least, a description ! as well written as the previous ones",
+        "fr": "Dernier mais pas des moindres, une description ! bien ecrite comme les precedente"
       },
-      "mainImage": "/images/projects/dinosaures-main.png",
+      "3DModelLink": "https://sketchfab.com/3d-models/old-computers-7bb6e720499a467b8e0427451d180063",
       "thumbnails": [
         {
-          "src": "/images/projects/dinosaures-thumb1.png",
-          "alt": "Dinosaur model detail 1"
+          "src": "thumbnail1.png",
+          "alt": "Sample project 3 detail 1"
         },
         {
-          "src": "/images/projects/dinosaures-thumb2.png",
-          "alt": "Dinosaur model detail 2"
+          "src": "thumbnail2.png",
+          "alt": "Sample project 3 detail 2"
         },
         {
-          "src": "/images/projects/dinosaures-thumb3.png",
-          "alt": "Dinosaur model detail 3"
+          "src": "thumbnail3.png",
+          "alt": "Sample project 3 detail 3"
         }
       ],
       "stats": {
@@ -101,114 +120,82 @@
         "faces": 85650,
         "triangles": 171300
       },
-      "software": ["Blender", "Substance"],
-      "template": "template1",
-      "wireframeImage": "/images/projects/dinosaures-wireframe.png"
-    },
-    {
-      "id": "space-marine",
-      "title": {
-        "en": "Space Marine",
-        "fr": "Space Marine"
-      },
-      "description": {
-        "en": "A detailed 3D model of a futuristic space marine character.",
-        "fr": "Un modèle 3D détaillé d'un personnage futuriste de marine spatiale."
-      },
-      "mainImage": "/images/projects/space-marine-main.png",
-      "thumbnails": [
-        {
-          "src": "/images/projects/space-marine-thumb1.png",
-          "alt": "Space marine detail 1"
-        },
-        {
-          "src": "/images/projects/space-marine-thumb2.png",
-          "alt": "Space marine detail 2"
-        },
-        {
-          "src": "/images/projects/space-marine-thumb3.png",
-          "alt": "Space marine detail 3"
-        }
+      "software": [
+        "Blender",
+        "ZBrush",
+        "Substance"
       ],
-      "stats": {
-        "vertices": 120500,
-        "edges": 241000,
-        "faces": 120480,
-        "triangles": 240960
-      },
-      "software": ["ZBrush", "Blender", "Substance"],
-      "template": "template2",
-      "wireframeImage": "/images/projects/space-marine-wireframe.png"
+      "template": "template1"
     }
   ],
   "galleryProjects": [
     {
-      "id": "project1",
+      "id": "sample-project-1",
       "title": {
-        "en": "Sci-Fi Helmet",
-        "fr": "Casque Sci-Fi"
+        "en": "Sample Project 1",
+        "fr": "Projet Exemple 1"
       },
-      "thumbnail": "/images/gallery/project1.png",
+      "thumbnail": "/images/gallery/sample-project-1.png",
       "stats": {
-        "vertices": 32000,
-        "edges": 64000
+        "vertices": 46091,
+        "edges": 92096
       }
     },
     {
-      "id": "project2",
+      "id": "sample-project-2",
       "title": {
-        "en": "Fantasy Sword",
-        "fr": "Épée de Fantasy"
+        "en": "Sample Project 2",
+        "fr": "Projet Exemple 2"
       },
-      "thumbnail": "/images/gallery/project2.png",
+      "thumbnail": "/images/gallery/sample-project-2.png",
       "stats": {
-        "vertices": 18500,
-        "edges": 37000
+        "vertices": 25600,
+        "edges": 51200
       }
     },
     {
-      "id": "project3",
+      "id": "sample-project-3",
       "title": {
-        "en": "Futuristic City",
-        "fr": "Ville Futuriste"
+        "en": "Sample Project 3",
+        "fr": "Projet Exemple 3"
       },
-      "thumbnail": "/images/gallery/project3.png",
+      "thumbnail": "/images/gallery/sample-project-3.png",
       "stats": {
-        "vertices": 250000,
-        "edges": 500000
+        "vertices": 85700,
+        "edges": 171400
       }
     },
     {
-      "id": "project4",
+      "id": "sample-project-4",
       "title": {
-        "en": "Robot Character",
-        "fr": "Personnage Robot"
+        "en": "Sample Project 4",
+        "fr": "Projet Exemple 4"
       },
-      "thumbnail": "/images/gallery/project4.png",
+      "thumbnail": "/images/gallery/sample-project-4.png",
       "stats": {
         "vertices": 75000,
         "edges": 150000
       }
     },
     {
-      "id": "project5",
+      "id": "sample-project-5",
       "title": {
-        "en": "Fantasy Environment",
-        "fr": "Environnement Fantasy"
+        "en": "Sample Project 5",
+        "fr": "Projet Exemple 5"
       },
-      "thumbnail": "/images/gallery/project5.png",
+      "thumbnail": "/images/gallery/sample-project-5.png",
       "stats": {
         "vertices": 180000,
         "edges": 360000
       }
     },
     {
-      "id": "project6",
+      "id": "sample-project-6",
       "title": {
-        "en": "Alien Creature",
-        "fr": "Créature Alien"
+        "en": "Sample Project 6",
+        "fr": "Projet Exemple 6"
       },
-      "thumbnail": "/images/gallery/project6.png",
+      "thumbnail": "/images/gallery/sample-project-6.png",
       "stats": {
         "vertices": 45000,
         "edges": 90000
