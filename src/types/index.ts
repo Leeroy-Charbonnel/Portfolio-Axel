@@ -3,7 +3,6 @@ export interface ProjectStats {
   vertices: number;
   edges: number;
   faces?: number;
-  triangles?: number;
 }
 
 export interface ProjectThumbnail {
@@ -13,6 +12,7 @@ export interface ProjectThumbnail {
 
 export interface Project {
   id: string;
+  imageFolder: string;
   title: {
     en: string;
     fr: string;
@@ -21,12 +21,11 @@ export interface Project {
     en: string;
     fr: string;
   };
-  mainImage: string;
+  modelLink: string;
   thumbnails: ProjectThumbnail[];
   stats: ProjectStats;
   software: string[];
-  template: 'template1' | 'template2'; // Different layout templates
-  wireframeImage: string; // For hover effect
+  template: 'template1' | 'template2';
 }
 
 // Language type

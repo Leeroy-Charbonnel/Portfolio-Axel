@@ -1,3 +1,5 @@
+// https://colorgradient.dev/gradient-generator/
+
 import React, { JSX } from 'react';
 import type { GetStaticProps } from 'next';
 import fs from 'fs';
