@@ -71,7 +71,15 @@ class MainProject extends Component<MainProjectProps, MainProjectState> {
     const mainImagePath = `/images/projects/${project.imageFolder}/main.png`;
     const wireframeImagePath = `/images/projects/${project.imageFolder}/main-wireframe.png`;
 
-    let sketchfabEmbedUrl = `https://sketchfab.com/models/${project.modelId}/embed?autospin=0&autostart=1&ui_theme=dark}`;
+
+    let sketchfabEmbedUrl = `https://sketchfab.com/models/${project.modelId}/embed?autospin=0&autostart=1&ui_theme=dark`;
+
+
+    console.log({
+      mainImagePath,
+      wireframeImagePath
+    });
+
 
     const layoutClassName = this.getLayoutClassName(index);
 
