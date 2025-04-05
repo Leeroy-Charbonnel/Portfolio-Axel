@@ -31,6 +31,10 @@ export interface Project {
   software: string[];
 }
 
+export interface Software {
+  logo: string;
+  url: string;
+}
 // Language type
 export type Language = 'en' | 'fr';
 

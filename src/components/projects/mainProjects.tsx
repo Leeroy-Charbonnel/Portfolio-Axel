@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
 import MainProject from './mainProject';
-import { Project } from '../../types';
+import { Project, Software } from '../../types';
 import styles from './mainProjects.module.css';
 
 //Context consumer for class components
@@ -10,6 +10,7 @@ import { LanguageContext } from '../languageProvider';
 
 interface MainProjectsProps {
   projects: Project[];
+  softwares: Software[]
 }
 
 class MainProjects extends Component<MainProjectsProps> {
@@ -17,8 +18,7 @@ class MainProjects extends Component<MainProjectsProps> {
   context!: React.ContextType<typeof LanguageContext>;
 
   render() {
-    const { projects } = this.props;
-    //Get translation function from context
+    const { projects, softwares } = this.props;
     const { t } = this.context as LanguageContextType;
 
     return (
@@ -35,7 +35,7 @@ class MainProjects extends Component<MainProjectsProps> {
           
           <div className={styles.projectsList}>
             {projects.map((project, index) => (
-              <MainProject key={project.id} project={project} index={index} />
+              <MainProject key={project.id} project={project} softwares={softwares} index={index} />
             ))}
           </div>
         </div>

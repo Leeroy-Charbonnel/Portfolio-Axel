@@ -11,6 +11,10 @@
     "Photoshop": {
       "logo": "/images/logos/photoshop-logo.png",
       "url": "https://www.adobe.com/products/photoshop.html"
+    },
+    "Illustrator": {
+      "logo": "/images/logos/illustrator-logo.png",
+      "url": "https://www.adobe.com/products/illustrator.html"
     }
   },
   "mainProjects": [

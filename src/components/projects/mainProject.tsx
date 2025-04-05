@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Grid } from 'lucide-react';
-import { Project } from '../../types';
+import { Project, Software } from '../../types';
 import { LanguageContextType } from '../languageProvider';
 import ProjectStats from '../projects/projectStats';
 import styles from './mainProject.module.css';
@@ -12,6 +12,7 @@ import { LanguageContext } from '../languageProvider';
 
 interface MainProjectProps {
   project: Project;
+  softwares: Software[];
   index: number;
 }
 
@@ -63,7 +64,7 @@ class MainProject extends Component<MainProjectProps, MainProjectState> {
   }
 
   render() {
-    const { project, index } = this.props;
+    const { project, softwares, index } = this.props;
     const { showWireframe, sketchfabWireframe, sketchfabLoaded, iframeKey } = this.state;
 
     const { language, t } = this.context as LanguageContextType;
@@ -74,10 +75,10 @@ class MainProject extends Component<MainProjectProps, MainProjectState> {
 
     let sketchfabEmbedUrl = `https://sketchfab.com/models/${project.modelId}/embed?autospin=0&autostart=1&ui_theme=dark`;
 
-
     console.log({
       mainImagePath,
-      wireframeImagePath
+      wireframeImagePath,
+      project, softwares, index 
     });
 
 
@@ -152,9 +153,9 @@ class MainProject extends Component<MainProjectProps, MainProjectState> {
                   <Image
                     src={showWireframe
                       ? thumbnail.srcWireframe
-                        ? `/images/projects/${project.imageFolder}/${thumbnail.srcWireframe}.png`
+                        ? `/images/projects/${project.imageFolder}/${thumbnail.srcWireframe}`
                         : wireframeImagePath
-                      : `/images/projects/${project.imageFolder}/${thumbnail.src}.png`}
+                      : `/images/projects/${project.imageFolder}/${thumbnail.src}`}
                     alt={thumbnail.alt}
                     width={200}
                     height={150}
