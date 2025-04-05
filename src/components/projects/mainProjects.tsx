@@ -10,7 +10,7 @@ import { LanguageContext } from '../languageProvider';
 
 interface MainProjectsProps {
   projects: Project[];
-  softwares: Software[]
+  softwares: Record<string, Software>;
 }
 
 class MainProjects extends Component<MainProjectsProps> {
@@ -32,10 +32,15 @@ class MainProjects extends Component<MainProjectsProps> {
           >
             <h2 className={styles.sectionTitle}>{t('projects.title')}</h2>
           </motion.div>
-          
+
           <div className={styles.projectsList}>
             {projects.map((project, index) => (
-              <MainProject key={project.id} project={project} softwares={softwares} index={index} />
+              <MainProject
+                key={project.id}
+                project={project}
+                softwares={softwares}
+                index={index}
+              />
             ))}
           </div>
         </div>

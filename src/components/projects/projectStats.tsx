@@ -24,7 +24,6 @@ class ProjectStats extends Component<ProjectStatsProps> {
 
   render() {
     const { stats } = this.props;
-    //Get translation function from context
     const { t } = this.context as LanguageContextType;
 
     const statItems = [

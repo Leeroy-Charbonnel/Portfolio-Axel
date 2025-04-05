@@ -14,7 +14,7 @@ import { Project, Experience as ExperienceType, Software } from '../types';
 //Explicitly define props interface
 interface HomePageProps {
   mainProjects: Project[];
-  softwares: Software[];
+  softwares: Record<string, Software>;
   galleryProjects: {
     id: string;
     title: {
@@ -49,8 +49,8 @@ function HomePage(props: HomePageProps): JSX.Element {
       <Layout>
         <Home />
         <MainProjects projects={props.mainProjects} softwares={props.softwares} />
-        {/* <ProjectGallery projects={props.galleryProjects} /> */}
-        {/* <Experience
+        {/* <ProjectGallery projects={props.galleryProjects} />
+        <Experience
           experiences={props.experiences}
           about={props.about}
           contact={props.contact}
@@ -75,7 +75,7 @@ export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
     return {
       props: {
         mainProjects: projectsData.mainProjects || [],
-        softwares:projectsData.software || [],
+        softwares: projectsData.software || {},
         galleryProjects: projectsData.galleryProjects || [],
         experiences: experienceData.experiences || [],
         about: experienceData.about || { en: '', fr: '' },
@@ -88,7 +88,7 @@ export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
     return {
       props: {
         mainProjects: [],
-        softwares: [],
+        softwares: {},
         galleryProjects: [],
         experiences: [],
         about: { en: '', fr: '' },

@@ -8,12 +8,11 @@ export interface ProjectStats {
 
 export interface ProjectThumbnail {
   src: string;
-  srcWireframe?: string; // Path to wireframe version of the thumbnail
+  srcWireframe: string;
   alt: string;
 }
 
 export interface Project {
-  modelId: any;
   id: string;
   imageFolder: string;
   title: {
@@ -24,9 +23,9 @@ export interface Project {
     en: string;
     fr: string;
   };
-  modelLink: string;
+  modelId: string;
   thumbnails: ProjectThumbnail[];
-  wireframeImage?: string; // Optional path to main wireframe image
+  wireframeImage: string;
   stats: ProjectStats;
   software: string[];
 }
@@ -35,10 +34,10 @@ export interface Software {
   logo: string;
   url: string;
 }
-// Language type
+
+
 export type Language = 'en' | 'fr';
 
-// Experience Type
 export interface Experience {
   period: string;
   title: {
@@ -53,7 +52,6 @@ export interface Experience {
   };
 }
 
-// Navigation Item Type
 export interface NavItem {
   id: string;
   label: {
