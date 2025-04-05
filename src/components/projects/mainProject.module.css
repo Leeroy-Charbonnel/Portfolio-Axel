@@ -83,6 +83,13 @@
   transition: all 0.3s ease;
   margin-bottom: 1rem;
   align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wireframeIcon {
+  opacity: 0.8;
 }
 
 .wireframeButton:hover {
@@ -167,21 +174,73 @@
   line-height: 1.8;
 }
 
-/* Template variations */
-.template1 .modelSection {
+/* Layout variations based on index (0, 1, 2) */
+
+/* Layout 0: view on center-left, 3 thumbnails stacked on right */
+.layout0 .modelSection {
   flex-direction: row;
 }
 
-.template2 .modelSection {
+.layout0 .modelContainer {
+  flex: 0 0 65%;
+}
+
+.layout0 .thumbnailsContainer {
+  flex: 0 0 30%;
+  flex-direction: column;
+}
+
+/* Layout 1: view on center-right, 3 thumbnails stacked on left */
+.layout1 .modelSection {
   flex-direction: row-reverse;
 }
 
+.layout1 .modelContainer {
+  flex: 0 0 65%;
+}
+
+.layout1 .thumbnailsContainer {
+  flex: 0 0 30%;
+  flex-direction: column;
+}
+
+/* Layout 2: view in center, 3 thumbnails aligned below */
+.layout2 .modelSection {
+  flex-direction: column;
+}
+
+.layout2 .modelContainer {
+  width: 100%;
+}
+
+.layout2 .thumbnailsContainer {
+  width: 100%;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.layout2 .thumbnailWrapper {
+  flex: 0 0 31%;
+}
+
 @media (max-width: 1200px) {
-  .modelSection {
-    flex-direction: column !important;
+  .layout0 .modelSection,
+  .layout1 .modelSection {
+    flex-direction: column;
   }
   
-  .modelContainer, .imagesSection {
+  .layout2 .thumbnailsContainer {
+    flex-wrap: wrap;
+  }
+  
+  .layout2 .thumbnailWrapper {
+    flex: 0 0 48%;
+    margin-bottom: 1rem;
+  }
+
+  .modelContainer, 
+  .imagesSection,
+  .thumbnailsContainer {
     width: 100%;
   }
 }
@@ -200,12 +259,18 @@
     margin-bottom: 6rem;
   }
   
-  .thumbnailsContainer {
+  .layout0 .thumbnailsContainer,
+  .layout1 .thumbnailsContainer,
+  .layout2 .thumbnailsContainer {
     flex-direction: row;
     overflow-x: auto;
   }
   
   .thumbnailWrapper {
     min-width: 150px;
+  }
+  
+  .layout2 .thumbnailWrapper {
+    flex: 0 0 100%;
   }
 }

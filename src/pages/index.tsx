@@ -1,5 +1,3 @@
-// https://colorgradient.dev/gradient-generator/
-
 import React, { JSX } from 'react';
 import type { GetStaticProps } from 'next';
 import fs from 'fs';
@@ -44,24 +42,19 @@ interface HomePageProps {
   };
 }
 
-//Home page component using function declaration
 function HomePage(props: HomePageProps): JSX.Element {
   return (
     <LanguageProvider>
       <Layout>
         <Home />
-
         <MainProjects projects={props.mainProjects} />
-
-
-        {/*
         <ProjectGallery projects={props.galleryProjects} />
         <Experience
           experiences={props.experiences}
           about={props.about}
           contact={props.contact}
           interests={props.interests}
-        /> */}
+        />
       </Layout>
     </LanguageProvider>
   );

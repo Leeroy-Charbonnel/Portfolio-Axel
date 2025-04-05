@@ -3,14 +3,17 @@ export interface ProjectStats {
   vertices: number;
   edges: number;
   faces?: number;
+  triangles?: number;
 }
 
 export interface ProjectThumbnail {
   src: string;
+  srcWireframe?: string; // Path to wireframe version of the thumbnail
   alt: string;
 }
 
 export interface Project {
+  modelId: any;
   id: string;
   imageFolder: string;
   title: {
@@ -23,9 +26,9 @@ export interface Project {
   };
   modelLink: string;
   thumbnails: ProjectThumbnail[];
+  wireframeImage?: string; // Optional path to main wireframe image
   stats: ProjectStats;
   software: string[];
-  template: 'template1' | 'template2';
 }
 
 // Language type

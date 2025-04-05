@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { Grid } from 'lucide-react';
 import { Project } from '../../types';
 import { LanguageContextType } from '../languageProvider';
 import ProjectStats from '../projects/projectStats';
@@ -17,18 +18,22 @@ interface MainProjectProps {
 interface MainProjectState {
   showWireframe: boolean;
   sketchfabWireframe: boolean;
+  sketchfabLoaded: boolean;
   iframeKey: number; // Used to force iframe recreation
 }
 
 class MainProject extends Component<MainProjectProps, MainProjectState> {
   static contextType = LanguageContext;
   context!: React.ContextType<typeof LanguageContext>;
+  sketchfabClient: any = null;
+  originalMaterials: any[] = [];
 
   constructor(props: MainProjectProps) {
     super(props);
     this.state = {
       showWireframe: false,
       sketchfabWireframe: false,
+      sketchfabLoaded: false,
       iframeKey: 0
     };
   }
@@ -48,47 +53,39 @@ class MainProject extends Component<MainProjectProps, MainProjectState> {
     }));
   }
 
-  extractModelId(url: string): string {
-    //Extract the model ID from different Sketchfab URL formats
-    const regex = /models\/([a-zA-Z0-9]+)/;
-    const match = url.match(regex);
-    return match ? match[1] : '';
+  handleIframeLoad = () => {
+    this.setState({ sketchfabLoaded: true });
+  }
+
+  getLayoutClassName(index: number): string {
+    const layoutType = index % 3;
+    return styles[`layout${layoutType}`];
   }
 
   render() {
     const { project, index } = this.props;
-    const { showWireframe, sketchfabWireframe, iframeKey } = this.state;
+    const { showWireframe, sketchfabWireframe, sketchfabLoaded, iframeKey } = this.state;
 
     const { language, t } = this.context as LanguageContextType;
 
-    const isTemplateOne = project.template === 'template1';
+    const mainImagePath = `/images/projects/${project.imageFolder}/main.png`;
+    const wireframeImagePath = `/images/projects/${project.imageFolder}/main-wireframe.png`;
 
-    // Fixed image paths to match your directory structure
-    const mainImagePath = `/images/projects/${project.imageFolder || project.id}/main.png`;
-    
-    // Create Sketchfab embed URL with proper parameters for wireframe
-    let sketchfabEmbedUrl = '';
-    if (project.modelLink) {
-      // Extract the model ID and construct the official embed URL
-      const modelId = this.extractModelId(project.modelLink);
-      sketchfabEmbedUrl = `https://sketchfab.com/models/${modelId}/embed?autospin=0&autostart=1&ui_theme=dark${sketchfabWireframe ? '&wireframe=1' : ''}`;
-    }
+    let sketchfabEmbedUrl = `https://sketchfab.com/models/${project.modelId}/embed?autospin=0&autostart=1&ui_theme=dark}`;
+
+    const layoutClassName = this.getLayoutClassName(index);
 
     return (
       <motion.div
-        className={`${styles.projectContainer} ${isTemplateOne ? styles.template1 : styles.template2}`}
+        className={`${styles.projectContainer} ${layoutClassName}`}
         initial={{ opacity: 0, y: 100 }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
         viewport={{ once: true, margin: "-100px" }}
       >
         <div className={styles.projectHeader}>
-          <h3 className={styles.projectNumber}>
-            {String(index + 1).padStart(2, '0')}
-          </h3>
-          <h3 className={styles.projectTitle}>
-            {project.title[language]}
-          </h3>
+          <h3 className={styles.projectNumber}>{String(index + 1).padStart(2, '0')}</h3>
+          <h3 className={styles.projectTitle}>{project.title[language]}</h3>
         </div>
 
         <div className={styles.projectContent}>
@@ -96,64 +93,67 @@ class MainProject extends Component<MainProjectProps, MainProjectState> {
             {project.modelLink && (
               <div className={styles.modelContainer}>
                 <div className={styles.sketchfabContainer}>
-                  {/* Use key to force iframe recreation when toggling wireframe */}
                   <iframe
                     key={iframeKey}
                     title={`Sketchfab Model - ${project.title[language]}`}
                     className={styles.sketchfabEmbed}
                     src={sketchfabEmbedUrl}
+                    onLoad={this.handleIframeLoad}
                     frameBorder="0"
                     allowFullScreen
                     allow="autoplay; fullscreen; xr-spatial-tracking"
-                    mozallowfullscreen="true"
-                    webkitallowfullscreen="true"
                   ></iframe>
                 </div>
-                <button 
+                <button
                   className={`${styles.wireframeButton} ${sketchfabWireframe ? styles.active : ''}`}
                   onClick={this.toggleSketchfabWireframe}
                 >
+                  <Grid size={16} className={styles.wireframeIcon} />
                   {sketchfabWireframe ? "Hide Wireframe" : "Show Wireframe"}
                 </button>
               </div>
             )}
-            
-            <div className={styles.imagesSection}>
-              <div
-                className={styles.projectImageContainer}
-                onMouseEnter={this.handleMouseEnter}
-                onMouseLeave={this.handleMouseLeave}
-              >
-                <Image
-                  src={showWireframe ? project.wireframeImage : mainImagePath}
-                  alt={project.title[language]}
-                  width={600}
-                  height={400}
-                  className={styles.projectMainImage}
-                  priority
-                />
-              </div>
 
-              <div className={styles.thumbnailsContainer}>
-                {project.thumbnails.map((thumbnail, idx) => (
-                  <div
-                    key={idx}
-                    className={styles.thumbnailWrapper}
-                    onMouseEnter={this.handleMouseEnter}
-                    onMouseLeave={this.handleMouseLeave}
-                  >
-                    <Image
-                      src={showWireframe 
-                        ? project.wireframeImage 
-                        : `/images/projects/${project.imageFolder || project.id}/${thumbnail.src}`}
-                      alt={thumbnail.alt}
-                      width={200}
-                      height={150}
-                      className={styles.thumbnailImage}
-                    />
-                  </div>
-                ))}
+            {(!project.modelLink || !sketchfabLoaded) && (
+              <div className={styles.imagesSection}>
+                <div
+                  className={styles.projectImageContainer}
+                  onMouseEnter={this.handleMouseEnter}
+                  onMouseLeave={this.handleMouseLeave}
+                >
+                  <Image
+                    src={showWireframe ? wireframeImagePath : mainImagePath}
+                    alt={project.title[language]}
+                    width={600}
+                    height={400}
+                    className={styles.projectMainImage}
+                    priority
+                  />
+                </div>
               </div>
+            )}
+
+            <div className={styles.thumbnailsContainer}>
+              {project.thumbnails.map((thumbnail, idx) => (
+                <div
+                  key={idx}
+                  className={styles.thumbnailWrapper}
+                  onMouseEnter={this.handleMouseEnter}
+                  onMouseLeave={this.handleMouseLeave}
+                >
+                  <Image
+                    src={showWireframe
+                      ? thumbnail.srcWireframe
+                        ? `/images/projects/${project.imageFolder}/${thumbnail.srcWireframe}.png`
+                        : wireframeImagePath
+                      : `/images/projects/${project.imageFolder}/${thumbnail.src}.png`}
+                    alt={thumbnail.alt}
+                    width={200}
+                    height={150}
+                    className={styles.thumbnailImage}
+                  />
+                </div>
+              ))}
             </div>
           </div>
 

@@ -22,24 +22,24 @@
         "fr": "Projet Exemple 1"
       },
       "description": {
-        "en": "Incredibly amazing description of a 3D model, what a sick description  .",
+        "en": "Incredibly amazing description of a 3D model, what a sick description.",
         "fr": "Description incroyable d'un modele 3D de folie, si ca c'est pas une description de fou"
       },
-      "modelLink": "https://sketchfab.com/models/3633c8c2b3844b33a9d10e4b0793b032/embed?autostart=1",
+      "modelId": "3633c8c2b3844b33a9d10e4b0793b032",
       "thumbnails": [
         {
           "src": "thumbnail1.png",
-          "srcWireframe": "thumbnail1Wireframe.png",
+          "srcWireframe": "thumbnail1-wireframe.png",
           "alt": "Sample project 1 detail 1"
         },
         {
           "src": "thumbnail2.png",
-          "srcWireframe": "thumbnail2Wireframe.png",
+          "srcWireframe": "thumbnail2-wireframe.png",
           "alt": "Sample project 1 detail 2"
         },
         {
           "src": "thumbnail3.png",
-          "srcWireframe": "thumbnail3Wireframe.png",
+          "srcWireframe": "thumbnail3-wireframe.png",
           "alt": "Sample project 1 detail 3"
         }
       ],
@@ -52,11 +52,11 @@
         "Blender",
         "Substance",
         "Photoshop"
-      ],
-      "template": "template1"
+      ]
     },
     {
       "id": "sample-project-2",
+      "imageFolder": "sample-project-2",
       "title": {
         "en": "Sample Project 2",
         "fr": "Projet Exemple 2"
@@ -65,21 +65,21 @@
         "en": "Still an awesome description, i'm a fine writter",
         "fr": "Toujours une description de fantastiqeu, je suis un auteur"
       },
-      "modelLink": "https://sketchfab.com/models/c1e00825937b4b01a7d194336566eb9b/embed?autostart=1",
+      "modelId": "c1e00825937b4b01a7d194336566eb9b",
       "thumbnails": [
         {
           "src": "thumbnail1.png",
-          "srcWireframe": "thumbnail1Wireframe.png",
+          "srcWireframe": "thumbnail1-wireframe.png",
           "alt": "Sample project 2 detail 1"
         },
         {
           "src": "thumbnail2.png",
-          "srcWireframe": "thumbnail2Wireframe.png",
+          "srcWireframe": "thumbnail2-wireframe.png",
           "alt": "Sample project 2 detail 2"
         },
         {
           "src": "thumbnail3.png",
-          "srcWireframe": "thumbnail3Wireframe.png",
+          "srcWireframe": "thumbnail3-wireframe.png",
           "alt": "Sample project 2 detail 3"
         }
       ],
@@ -92,11 +92,11 @@
       "software": [
         "Photoshop",
         "Blender"
-      ],
-      "template": "template2"
+      ]
     },
     {
       "id": "sample-project-3",
+      "imageFolder": "sample-project-3",
       "title": {
         "en": "Sample Project 3",
         "fr": "Projet Exemple 3"
@@ -105,21 +105,21 @@
         "en": "Last but not least, a description ! as well written as the previous ones",
         "fr": "Dernier mais pas des moindres, une description ! bien ecrite comme les precedente"
       },
-      "modelLink": "https://sketchfab.com/models/c0bde64524c0426ea6cd74cee2dc9707/embed?autostart=1",
+      "modelId": "c0bde64524c0426ea6cd74cee2dc9707",
       "thumbnails": [
         {
           "src": "thumbnail1.png",
-          "srcWireframe": "thumbnail1Wireframe.png",
+          "srcWireframe": "thumbnail1-wireframe.png",
           "alt": "Sample project 3 detail 1"
         },
         {
           "src": "thumbnail2.png",
-          "srcWireframe": "thumbnail2Wireframe.png",
+          "srcWireframe": "thumbnail2-wireframe.png",
           "alt": "Sample project 3 detail 2"
         },
         {
           "src": "thumbnail3.png",
-          "srcWireframe": "thumbnail3Wireframe.png",
+          "srcWireframe": "thumbnail3-wireframe.png",
           "alt": "Sample project 3 detail 3"
         }
       ],
@@ -133,8 +133,7 @@
         "Blender",
         "ZBrush",
         "Substance"
-      ],
-      "template": "template1"
+      ]
     }
   ],
   "galleryProjects": [
@@ -144,7 +143,8 @@
         "en": "Sample Project 1",
         "fr": "Projet Exemple 1"
       },
-      "thumbnail": "/images/gallery/sample-project-1.png",
+      "imageFolder": "sample-project-1",
+      "thumbnail": "main.png",
       "stats": {
         "vertices": 46091,
         "edges": 92096
@@ -156,7 +156,8 @@
         "en": "Sample Project 2",
         "fr": "Projet Exemple 2"
       },
-      "thumbnail": "/images/gallery/sample-project-2.png",
+      "imageFolder": "sample-project-2",
+      "thumbnail": "main.png",
       "stats": {
         "vertices": 25600,
         "edges": 51200
@@ -168,7 +169,8 @@
         "en": "Sample Project 3",
         "fr": "Projet Exemple 3"
       },
-      "thumbnail": "/images/gallery/sample-project-3.png",
+      "imageFolder": "sample-project-3",
+      "thumbnail": "main.png",
       "stats": {
         "vertices": 85700,
         "edges": 171400
@@ -180,7 +182,8 @@
         "en": "Sample Project 4",
         "fr": "Projet Exemple 4"
       },
-      "thumbnail": "/images/gallery/sample-project-4.png",
+      "imageFolder": "sample-project-4",
+      "thumbnail": "main.png",
       "stats": {
         "vertices": 75000,
         "edges": 150000
@@ -192,7 +195,8 @@
         "en": "Sample Project 5",
         "fr": "Projet Exemple 5"
       },
-      "thumbnail": "/images/gallery/sample-project-5.png",
+      "imageFolder": "sample-project-5",
+      "thumbnail": "main.png",
       "stats": {
         "vertices": 180000,
         "edges": 360000
@@ -204,7 +208,8 @@
         "en": "Sample Project 6",
         "fr": "Projet Exemple 6"
       },
-      "thumbnail": "/images/gallery/sample-project-6.png",
+      "imageFolder": "sample-project-6",
+      "thumbnail": "main.png",
       "stats": {
         "vertices": 45000,
         "edges": 90000
