@@ -29,14 +29,17 @@
       "thumbnails": [
         {
           "src": "thumbnail1.png",
+          "srcWireframe": "thumbnail1Wireframe.png",
           "alt": "Sample project 1 detail 1"
         },
         {
           "src": "thumbnail2.png",
+          "srcWireframe": "thumbnail2Wireframe.png",
           "alt": "Sample project 1 detail 2"
         },
         {
           "src": "thumbnail3.png",
+          "srcWireframe": "thumbnail3Wireframe.png",
           "alt": "Sample project 1 detail 3"
         }
       ],
@@ -66,14 +69,17 @@
       "thumbnails": [
         {
           "src": "thumbnail1.png",
+          "srcWireframe": "thumbnail1Wireframe.png",
           "alt": "Sample project 2 detail 1"
         },
         {
           "src": "thumbnail2.png",
+          "srcWireframe": "thumbnail2Wireframe.png",
           "alt": "Sample project 2 detail 2"
         },
         {
           "src": "thumbnail3.png",
+          "srcWireframe": "thumbnail3Wireframe.png",
           "alt": "Sample project 2 detail 3"
         }
       ],
@@ -103,14 +109,17 @@
       "thumbnails": [
         {
           "src": "thumbnail1.png",
+          "srcWireframe": "thumbnail1Wireframe.png",
           "alt": "Sample project 3 detail 1"
         },
         {
           "src": "thumbnail2.png",
+          "srcWireframe": "thumbnail2Wireframe.png",
           "alt": "Sample project 3 detail 2"
         },
         {
           "src": "thumbnail3.png",
+          "srcWireframe": "thumbnail3Wireframe.png",
           "alt": "Sample project 3 detail 3"
         }
       ],
