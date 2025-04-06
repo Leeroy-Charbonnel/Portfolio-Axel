@@ -80,8 +80,8 @@
   --border-width-xl: 4px;
 
   /* Border Radius */
-  --border-radius-sm: 3px;
-  --border-radius-md: 4px;
+  --border-radius-sm: 1px;
+  --border-radius-md: 3px;
   --border-radius-lg: 12px;
   --border-radius-xl: 15px;
   --border-radius-full: 100vh;
@@ -179,4 +179,12 @@ button {
 
 .main {
   position: relative;
+}
+
+.border-sm{
+  border: var(--border-radius-sm) solid var(--color-border-primary);
+}
+
+.border-md{
+  border: var(--border-radius-md) solid var(--color-border-primary);
 }

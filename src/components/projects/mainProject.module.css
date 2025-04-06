@@ -1,352 +1,278 @@
+.projectWrapper {
+  width: 100%;
+  margin-bottom: 120px;
+}
+
 .projectContainer {
-  margin-bottom: 10rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 2rem;
-  background-color: rgba(0, 0, 0, 0.6);
-  position: relative;
+  width: 100%;
   max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
-  height: 90vh;
-  display: flex;
-  flex-direction: column;
+  margin: 0 auto;
+  padding: 0 20px;
 }
 
 .projectHeader {
   display: flex;
   align-items: center;
-  margin-bottom: 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 1rem;
+  margin-bottom: 30px;
 }
 
 .projectNumber {
-  font-size: 3rem;
-  font-weight: 900;
-  margin-right: 1.5rem;
-  font: 800 40px Arial;
-  -webkit-text-fill-color: transparent;
-  -webkit-text-stroke: 1px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #888;
+  margin-right: 16px;
 }
 
 .projectTitle {
   font-size: 2rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
-.projectContent {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* Model and Images Layout */
 .modelSection {
-  display: flex;
-  flex-direction: row;
-  gap: 2rem;
-  width: 100%;
   position: relative;
-  flex: 1;
-  min-height: 0;
+  margin-bottom: 40px;
+  width: 100%;
 }
 
 .modelContainer {
-  flex: 0 0 60%;
-  display: flex;
-  flex-direction: column;
   position: relative;
-  height: 100%;
-}
-
-.imagesSection {
-  flex: 0 0 60%;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  position: relative;
-  height: 100%;
-}
-
-.sketchfabContainer {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: #1a1a1a;
   overflow: hidden;
 }
 
-.sketchfabEmbed {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.wireframeButton {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-}
-
-.wireframeIcon {
-  opacity: 0.8;
-}
-
-.wireframeButton:hover {
-  background-color: rgba(50, 50, 50, 0.8);
-  transform: scale(1.05);
-}
-
-.wireframeButton.active {
-  background-color: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-.projectImageContainer {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
+.modelEmbed,
 .projectMainImage {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: all 0.3s ease;
 }
 
-.thumbnailsContainer {
+.wireframeButton {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  width: 40px;
+  height: 40px;
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  flex: 0 0 35%;
-  height: 100%;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.wireframeButton.active {
+  background-color: var(--color-accent);
 }
 
 .thumbnailWrapper {
   position: relative;
+  background-color: #1a1a1a;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  flex: 1;
-  aspect-ratio: 1/1;
-  /* Make thumbnails square */
 }
 
 .thumbnailImage {
-  width: 100%;
-  height: 100%;
   object-fit: cover;
-  transition: all 0.3s ease;
 }
 
 .projectDetails {
-  display: flex;
-  gap: 2rem;
-  max-height: 30%;
-  overflow-y: auto;
+  margin-top: 40px;
 }
 
 .projectInfo {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.projectDescription p {
+  margin: 0;
+  line-height: 1.6;
+  color: #e0e0e0;
 }
 
 .software {
-  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .softwareLabel {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
-  display: block;
-  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #888;
 }
 
 .softwareIcons {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .softwareIcon {
-  padding: 0.5rem 0.8rem;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  transition: all 0.3s ease;
-}
-
-.softwareIcon:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  display: flex;
 }
 
 .softwareLink {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 8px;
   text-decoration: none;
-  color: rgba(255, 255, 255, 0.9);
+  color: inherit;
+  transition: opacity 0.2s;
 }
 
-.softwareLogo {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
+.softwareLink:hover {
+  opacity: 0.7;
 }
 
-.projectDescription {
-  padding: 1rem 0;
-  line-height: 1.8;
-}
-
-/* Layout variations based on index (0, 1, 2) */
-
-/* Layout 0: view on center-left, 3 thumbnails stacked on right */
-.layout0 .modelSection {
-  flex-direction: row;
-}
-
-.layout0 .modelContainer,
-.layout0 .imagesSection {
-  flex: 0 0 65%;
-}
-
-.layout0 .thumbnailsContainer {
-  flex: 0 0 30%;
-  flex-direction: column;
-  height: 100%;
+/*Layout0: title on top, sketfab left, thumbnails right stacked*/
+.projectContainer.layout0 .modelSection {
   display: flex;
-  justify-content: space-between;
+  gap: 16px;
+  height: auto;
 }
 
-.layout0 .thumbnailWrapper {
-  height: calc((100% - 2rem) / 3);
+.projectContainer.layout0 .modelContainer {
+  flex: 3;
+  height: 450px;
+  max-width: 75%;
 }
 
-/* Layout 1: view on center-right, 3 thumbnails stacked on left */
-.layout1 .modelSection {
+.projectContainer.layout0 .thumbnailsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 25%;
+  max-width: 25%;
+}
+
+.projectContainer.layout0 .thumbnailWrapper {
+  width: 100%;
+  aspect-ratio: 1/1;
+  height: auto;
+}
+
+/*Layout1: title on top, sketfab right, thumbnails left stacked*/
+.projectContainer.layout1 .modelSection {
+  display: flex;
   flex-direction: row-reverse;
+  gap: 16px;
+  height: auto;
 }
 
-.layout1 .modelContainer,
-.layout1 .imagesSection {
-  flex: 0 0 65%;
+.projectContainer.layout1 .modelContainer {
+  flex: 3;
+  height: 450px;
+  max-width: 75%;
 }
 
-.layout1 .thumbnailsContainer {
-  flex: 0 0 30%;
-  flex-direction: column;
-  height: 100%;
+.projectContainer.layout1 .thumbnailsContainer {
   display: flex;
-  justify-content: space-between;
-}
-
-.layout1 .thumbnailWrapper {
-  height: calc((100% - 2rem) / 3);
-}
-
-/* Layout 2: view in center, 3 thumbnails aligned below */
-.layout2 .modelSection {
   flex-direction: column;
-  height: 100%;
+  gap: 16px;
+  width: 25%;
+  max-width: 25%;
 }
 
-.layout2 .modelContainer,
-.layout2 .imagesSection {
+.projectContainer.layout1 .thumbnailWrapper {
   width: 100%;
-  height: 70%;
+  aspect-ratio: 1/1;
+  height: auto;
 }
 
-.layout2 .thumbnailsContainer {
+/*Layout2: title on top, sketfab full width, thumbnails in row below*/
+.projectContainer.layout2 .modelSection {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.projectContainer.layout2 .modelContainer {
   width: 100%;
+  height: 450px;
+}
+
+.projectContainer.layout2 .thumbnailsContainer {
+  display: flex;
   flex-direction: row;
-  justify-content: space-between;
-  height: 25%;
+  gap: 16px;
+  width: 100%;
 }
 
-.layout2 .thumbnailWrapper {
-  flex: 0 0 31%;
-  height: 100%;
+.projectContainer.layout2 .thumbnailWrapper {
+  flex: 1;
+  aspect-ratio: 1/1;
+  max-width: calc(33.333% - 11px);
 }
 
-@media (max-width: 1200px) {
-  .projectContainer {
-    height: auto;
-    min-height: 80vh;
-  }
+/*Stats styles*/
+.projectStats {
+  display: flex;
+  gap: 32px;
+}
 
-  .layout0 .modelSection,
-  .layout1 .modelSection {
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: #888;
+  text-transform: uppercase;
+}
+
+
+
+/*Responsive adjustments*/
+@media (max-width: 768px) {
+
+  .projectContainer.layout0 .modelSection,
+  .projectContainer.layout1 .modelSection {
     flex-direction: column;
   }
 
-  .layout2 .thumbnailsContainer {
-    flex-wrap: wrap;
+  .projectContainer.layout0 .modelContainer,
+  .projectContainer.layout1 .modelContainer {
+    max-width: 100%;
   }
 
-  .layout2 .thumbnailWrapper {
-    flex: 0 0 48%;
-    margin-bottom: 1rem;
-  }
-
-  .modelContainer,
-  .imagesSection,
-  .thumbnailsContainer {
+  .projectContainer.layout0 .thumbnailsContainer,
+  .projectContainer.layout1 .thumbnailsContainer {
+    flex-direction: row;
     width: 100%;
+    max-width: 100%;
+    margin-top: 16px;
   }
 
-  .projectDetails {
-    max-height: none;
+  .projectContainer.layout0 .thumbnailWrapper,
+  .projectContainer.layout1 .thumbnailWrapper,
+  .projectContainer.layout2 .thumbnailWrapper {
+    width: calc(33.333% - 11px);
+    flex-basis: calc(33.333% - 11px);
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 480px) {
+  .projectHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .projectNumber {
-    font-size: 2.5rem;
+    margin-bottom: 8px;
   }
 
-  .projectTitle {
-    font-size: 1.5rem;
-  }
-
-  .projectContainer {
-    padding: 1.5rem;
-    margin-bottom: 6rem;
-  }
-
-  .layout0 .thumbnailsContainer,
-  .layout1 .thumbnailsContainer,
-  .layout2 .thumbnailsContainer {
-    flex-direction: row;
+  .thumbnailsContainer {
     overflow-x: auto;
-    height: auto;
-  }
-
-  .thumbnailWrapper {
-    min-width: 150px;
-    min-height: 150px;
-    /* Keep square aspect on mobile */
-  }
-
-  .layout2 .thumbnailWrapper {
-    flex: 0 0 100%;
+    padding-bottom: 8px;
   }
 }

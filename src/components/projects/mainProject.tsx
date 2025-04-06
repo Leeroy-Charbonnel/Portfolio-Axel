@@ -134,77 +134,60 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
   return (
     <motion.div
-      className={`${styles.projectContainer} ${layoutClassName}`}
+      className={styles.projectWrapper}
       initial={{ opacity: 0, y: 100 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
       viewport={{ once: true, margin: "-100px" }}
     >
-      <div className={styles.projectHeader}>
-        <h3 className={styles.projectNumber}>{String(index + 1).padStart(2, '0')}</h3>
-        <h3 className={styles.projectTitle}>{project.title[language]}</h3>
-      </div>
 
-      <div className={styles.projectContent}>
-        <div className={styles.modelSection}>
+      <div className={`container ${styles.projectContainer} ${layoutClassName}`}>
+
+        <div className={styles.projectHeader}>
+          <h3 className={styles.projectNumber}>{String(index + 1).padStart(2, '0')}</h3>
+          <h3 className={styles.projectTitle}>{project.title[language]}</h3>
+        </div>
+
+        <div className={`${styles.modelSection} noGrainOverlay`}>
           {showSketchfab && (
-            <div className={styles.modelContainer}>
-              <div className={styles.sketchfabContainer}>
-                <iframe
-                  ref={iframeRef}
-                  title={`Sketchfab Model - ${project.title[language]}`}
-                  className={`${styles.sketchfabEmbed} noGrainOverlay`}
-                  frameBorder="0"
-                  allowFullScreen
-                  allow="autoplay; fullscreen; xr-spatial-tracking"
-                ></iframe>
-                <button
-                  className={`${styles.wireframeButton} ${isWireframe ? styles.active : ''}`}
-                  onClick={toggleWireframe}
-                  aria-label="Toggle wireframe"
-                >
-                  <Grid size={16} className={styles.wireframeIcon} />
-                </button>
-              </div>
+            <div className={`${styles.modelContainer} border-sm`}>
+              <iframe
+                ref={iframeRef}
+                title={`Sketchfab Model - ${project.title[language]}`}
+                className={styles.modelEmbed}
+              ></iframe>
+              <button
+                className={`${styles.wireframeButton} ${isWireframe ? styles.active : 'border-sm'} `}
+                onClick={toggleWireframe}
+                aria-label="Toggle wireframe"
+              >
+                <Grid size={16} className={styles.wireframeIcon} />
+              </button>
             </div>
           )}
 
           {showMainImage && (
-            <div className={styles.imagesSection}>
-              <div className={styles.projectImageContainer}>
-                <Image
-                  src={isWireframe ? wireframeImagePath : mainImagePath}
-                  alt={project.title[language]}
-                  width={600}
-                  height={400}
-                  className={`${styles.projectMainImage} noGrainOverlay`}
-                  priority
-                />
-                <button
-                  className={`${styles.wireframeButton} ${isWireframe ? styles.active : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setIsWireframe(!isWireframe);
-                  }}
-                  aria-label="Toggle wireframe"
-                >
-                  <Grid size={16} className={styles.wireframeIcon} />
-                </button>
-              </div>
+            <div className={`${styles.modelContainer} border-sm`}>
+              <Image
+                src={isWireframe ? wireframeImagePath : mainImagePath}
+                alt={project.title[language]}
+                fill={true}
+                className={styles.projectMainImage}
+                priority
+              />
             </div>
           )}
 
-          <div className={`${styles.thumbnailsContainer} noGrainOverlay`}>
-            {project.thumbnails.map((thumbnail, idx) => (
+          <div className={styles.thumbnailsContainer}>
+            {project.thumbnails.map((thumbnail, index) => (
               <div
-                key={idx}
-                className={styles.thumbnailWrapper}
+                key={index}
+                className={`${styles.thumbnailWrapper} border-sm`}
               >
                 <Image
                   src={`/images/projects/${project.imageFolder}/${thumbnail.src}`}
                   alt={thumbnail.alt}
-                  width={150}
-                  height={113}
+                  fill={true}
                   className={styles.thumbnailImage}
                 />
               </div>
@@ -224,8 +207,8 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
             <div className={styles.software}>
               <span className={styles.softwareLabel}>{t('projects.renderedWith')}</span>
               <div className={styles.softwareIcons}>
-                {projectSoftwareWithLogos.map((sw, idx) => (
-                  <div key={idx} className={styles.softwareIcon}>
+                {projectSoftwareWithLogos.map((sw, index) => (
+                  <div key={index} className={styles.softwareIcon}>
                     <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
                       <Image
                         src={sw.logo}
@@ -242,7 +225,6 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
             </div>
           </div>
         </div>
-
       </div>
     </motion.div>
   );

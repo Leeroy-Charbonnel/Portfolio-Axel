@@ -19,18 +19,23 @@
 }
 
 .gradient1 {
-  top: calc(-1 * var(--size) / 2);
-  right: calc(-1 * var(--size) / 2);
   --size: 184%;
   --intensity: 50%;
+  top: calc(-1 * var(--size) / 2);
+  right: calc(-1 * var(--size) / 2);
+  height: calc(var(--size) * 2);
+  transform: translateY(-25%);
 }
 
 .gradient2 {
-  bottom: calc(-1 * var(--size) / 2);
-  left: calc(-1 * var(--size) / 2);
   --size: 167%;
   --intensity: 39%;
+  bottom: calc(-1 * var(--size) / 2);
+  left: calc(-1 * var(--size) / 2);
+  height: calc(var(--size) * 2);
+  transform: translateY(25%);
 }
+
 
 .homeContainer {
   --margin: 170px;
@@ -38,7 +43,6 @@
   z-index: 10;
   height: calc(100% - var(--margin));
   width: calc(100% - var(--margin));
-  border: var(--border-width-md) solid var(--color-border-primary);
 }
 
 .content {
