@@ -2,9 +2,9 @@ import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
 import GalleryItem from './galleryItem';
-import styles from './projectGallery.module.css';
+import styles from './galleryItem.module.css';
 
-//Context consumer for class components
+// Context consumer for class components
 import { LanguageContext } from '../languageProvider';
 
 interface GalleryProject {
@@ -13,6 +13,7 @@ interface GalleryProject {
     en: string;
     fr: string;
   };
+  imageFolder: string;
   thumbnail: string;
   stats: {
     vertices: number;
@@ -30,7 +31,7 @@ class ProjectGallery extends Component<ProjectGalleryProps> {
 
   render() {
     const { projects } = this.props;
-    //Get translation function from context
+    // Get translation function from context
     const { t } = this.context as LanguageContextType;
 
     return (
@@ -44,14 +45,14 @@ class ProjectGallery extends Component<ProjectGalleryProps> {
           >
             <h2 className={styles.sectionTitle}>{t('gallery.title')}</h2>
           </motion.div>
-          
+
           <div className={styles.galleryGrid}>
             {projects.map((project, index) => (
               <GalleryItem
                 key={project.id}
                 id={project.id}
                 title={project.title}
-                thumbnail={project.thumbnail}
+                thumbnail={`/images/projects/${project.imageFolder}/${project.thumbnail}`}
                 stats={project.stats}
                 index={index}
               />

@@ -2,9 +2,9 @@ import React, { Component } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
-import styles from './galleryItem.module.css';
+import styles from './projectGallery.module.css';
 
-//Context consumer for class components
+// Context consumer for class components
 import { LanguageContext } from '../languageProvider';
 
 interface GalleryItemProps {
@@ -34,11 +34,11 @@ class GalleryItem extends Component<GalleryItemProps> {
 
   render() {
     const { id, title, thumbnail, stats, index } = this.props;
-    //Get language from context
+    // Get language from context
     const { language } = this.context as LanguageContextType;
-    
+
     return (
-      <motion.div 
+      <motion.div
         className={styles.galleryItem}
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -50,15 +50,15 @@ class GalleryItem extends Component<GalleryItemProps> {
           <Image
             src={thumbnail}
             alt={title[language]}
-            width={350}
-            height={250}
+            width={400}
+            height={400}
             className={styles.thumbnail}
           />
         </div>
-        
+
         <div className={styles.itemDetails}>
           <h3 className={styles.itemTitle}>{title[language]}</h3>
-          
+
           <div className={styles.itemStats}>
             <div className={styles.statItem}>
               <span className={styles.statIcon}>V</span> {this.formatNumber(stats.vertices)}

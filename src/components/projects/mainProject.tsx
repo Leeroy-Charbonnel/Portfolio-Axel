@@ -53,7 +53,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
         },
         autostart: 1,
         preload: 1,
-        ui_controls: 1
+        ui_controls: 0
       });
     } catch (err) {
       console.error('Error initializing Sketchfab:', err);
