@@ -66,13 +66,13 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
     //Get materials list
     sketchfabAPI.current.getMaterialList((err: any, materials: any) => {
-      myMaterials.current =  materials.filter((m: any) => !project.excludedFromWireframe.includes(m.name)).map((m: any) => JSON.parse(JSON.stringify(m)));
+      myMaterials.current = materials.filter((m: any) => !project.excludedFromWireframe.includes(m.name)).map((m: any) => JSON.parse(JSON.stringify(m)));
       originalMaterials.current = myMaterials.current.map((m: any) => JSON.parse(JSON.stringify(m)));
     });
   };
 
   const toggleWireframe = (e: React.MouseEvent) => {
-    e.preventDefault(); 
+    e.preventDefault();
 
     if (!sketchfabAPI.current) {
       setIsWireframe(false);
@@ -95,27 +95,19 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
     for (let i = 0; i < myMaterials.current.length; i++) {
       const m = myMaterials.current[i];
 
-      if (m.channels.AlbedoPBR) {
-        m.channels.AlbedoPBR.enable = false;
-        m.channels.AlbedoPBR.color = [1.0, 1.0, 1.0];
-        if (m.channels.AlbedoPBR.texture) {
-          m.channels.AlbedoPBR.texture = null;
-        }
-      }
+      const c = 0.1
+      m.channels.EmitColor.color = [c, c, c];
+      m.channels.DiffuseColor.color = [1, 1, 1];
+      m.channels.ClearCoat.tint = [0, 0, 0]
+      m.channels.ClearCoatRoughness.factor = 1
+      m.channels.GlossinessPBR.factor = 1
+      m.channels.MetalnessPBR.factor = 0
+      m.channels.RoughnessPBR.factor = 1
 
-      if (m.channels.DiffuseColor) {
-        m.channels.DiffuseColor.enable = false;
-      }
-
-      if (m.channels.RoughnessPBR) {
-        m.channels.RoughnessPBR.enable = true;
-        m.channels.RoughnessPBR.factor = 1.0;
-      }
-
-      if (m.channels.MetalnessPBR) {
-        m.channels.MetalnessPBR.enable = false;
-      }
-
+      m.channels.Matcap.color = [1, 1, 1];
+      m.channels.Sheen.colorFactor = [1, 1, 1];
+      m.channels.Sheen.factor = 1;
+      m.channels.SpecularColor.color = [1, 1, 1];
       sketchfabAPI.current.setMaterial(m);
     }
   };
@@ -161,7 +153,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
                 <iframe
                   ref={iframeRef}
                   title={`Sketchfab Model - ${project.title[language]}`}
-                  className={styles.sketchfabEmbed}
+                  className={`${styles.sketchfabEmbed} noGrainOverlay`}
                   frameBorder="0"
                   allowFullScreen
                   allow="autoplay; fullscreen; xr-spatial-tracking"
@@ -185,7 +177,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
                   alt={project.title[language]}
                   width={600}
                   height={400}
-                  className={styles.projectMainImage}
+                  className={`${styles.projectMainImage} noGrainOverlay`}
                   priority
                 />
                 <button
@@ -202,7 +194,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
             </div>
           )}
 
-          <div className={styles.thumbnailsContainer}>
+          <div className={`${styles.thumbnailsContainer} noGrainOverlay`}>
             {project.thumbnails.map((thumbnail, idx) => (
               <div
                 key={idx}

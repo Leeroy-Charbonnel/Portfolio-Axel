@@ -17,9 +17,9 @@ class Layout extends Component<LayoutProps> {
     const { toggleLanguage, language, t } = this.context as LanguageContextType;
     const title = this.props.title || t("title");
     const sections: Array<[string, string]> = [
-      [t('nav.home'), 'Home'], 
-      [t('nav.projects'), 'Move3d'], 
-      [t('nav.gallery'), 'LayoutGrid'], 
+      [t('nav.home'), 'Home'],
+      [t('nav.projects'), 'Move3d'],
+      [t('nav.gallery'), 'LayoutGrid'],
       [t('nav.experience'), 'FileUser']
     ];
 
@@ -35,7 +35,10 @@ class Layout extends Component<LayoutProps> {
         <button className="language-switch" onClick={toggleLanguage} aria-label="Toggle language">{language === 'en' ? 'EN / FR' : 'FR / EN'}</button>
 
         <Navigation sections={sections} />
-        <main>{children}</main>
+        <main className='main'>
+          <div className='grainOverlay'></div>
+          {children}
+        </main>
       </div>
     );
   }
