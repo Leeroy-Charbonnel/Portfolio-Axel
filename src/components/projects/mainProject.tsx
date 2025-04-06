@@ -23,14 +23,12 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
   const { language, t } = useContext(LanguageContext) as LanguageContextType;
 
-  //Refs
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [sketchfabLoaded, setSketchfabLoaded] = useState<boolean>(false);
   const [sketchfabError, setSketchfabError] = useState<boolean>(false);
   const [isWireframe, setIsWireframe] = useState<boolean>(false);
 
-  //Sketchfab API references
   const sketchfabAPI = useRef<any>(null);
   const sketchfabClient = useRef<any>(null);
   const myMaterials = useRef<any[]>([]);
@@ -55,7 +53,6 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
         },
         autostart: 1,
         preload: 1,
-        ui_theme: 'dark',
         ui_controls: 1
       });
     } catch (err) {
@@ -69,11 +66,14 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
     //Get materials list
     sketchfabAPI.current.getMaterialList((err: any, materials: any) => {
-      myMaterials.current = materials.map((m: any) => JSON.parse(JSON.stringify(m)));
+      myMaterials.current =  materials.filter((m: any) => !project.excludedFromWireframe.includes(m.name)).map((m: any) => JSON.parse(JSON.stringify(m)));
+      originalMaterials.current = myMaterials.current.map((m: any) => JSON.parse(JSON.stringify(m)));
     });
   };
 
-  const toggleWireframe = () => {
+  const toggleWireframe = (e: React.MouseEvent) => {
+    e.preventDefault(); 
+
     if (!sketchfabAPI.current) {
       setIsWireframe(false);
       return;
@@ -96,7 +96,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
       const m = myMaterials.current[i];
 
       if (m.channels.AlbedoPBR) {
-        m.channels.AlbedoPBR.enable = true;
+        m.channels.AlbedoPBR.enable = false;
         m.channels.AlbedoPBR.color = [1.0, 1.0, 1.0];
         if (m.channels.AlbedoPBR.texture) {
           m.channels.AlbedoPBR.texture = null;
@@ -136,8 +136,9 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const showSketchfab = project.modelId && !sketchfabError;
   const showMainImage = !showSketchfab;
 
-  initSketchfab();
-
+  useEffect(() => {
+    initSketchfab();
+  }, []);
 
   return (
     <motion.div
@@ -165,14 +166,14 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
                   allowFullScreen
                   allow="autoplay; fullscreen; xr-spatial-tracking"
                 ></iframe>
+                <button
+                  className={`${styles.wireframeButton} ${isWireframe ? styles.active : ''}`}
+                  onClick={toggleWireframe}
+                  aria-label="Toggle wireframe"
+                >
+                  <Grid size={16} className={styles.wireframeIcon} />
+                </button>
               </div>
-              <button
-                className={`${styles.wireframeButton} ${isWireframe ? styles.active : ''}`}
-                onClick={toggleWireframe}
-              >
-                <Grid size={16} className={styles.wireframeIcon} />
-                {isWireframe ? "Hide Wireframe" : "Show Wireframe"}
-              </button>
             </div>
           )}
 
@@ -187,14 +188,17 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
                   className={styles.projectMainImage}
                   priority
                 />
+                <button
+                  className={`${styles.wireframeButton} ${isWireframe ? styles.active : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsWireframe(!isWireframe);
+                  }}
+                  aria-label="Toggle wireframe"
+                >
+                  <Grid size={16} className={styles.wireframeIcon} />
+                </button>
               </div>
-              <button
-                className={`${styles.wireframeButton} ${isWireframe ? styles.active : ''}`}
-                onClick={() => setIsWireframe(!isWireframe)}
-              >
-                <Grid size={16} className={styles.wireframeIcon} />
-                {isWireframe ? "Hide Wireframe" : "Show Wireframe"}
-              </button>
             </div>
           )}
 
@@ -205,7 +209,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
                 className={styles.thumbnailWrapper}
               >
                 <Image
-                  src={isWireframe ? `/images/projects/${project.imageFolder}/${thumbnail.srcWireframe}` : `/images/projects/${project.imageFolder}/${thumbnail.src}`}
+                  src={`/images/projects/${project.imageFolder}/${thumbnail.src}`}
                   alt={thumbnail.alt}
                   width={150}
                   height={113}

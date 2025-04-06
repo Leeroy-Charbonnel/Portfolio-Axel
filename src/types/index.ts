@@ -8,7 +8,6 @@ export interface ProjectStats {
 
 export interface ProjectThumbnail {
   src: string;
-  srcWireframe: string;
   alt: string;
 }
 
@@ -24,8 +23,8 @@ export interface Project {
     fr: string;
   };
   modelId: string;
+  excludedFromWireframe: string[];
   thumbnails: ProjectThumbnail[];
-  wireframeImage: string;
   stats: ProjectStats;
   software: string[];
 }

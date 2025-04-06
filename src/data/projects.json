@@ -30,20 +30,18 @@
         "fr": "Description incroyable d'un modele 3D de folie, si ca c'est pas une description de fou"
       },
       "modelId": "3633c8c2b3844b33a9d10e4b0793b032",
+      "excludedFromWireframe": ["Ground"],
       "thumbnails": [
         {
           "src": "thumbnail1.png",
-          "srcWireframe": "thumbnail1-wireframe.png",
           "alt": "Sample project 1 detail 1"
         },
         {
           "src": "thumbnail2.png",
-          "srcWireframe": "thumbnail2-wireframe.png",
           "alt": "Sample project 1 detail 2"
         },
         {
           "src": "thumbnail3.png",
-          "srcWireframe": "thumbnail3-wireframe.png",
           "alt": "Sample project 1 detail 3"
         }
       ],
@@ -70,20 +68,18 @@
         "fr": "Toujours une description de fantastiqeu, je suis un auteur"
       },
       "modelId": "c1e00825937b4b01a7d194336566eb9b",
+      "excludedFromWireframe": ["Ground","Black"],
       "thumbnails": [
         {
           "src": "thumbnail1.png",
-          "srcWireframe": "thumbnail1-wireframe.png",
           "alt": "Sample project 2 detail 1"
         },
         {
           "src": "thumbnail2.png",
-          "srcWireframe": "thumbnail2-wireframe.png",
           "alt": "Sample project 2 detail 2"
         },
         {
           "src": "thumbnail3.png",
-          "srcWireframe": "thumbnail3-wireframe.png",
           "alt": "Sample project 2 detail 3"
         }
       ],
@@ -111,20 +107,18 @@
         "fr": "Dernier mais pas des moindres, une description ! bien ecrite comme les precedente"
       },
       "modelId": "c0bde64524c0426ea6cd74cee2dc9707",
+      "excludedFromWireframe": ["Ground","Dust","Black"],
       "thumbnails": [
         {
           "src": "thumbnail1.png",
-          "srcWireframe": "thumbnail1-wireframe.png",
           "alt": "Sample project 3 detail 1"
         },
         {
           "src": "thumbnail2.png",
-          "srcWireframe": "thumbnail2-wireframe.png",
           "alt": "Sample project 3 detail 2"
         },
         {
           "src": "thumbnail3.png",
-          "srcWireframe": "thumbnail3-wireframe.png",
           "alt": "Sample project 3 detail 3"
         }
       ],

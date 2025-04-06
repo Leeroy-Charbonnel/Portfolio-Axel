@@ -140,3 +140,20 @@ button {
   background: transparent;
   border: none;
 }
+
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Home section should be full width */
+.homeSection .container {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}

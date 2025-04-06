@@ -4,6 +4,9 @@
   padding: 2rem;
   background-color: rgba(0, 0, 0, 0.6);
   position: relative;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .projectHeader {
@@ -40,12 +43,14 @@
   flex-direction: row;
   gap: 2rem;
   width: 100%;
+  position: relative;
 }
 
 .modelContainer {
   flex: 0 0 60%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .imagesSection {
@@ -53,6 +58,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  position: relative;
 }
 
 .sketchfabContainer {
@@ -74,18 +80,21 @@
 }
 
 .wireframeButton {
-  padding: 0.5rem 1rem;
-  background-color: rgba(255, 255, 255, 0.1);
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.7);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-bottom: 1rem;
-  align-self: flex-start;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  z-index: 10;
 }
 
 .wireframeIcon {
@@ -93,11 +102,13 @@
 }
 
 .wireframeButton:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(50, 50, 50, 0.8);
+  transform: scale(1.05);
 }
 
 .wireframeButton.active {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .projectImageContainer {
@@ -120,13 +131,14 @@
   flex-direction: column;
   gap: 1rem;
   flex: 0 0 35%;
+  height: 100%;
 }
 
 .thumbnailWrapper {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  height: 113px; /* Fixed height to match width:150px at 4:3 ratio */
+  flex: 1;
 }
 
 .thumbnailImage {
@@ -208,6 +220,13 @@
 .layout0 .thumbnailsContainer {
   flex: 0 0 30%;
   flex-direction: column;
+  height: auto;
+  display: flex;
+  justify-content: space-between;
+}
+
+.layout0 .thumbnailWrapper {
+  height: calc((100% - 2rem) / 3); /* Distribute height evenly with gaps */
 }
 
 /* Layout 1: view on center-right, 3 thumbnails stacked on left */
@@ -223,6 +242,13 @@
 .layout1 .thumbnailsContainer {
   flex: 0 0 30%;
   flex-direction: column;
+  height: auto;
+  display: flex;
+  justify-content: space-between;
+}
+
+.layout1 .thumbnailWrapper {
+  height: calc((100% - 2rem) / 3); /* Distribute height evenly with gaps */
 }
 
 /* Layout 2: view in center, 3 thumbnails aligned below */
@@ -239,10 +265,12 @@
   width: 100%;
   flex-direction: row;
   justify-content: space-between;
+  height: auto;
 }
 
 .layout2 .thumbnailWrapper {
   flex: 0 0 31%;
+  height: 150px; /* Fixed height for horizontal layout */
 }
 
 @media (max-width: 1200px) {

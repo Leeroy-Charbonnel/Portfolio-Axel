@@ -12,6 +12,8 @@
   text-align: center;
   position: relative;
   display: inline-block;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .sectionTitle::after {
@@ -33,7 +35,7 @@
     font-size: 2.5rem;
     margin-bottom: 3rem;
   }
-  
+
   .projectsList {
     margin-top: 2rem;
   }
