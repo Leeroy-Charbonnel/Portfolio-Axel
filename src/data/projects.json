@@ -53,7 +53,8 @@
             "stats": {
                 "vertices": 46091,
                 "edges": 92096,
-                "faces": 46060
+                "faces": 46060,
+                "triangles": 92120
             },
             "software": [
                 "Blender",

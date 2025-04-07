@@ -47,7 +47,7 @@ function HomePage(props: HomePageProps): JSX.Element {
   return (
     <LanguageProvider>
       <Layout>
-        {/*<Home />*/}
+        <Home />
         <MainProjects projects={props.mainProjects} softwares={props.softwares} />
         {/*<ProjectGallery projects={props.galleryProjects} />*/}
         {/* <Experience

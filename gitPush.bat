@@ -37,5 +37,3 @@ REM Display status after commit
 echo.
 echo Git status after commit:
 git status
-
-pause

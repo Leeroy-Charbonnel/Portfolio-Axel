@@ -122,7 +122,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
   const mainImagePath = `/images/projects/${project.imageFolder}/main.png`;
   const wireframeImagePath = `/images/projects/${project.imageFolder}/main-wireframe.png`;
-  const layoutClassName = styles[`layout${index % 3}`];
+  const layoutClassName = styles[`layout${index % 2}`];
   const projectSoftwareWithLogos = project.software.filter(sw => softwares[sw]).map(sw => ({ name: sw, ...softwares[sw] }));
 
   const showSketchfab = project.modelId && !sketchfabError;
@@ -141,44 +141,79 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
       viewport={{ once: true, margin: "-100px" }}
     >
 
-      <div className={`container ${layoutClassName}`}>
+      <div className={`container  ${styles.projectContainer} ${layoutClassName}`}>
 
         <div className={styles.projectHeader}>
           <h3 className={styles.projectNumber}>{String(index + 1).padStart(2, '0')}</h3>
           <h3 className={styles.projectTitle}>{project.title[language]}</h3>
         </div>
 
-        <div className={`${styles.modelSection} noGrainOverlay`}>
-          {showSketchfab && (
-            <div className={`${styles.modelContainer} border-sm`}>
-              <iframe
-                ref={iframeRef}
-                title={`Sketchfab Model - ${project.title[language]}`}
-                className={styles.modelEmbed}
-              ></iframe>
-              <button
-                className={`${styles.wireframeButton} ${isWireframe ? styles.active : 'border-sm'} `}
-                onClick={toggleWireframe}
-                aria-label="Toggle wireframe"
-              >
-                <Grid size={16} className={styles.wireframeIcon} />
-              </button>
-            </div>
-          )}
+        <div className={styles.projectContent}>
+          <div className={`${styles.modelSection} noGrainOverlay`}>
+            {showSketchfab && (
+              <div className={`${styles.modelContainer} border-sm`}>
+                <iframe
+                  ref={iframeRef}
+                  title={`Sketchfab Model - ${project.title[language]}`}
+                  className={styles.modelEmbed}
+                ></iframe>
+                <button
+                  className={`${styles.wireframeButton} ${isWireframe ? styles.active : 'border-sm'} `}
+                  onClick={toggleWireframe}
+                  aria-label="Toggle wireframe"
+                >
+                  <Grid size={16} className={styles.wireframeIcon} />
+                </button>
+              </div>
+            )}
 
-          {showMainImage && (
-            <div className={`${styles.modelContainer} border-sm`}>
-              <Image
-                src={isWireframe ? wireframeImagePath : mainImagePath}
-                alt={project.title[language]}
-                fill={true}
-                className={styles.projectMainImage}
-                priority
-              />
-            </div>
-          )}
+            {showMainImage && (
+              <div className={`${styles.modelContainer} border-sm`}>
+                <Image
+                  src={isWireframe ? wireframeImagePath : mainImagePath}
+                  alt={project.title[language]}
+                  fill={true}
+                  className={styles.projectMainImage}
+                  priority
+                />
+              </div>
+            )}
+          </div>
 
-          <div className={styles.thumbnailsContainer}>
+          <div className={`${styles.projectDetails} noGrainOverlay`}>
+            <div className={styles.projectInfo}>
+              <div className={styles.projectDescription}>
+                <p>{project.description[language]}</p>
+              </div>
+
+              {/* New wrapper for stats and software */}
+              <div className={styles.projectStatsAndSoftware}>
+                <ProjectStats stats={project.stats} />
+
+                <div className={styles.software}>
+                  <span className={styles.softwareLabel}>{t('projects.renderedWith')}</span>
+                  <div className={styles.softwareIcons}>
+                    {projectSoftwareWithLogos.map((sw, index) => (
+                      <div key={index} className={styles.softwareIcon}>
+                        <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
+                          <Image
+                            src={sw.logo}
+                            alt={sw.name}
+                            width={24}
+                            height={24}
+                            className={styles.softwareLogo}
+                          />
+                          <span>{sw.name}</span>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`${styles.thumbnailsContainer} noGrainOverlay`}>
             {project.thumbnails.map((thumbnail, index) => (
               <div
                 key={index}
@@ -193,40 +228,16 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
               </div>
             ))}
           </div>
+
+
+
+
         </div>
 
-        <div className={styles.projectDetails}>
-          <div className={styles.projectInfo}>
-            <div className={styles.projectDescription}>
-              <p>{project.description[language]}</p>
-            </div>
 
-            {/* New wrapper for stats and software */}
-            <div className={styles.projectStatsAndSoftware}>
-              <ProjectStats stats={project.stats} />
 
-              <div className={styles.software}>
-                <span className={styles.softwareLabel}>{t('projects.renderedWith')}</span>
-                <div className={styles.softwareIcons}>
-                  {projectSoftwareWithLogos.map((sw, index) => (
-                    <div key={index} className={styles.softwareIcon}>
-                      <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
-                        <Image
-                          src={sw.logo}
-                          alt={sw.name}
-                          width={24}
-                          height={24}
-                          className={styles.softwareLogo}
-                        />
-                        <span>{sw.name}</span>
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+
+
       </div>
     </motion.div>
   );
