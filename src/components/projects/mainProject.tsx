@@ -185,7 +185,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
                 className={`${styles.thumbnailWrapper} border-sm`}
               >
                 <Image
-                  src={`/images/projects/${project.imageFolder}/${thumbnail.src}`}
+                  src={`/images/projects/${project.imageFolder}/${isWireframe ? thumbnail.srcWireframe : thumbnail.src}`}
                   alt={thumbnail.alt}
                   fill={true}
                   className={styles.thumbnailImage}

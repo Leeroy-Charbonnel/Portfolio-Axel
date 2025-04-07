@@ -14,24 +14,24 @@
     0px 0px, 0px 0px, 0px 0px;
   background-image: radial-gradient(circle, rgba(255, 255, 255, var(--intensity)) 0%, rgba(0, 0, 0, 0) 50%);
   position: absolute;
-  width: var(--size);
+  width: calc(var(--size)*2);
   height: var(--size);
 }
 
 .gradient1 {
-  --size: 184%;
+  --size: 90%;
   --intensity: 50%;
   top: calc(-1 * var(--size) / 2);
-  right: calc(-1 * var(--size) / 2);
+  right: calc(-1 * var(--size));
   height: calc(var(--size) * 2);
   transform: translateY(-25%);
 }
 
 .gradient2 {
-  --size: 167%;
+  --size: 70%;
   --intensity: 39%;
   bottom: calc(-1 * var(--size) / 2);
-  left: calc(-1 * var(--size) / 2);
+  left: calc(-1 * var(--size));
   height: calc(var(--size) * 2);
   transform: translateY(25%);
 }

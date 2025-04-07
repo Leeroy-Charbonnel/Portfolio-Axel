@@ -1,6 +1,11 @@
+
 .projectWrapper {
+   --thumbnail-gap: 10px;
   width: 100%;
   margin-bottom: 120px;
+  height: 63vh;
+  overflow: hidden;
+  background: #ff00004d;
 }
 
 .projectContainer {
@@ -8,12 +13,15 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
+  max-height: 100%;
 }
 
 .projectHeader {
   display: flex;
   align-items: center;
   margin-bottom: 30px;
+  height: 10vh;
+  background: #0000ff3b;
 }
 
 .projectNumber {
@@ -130,27 +138,32 @@
 .projectContainer.layout0 .modelSection {
   display: flex;
   gap: 16px;
-  height: auto;
+  height: 40vh;
+  background: #0080006e;
+  grid-template-columns: auto auto;
 }
 
 .projectContainer.layout0 .modelContainer {
-  flex: 3;
-  height: 450px;
-  max-width: 75%;
+  height: 100%;
+  flex: 1;
 }
 
 .projectContainer.layout0 .thumbnailsContainer {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  width: 25%;
-  max-width: 25%;
+  gap: var(--thumbnail-gap);
+  width: auto;
+  overflow: hidden;
+  height: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 .projectContainer.layout0 .thumbnailWrapper {
-  width: 100%;
+  width: auto;
   aspect-ratio: 1/1;
-  height: auto;
+  height: calc((100% - (var(--thumbnail-gap) * 2)) / 3); /*Height divided by 3 minus the gaps*/
+  overflow: hidden;
 }
 
 /*Layout1: title on top, sketfab right, thumbnails left stacked*/
@@ -158,34 +171,41 @@
   display: flex;
   flex-direction: row-reverse;
   gap: 16px;
-  height: auto;
+  height: 40vh;
+  background: #0080006e;
+  grid-template-columns: auto auto;
 }
 
 .projectContainer.layout1 .modelContainer {
-  flex: 3;
-  height: 450px;
-  max-width: 75%;
+  height: 100%;
+  flex: 1;
 }
 
 .projectContainer.layout1 .thumbnailsContainer {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  width: 25%;
-  max-width: 25%;
+  gap: var(--thumbnail-gap);
+  width: auto;
+  overflow: hidden;
+  height: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 .projectContainer.layout1 .thumbnailWrapper {
-  width: 100%;
+  width: auto;
   aspect-ratio: 1/1;
-  height: auto;
+  height: calc((100% - (var(--thumbnail-gap) * 2)) / 3); /*Height divided by 3 minus the gaps*/
+  overflow: hidden;
 }
 
 /*Layout2: title on top, sketfab full width, thumbnails in row below*/
 .projectContainer.layout2 .modelSection {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--thumbnail-gap);
+  height: 40vh;
+  background: #0080006e;
 }
 
 .projectContainer.layout2 .modelContainer {
@@ -196,7 +216,7 @@
 .projectContainer.layout2 .thumbnailsContainer {
   display: flex;
   flex-direction: row;
-  gap: 16px;
+  gap: var(--thumbnail-gap);
   width: 100%;
 }
 
@@ -230,7 +250,14 @@
   text-transform: uppercase;
 }
 
-
+/*Thumbnail image styles*/
+.projectContainer.layout0 .thumbnailWrapper img,
+.projectContainer.layout1 .thumbnailWrapper img,
+.projectContainer.layout2 .thumbnailWrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
 /*Responsive adjustments*/
 @media (max-width: 768px) {

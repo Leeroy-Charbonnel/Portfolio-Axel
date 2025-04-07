@@ -8,6 +8,7 @@ export interface ProjectStats {
 
 export interface ProjectThumbnail {
   src: string;
+  srcWireframe: string;
   alt: string;
 }
 

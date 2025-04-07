@@ -1,218 +1,236 @@
 {
-  "software": {
-    "Blender": {
-      "logo": "/images/logos/blender-logo.png",
-      "url": "https://www.blender.org/"
-    },
-    "Substance": {
-      "logo": "/images/logos/substance-logo.png",
-      "url": "https://www.substance3d.com/"
-    },
-    "Photoshop": {
-      "logo": "/images/logos/photoshop-logo.png",
-      "url": "https://www.adobe.com/products/photoshop.html"
-    },
-    "Illustrator": {
-      "logo": "/images/logos/illustrator-logo.png",
-      "url": "https://www.adobe.com/products/illustrator.html"
-    }
-  },
-  "mainProjects": [
-    {
-      "id": "sample-project-1",
-      "imageFolder": "sample-project-1",
-      "title": {
-        "en": "Sample Project 1",
-        "fr": "Projet Exemple 1"
-      },
-      "description": {
-        "en": "Incredibly amazing description of a 3D model, what a sick description.",
-        "fr": "Description incroyable d'un modele 3D de folie, si ca c'est pas une description de fou"
-      },
-      "modelId": "3633c8c2b3844b33a9d10e4b0793b032",
-      "excludedFromWireframe": ["Ground"],
-      "thumbnails": [
-        {
-          "src": "thumbnail1.png",
-          "alt": "Sample project 1 detail 1"
+    "software": {
+        "Blender": {
+            "logo": "/images/logos/blender-logo.png",
+            "url": "https://www.blender.org/"
         },
-        {
-          "src": "thumbnail2.png",
-          "alt": "Sample project 1 detail 2"
+        "Substance": {
+            "logo": "/images/logos/substance-logo.png",
+            "url": "https://www.substance3d.com/"
         },
-        {
-          "src": "thumbnail3.png",
-          "alt": "Sample project 1 detail 3"
+        "Photoshop": {
+            "logo": "/images/logos/photoshop-logo.png",
+            "url": "https://www.adobe.com/products/photoshop.html"
+        },
+        "Illustrator": {
+            "logo": "/images/logos/illustrator-logo.png",
+            "url": "https://www.adobe.com/products/illustrator.html"
         }
-      ],
-      "stats": {
-        "vertices": 46091,
-        "edges": 92096,
-        "faces": 46060
-      },
-      "software": [
-        "Blender",
-        "Substance",
-        "Photoshop"
-      ]
     },
-    {
-      "id": "sample-project-2",
-      "imageFolder": "sample-project-2",
-      "title": {
-        "en": "Sample Project 2",
-        "fr": "Projet Exemple 2"
-      },
-      "description": {
-        "en": "Still an awesome description, i'm a fine writter",
-        "fr": "Toujours une description de fantastiqeu, je suis un auteur"
-      },
-      "modelId": "c1e00825937b4b01a7d194336566eb9b",
-      "excludedFromWireframe": ["Ground","Black"],
-      "thumbnails": [
+    "mainProjects": [
         {
-          "src": "thumbnail1.png",
-          "alt": "Sample project 2 detail 1"
+            "id": "sample-project-1",
+            "imageFolder": "sample-project-1",
+            "title": {
+                "en": "Sample Project 1",
+                "fr": "Projet Exemple 1"
+            },
+            "description": {
+                "en": "Incredibly amazing description of a 3D model, what a sick description.",
+                "fr": "Description incroyable d'un modele 3D de folie, si ca c'est pas une description de fou"
+            },
+            "modelId": "3633c8c2b3844b33a9d10e4b0793b032",
+            "excludedFromWireframe": [
+                "Ground"
+            ],
+            "thumbnails": [
+                {
+                    "src": "thumbnail1.png",
+                    "srcWireframe": "thumbnail1-w.png",
+                    "alt": "Sample project 1 detail 1"
+                },
+                {
+                    "src": "thumbnail2.png",
+                    "srcWireframe": "thumbnail2-w.png",
+                    "alt": "Sample project 1 detail 2"
+                },
+                {
+                    "src": "thumbnail3.png",
+                    "srcWireframe": "thumbnail3-w.png",
+                    "alt": "Sample project 1 detail 3"
+                }
+            ],
+            "stats": {
+                "vertices": 46091,
+                "edges": 92096,
+                "faces": 46060
+            },
+            "software": [
+                "Blender",
+                "Substance",
+                "Photoshop"
+            ]
         },
         {
-          "src": "thumbnail2.png",
-          "alt": "Sample project 2 detail 2"
+            "id": "sample-project-2",
+            "imageFolder": "sample-project-2",
+            "title": {
+                "en": "Sample Project 2",
+                "fr": "Projet Exemple 2"
+            },
+            "description": {
+                "en": "Still an awesome description, i'm a fine writter",
+                "fr": "Toujours une description de fantastiqeu, je suis un auteur"
+            },
+            "modelId": "c1e00825937b4b01a7d194336566eb9b",
+            "excludedFromWireframe": [
+                "Ground",
+                "Black"
+            ],
+            "thumbnails": [
+                {
+                    "src": "thumbnail1.png",
+                    "srcWireframe": "thumbnail1-w.png",
+                    "alt": "Sample project 2 detail 1"
+                },
+                {
+                    "src": "thumbnail2.png",
+                    "srcWireframe": "thumbnail2-w.png",
+                    "alt": "Sample project 2 detail 2"
+                },
+                {
+                    "src": "thumbnail3.png",
+                    "srcWireframe": "thumbnail3-w.png",
+                    "alt": "Sample project 2 detail 3"
+                }
+            ],
+            "stats": {
+                "vertices": 25600,
+                "edges": 51200,
+                "faces": 25550,
+                "triangles": 51100
+            },
+            "software": [
+                "Photoshop",
+                "Blender",
+                "Illustrator"
+            ]
         },
         {
-          "src": "thumbnail3.png",
-          "alt": "Sample project 2 detail 3"
+            "id": "sample-project-3",
+            "imageFolder": "sample-project-3",
+            "title": {
+                "en": "Sample Project 3",
+                "fr": "Projet Exemple 3"
+            },
+            "description": {
+                "en": "Last but not least, a description ! as well written as the previous ones",
+                "fr": "Dernier mais pas des moindres, une description ! bien ecrite comme les precedente"
+            },
+            "modelId": "c0bde64524c0426ea6cd74cee2dc9707",
+            "excludedFromWireframe": [
+                "Ground",
+                "Dust",
+                "Black"
+            ],
+            "thumbnails": [
+                {
+                    "src": "thumbnail1.png",
+                    "srcWireframe": "thumbnail1-w.png",
+                    "alt": "Sample project 3 detail 1"
+                },
+                {
+                    "src": "thumbnail2.png",
+                    "srcWireframe": "thumbnail2-w.png",
+                    "alt": "Sample project 3 detail 2"
+                },
+                {
+                    "src": "thumbnail3.png",
+                    "srcWireframe": "thumbnail3-w.png",
+                    "alt": "Sample project 3 detail 3"
+                }
+            ],
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400,
+                "faces": 85650,
+                "triangles": 171300
+            },
+            "software": [
+                "Blender",
+                "ZBrush",
+                "Substance"
+            ]
         }
-      ],
-      "stats": {
-        "vertices": 25600,
-        "edges": 51200,
-        "faces": 25550,
-        "triangles": 51100
-      },
-      "software": [
-        "Photoshop",
-        "Blender",
-        "Illustrator"
-      ]
-    },
-    {
-      "id": "sample-project-3",
-      "imageFolder": "sample-project-3",
-      "title": {
-        "en": "Sample Project 3",
-        "fr": "Projet Exemple 3"
-      },
-      "description": {
-        "en": "Last but not least, a description ! as well written as the previous ones",
-        "fr": "Dernier mais pas des moindres, une description ! bien ecrite comme les precedente"
-      },
-      "modelId": "c0bde64524c0426ea6cd74cee2dc9707",
-      "excludedFromWireframe": ["Ground","Dust","Black"],
-      "thumbnails": [
+    ],
+    "galleryProjects": [
         {
-          "src": "thumbnail1.png",
-          "alt": "Sample project 3 detail 1"
+            "id": "sample-project-1",
+            "title": {
+                "en": "Sample Project 1",
+                "fr": "Projet Exemple 1"
+            },
+            "imageFolder": "sample-project-1",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 46091,
+                "edges": 92096
+            }
         },
         {
-          "src": "thumbnail2.png",
-          "alt": "Sample project 3 detail 2"
+            "id": "sample-project-2",
+            "title": {
+                "en": "Sample Project 2",
+                "fr": "Projet Exemple 2"
+            },
+            "imageFolder": "sample-project-2",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 25600,
+                "edges": 51200
+            }
         },
         {
-          "src": "thumbnail3.png",
-          "alt": "Sample project 3 detail 3"
+            "id": "sample-project-3",
+            "title": {
+                "en": "Sample Project 3",
+                "fr": "Projet Exemple 3"
+            },
+            "imageFolder": "sample-project-3",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
+            }
+        },
+        {
+            "id": "sample-project-4",
+            "title": {
+                "en": "Sample Project 4",
+                "fr": "Projet Exemple 4"
+            },
+            "imageFolder": "sample-project-4",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 75000,
+                "edges": 150000
+            }
+        },
+        {
+            "id": "sample-project-5",
+            "title": {
+                "en": "Sample Project 5",
+                "fr": "Projet Exemple 5"
+            },
+            "imageFolder": "sample-project-5",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 180000,
+                "edges": 360000
+            }
+        },
+        {
+            "id": "sample-project-6",
+            "title": {
+                "en": "Sample Project 6",
+                "fr": "Projet Exemple 6"
+            },
+            "imageFolder": "sample-project-6",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 45000,
+                "edges": 90000
+            }
         }
-      ],
-      "stats": {
-        "vertices": 85700,
-        "edges": 171400,
-        "faces": 85650,
-        "triangles": 171300
-      },
-      "software": [
-        "Blender",
-        "ZBrush",
-        "Substance"
-      ]
-    }
-  ],
-  "galleryProjects": [
-    {
-      "id": "sample-project-1",
-      "title": {
-        "en": "Sample Project 1",
-        "fr": "Projet Exemple 1"
-      },
-      "imageFolder": "sample-project-1",
-      "thumbnail": "main.png",
-      "stats": {
-        "vertices": 46091,
-        "edges": 92096
-      }
-    },
-    {
-      "id": "sample-project-2",
-      "title": {
-        "en": "Sample Project 2",
-        "fr": "Projet Exemple 2"
-      },
-      "imageFolder": "sample-project-2",
-      "thumbnail": "main.png",
-      "stats": {
-        "vertices": 25600,
-        "edges": 51200
-      }
-    },
-    {
-      "id": "sample-project-3",
-      "title": {
-        "en": "Sample Project 3",
-        "fr": "Projet Exemple 3"
-      },
-      "imageFolder": "sample-project-3",
-      "thumbnail": "main.png",
-      "stats": {
-        "vertices": 85700,
-        "edges": 171400
-      }
-    },
-    {
-      "id": "sample-project-4",
-      "title": {
-        "en": "Sample Project 4",
-        "fr": "Projet Exemple 4"
-      },
-      "imageFolder": "sample-project-4",
-      "thumbnail": "main.png",
-      "stats": {
-        "vertices": 75000,
-        "edges": 150000
-      }
-    },
-    {
-      "id": "sample-project-5",
-      "title": {
-        "en": "Sample Project 5",
-        "fr": "Projet Exemple 5"
-      },
-      "imageFolder": "sample-project-5",
-      "thumbnail": "main.png",
-      "stats": {
-        "vertices": 180000,
-        "edges": 360000
-      }
-    },
-    {
-      "id": "sample-project-6",
-      "title": {
-        "en": "Sample Project 6",
-        "fr": "Projet Exemple 6"
-      },
-      "imageFolder": "sample-project-6",
-      "thumbnail": "main.png",
-      "stats": {
-        "vertices": 45000,
-        "edges": 90000
-      }
-    }
-  ]
+    ]
 }
