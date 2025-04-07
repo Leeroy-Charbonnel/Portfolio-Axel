@@ -34,8 +34,10 @@ git add .
 git commit -m "!commit_message!"
 
 echo.
+echo Git push :
 git push
 
+echo.
 echo Git status after push:
 git status
 
