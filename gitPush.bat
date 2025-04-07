@@ -33,9 +33,10 @@ REM Add all files and commit
 git add .
 git commit -m "!commit_message!"
 
-REM Display status after commit
 echo.
-echo Git status after commit:
 git push
+
+echo Git status after push:
+git status
 
 pause
