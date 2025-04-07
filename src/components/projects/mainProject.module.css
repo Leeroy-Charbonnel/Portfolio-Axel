@@ -1,19 +1,9 @@
-
 .projectWrapper {
-   --thumbnail-gap: 10px;
+  --thumbnail-gap: 10px;
   width: 100%;
   margin-bottom: 120px;
-  height: 63vh;
+  height: 90vh;
   overflow: hidden;
-  background: #ff00004d;
-}
-
-.projectContainer {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-  max-height: 100%;
 }
 
 .projectHeader {
@@ -21,7 +11,8 @@
   align-items: center;
   margin-bottom: 30px;
   height: 10vh;
-  background: #0000ff3b;
+  background: transparent;
+  /* Removed blue background */
 }
 
 .projectNumber {
@@ -34,6 +25,9 @@
 .projectTitle {
   font-size: 2rem;
   font-weight: 700;
+  padding-bottom: 0.5rem;
+  border-bottom: var(--border-width-sm) solid var(--color-border-primary);
+  /* Added border bottom */
 }
 
 .modelSection {
@@ -76,7 +70,6 @@
 
 .thumbnailWrapper {
   position: relative;
-  background-color: #1a1a1a;
   overflow: hidden;
 }
 
@@ -94,16 +87,42 @@
   gap: 24px;
 }
 
+.projectDescription {
+  width: 100%;
+  /* Full width description */
+  margin-bottom: 20px;
+}
+
 .projectDescription p {
   margin: 0;
   line-height: 1.6;
   color: #e0e0e0;
 }
 
+/* Stats and software layout (side by side) */
+.projectDetails {
+  display: flex;
+  flex-direction: column;
+}
+
+.projectInfo {
+  width: 100%;
+}
+
+/* Added a wrapper for stats and software */
+.projectStatsAndSoftware {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 20px;
+}
+
 .software {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 16px;
+  border-radius: 4px;
 }
 
 .softwareLabel {
@@ -118,7 +137,10 @@
 }
 
 .softwareIcon {
+  padding: var(--spacing-xs);
   display: flex;
+  border-radius: var(--border-radius-md);
+  border: var(--border-width-sm) solid var(--color-border-primary);
 }
 
 .softwareLink {
@@ -135,20 +157,21 @@
 }
 
 /*Layout0: title on top, sketfab left, thumbnails right stacked*/
-.projectContainer.layout0 .modelSection {
+.layout0 .modelSection {
   display: flex;
   gap: 16px;
   height: 40vh;
-  background: #0080006e;
+  background: transparent;
+  /* Removed green background */
   grid-template-columns: auto auto;
 }
 
-.projectContainer.layout0 .modelContainer {
+.layout0 .modelContainer {
   height: 100%;
   flex: 1;
 }
 
-.projectContainer.layout0 .thumbnailsContainer {
+.layout0 .thumbnailsContainer {
   display: flex;
   flex-direction: column;
   gap: var(--thumbnail-gap);
@@ -159,29 +182,31 @@
   margin: 0;
 }
 
-.projectContainer.layout0 .thumbnailWrapper {
+.layout0 .thumbnailWrapper {
   width: auto;
   aspect-ratio: 1/1;
-  height: calc((100% - (var(--thumbnail-gap) * 2)) / 3); /*Height divided by 3 minus the gaps*/
+  height: calc((100% - (var(--thumbnail-gap) * 2)) / 3);
+  /*Height divided by 3 minus the gaps*/
   overflow: hidden;
 }
 
 /*Layout1: title on top, sketfab right, thumbnails left stacked*/
-.projectContainer.layout1 .modelSection {
+.layout1 .modelSection {
   display: flex;
   flex-direction: row-reverse;
   gap: 16px;
   height: 40vh;
-  background: #0080006e;
+  background: transparent;
+  /* Removed green background */
   grid-template-columns: auto auto;
 }
 
-.projectContainer.layout1 .modelContainer {
+.layout1 .modelContainer {
   height: 100%;
   flex: 1;
 }
 
-.projectContainer.layout1 .thumbnailsContainer {
+.layout1 .thumbnailsContainer {
   display: flex;
   flex-direction: column;
   gap: var(--thumbnail-gap);
@@ -192,35 +217,37 @@
   margin: 0;
 }
 
-.projectContainer.layout1 .thumbnailWrapper {
+.layout1 .thumbnailWrapper {
   width: auto;
   aspect-ratio: 1/1;
-  height: calc((100% - (var(--thumbnail-gap) * 2)) / 3); /*Height divided by 3 minus the gaps*/
+  height: calc((100% - (var(--thumbnail-gap) * 2)) / 3);
+  /*Height divided by 3 minus the gaps*/
   overflow: hidden;
 }
 
 /*Layout2: title on top, sketfab full width, thumbnails in row below*/
-.projectContainer.layout2 .modelSection {
+.layout2 .modelSection {
   display: flex;
   flex-direction: column;
   gap: var(--thumbnail-gap);
   height: 40vh;
-  background: #0080006e;
+  background: transparent;
+  /* Removed green background */
 }
 
-.projectContainer.layout2 .modelContainer {
+.layout2 .modelContainer {
   width: 100%;
   height: 450px;
 }
 
-.projectContainer.layout2 .thumbnailsContainer {
+.layout2 .thumbnailsContainer {
   display: flex;
   flex-direction: row;
   gap: var(--thumbnail-gap);
   width: 100%;
 }
 
-.projectContainer.layout2 .thumbnailWrapper {
+.layout2 .thumbnailWrapper {
   flex: 1;
   aspect-ratio: 1/1;
   max-width: calc(33.333% - 11px);
@@ -251,9 +278,9 @@
 }
 
 /*Thumbnail image styles*/
-.projectContainer.layout0 .thumbnailWrapper img,
-.projectContainer.layout1 .thumbnailWrapper img,
-.projectContainer.layout2 .thumbnailWrapper img {
+.layout0 .thumbnailWrapper img,
+.layout1 .thumbnailWrapper img,
+.layout2 .thumbnailWrapper img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -262,29 +289,34 @@
 /*Responsive adjustments*/
 @media (max-width: 768px) {
 
-  .projectContainer.layout0 .modelSection,
-  .projectContainer.layout1 .modelSection {
+  .layout0 .modelSection,
+  .layout1 .modelSection {
     flex-direction: column;
   }
 
-  .projectContainer.layout0 .modelContainer,
-  .projectContainer.layout1 .modelContainer {
+  .layout0 .modelContainer,
+  .layout1 .modelContainer {
     max-width: 100%;
   }
 
-  .projectContainer.layout0 .thumbnailsContainer,
-  .projectContainer.layout1 .thumbnailsContainer {
+  .layout0 .thumbnailsContainer,
+  .layout1 .thumbnailsContainer {
     flex-direction: row;
     width: 100%;
     max-width: 100%;
     margin-top: 16px;
   }
 
-  .projectContainer.layout0 .thumbnailWrapper,
-  .projectContainer.layout1 .thumbnailWrapper,
-  .projectContainer.layout2 .thumbnailWrapper {
+  .layout0 .thumbnailWrapper,
+  .layout1 .thumbnailWrapper,
+  .layout2 .thumbnailWrapper {
     width: calc(33.333% - 11px);
     flex-basis: calc(33.333% - 11px);
+  }
+
+  .projectStatsAndSoftware {
+    flex-direction: column;
+    gap: 20px;
   }
 }
 

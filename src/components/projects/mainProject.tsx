@@ -141,7 +141,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
       viewport={{ once: true, margin: "-100px" }}
     >
 
-      <div className={`container ${styles.projectContainer} ${layoutClassName}`}>
+      <div className={`container ${layoutClassName}`}>
 
         <div className={styles.projectHeader}>
           <h3 className={styles.projectNumber}>{String(index + 1).padStart(2, '0')}</h3>
@@ -197,30 +197,32 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
         <div className={styles.projectDetails}>
           <div className={styles.projectInfo}>
-
             <div className={styles.projectDescription}>
               <p>{project.description[language]}</p>
             </div>
 
-            <ProjectStats stats={project.stats} />
+            {/* New wrapper for stats and software */}
+            <div className={styles.projectStatsAndSoftware}>
+              <ProjectStats stats={project.stats} />
 
-            <div className={styles.software}>
-              <span className={styles.softwareLabel}>{t('projects.renderedWith')}</span>
-              <div className={styles.softwareIcons}>
-                {projectSoftwareWithLogos.map((sw, index) => (
-                  <div key={index} className={styles.softwareIcon}>
-                    <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
-                      <Image
-                        src={sw.logo}
-                        alt={sw.name}
-                        width={24}
-                        height={24}
-                        className={styles.softwareLogo}
-                      />
-                      <span>{sw.name}</span>
-                    </a>
-                  </div>
-                ))}
+              <div className={styles.software}>
+                <span className={styles.softwareLabel}>{t('projects.renderedWith')}</span>
+                <div className={styles.softwareIcons}>
+                  {projectSoftwareWithLogos.map((sw, index) => (
+                    <div key={index} className={styles.softwareIcon}>
+                      <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
+                        <Image
+                          src={sw.logo}
+                          alt={sw.name}
+                          width={24}
+                          height={24}
+                          className={styles.softwareLogo}
+                        />
+                        <span>{sw.name}</span>
+                      </a>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

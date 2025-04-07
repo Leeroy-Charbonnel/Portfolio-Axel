@@ -23,22 +23,21 @@
 
   --color-background: #000000;
   --color-background-secondary: #111111;
-  --color-background-tertiary: rgba(20, 20, 20, 0.7);
+  --color-background-tertiary: #141414b3;
+  --color-background-gray-50: #0a0a0a;
+  --color-background-gray-100: #141414;
+  --color-background-gray-150: #1a1a1a;
+  --color-background-gray-200: #202020;
+  --color-background-gray-250: #252525;
+  --color-background-gray-300: #2a2a2a;
 
   /* Accent */
   --color-accent-neutral: #ffffff;
   --color-accent: #d42d2d;
   --color-accent-hover: #f0f0f0;
 
-  /* Border colors */
-  --color-border-primary: rgb(223, 223, 223);
-  --color-border-muted: rgb(211, 211, 211);
-  --color-border-accent: #ffffff;
 
-  /* Gradients */
-  --gradient-background-primary: linear-gradient(to bottom, #000000, #111111);
-  --gradient-background-secondary: linear-gradient(to bottom, #111111, #000000);
-  --gradient-background-accent: linear-gradient(135deg, #111111, #000000);
+
 
   /* Font */
   --font-weight-regular: 400;
@@ -74,6 +73,10 @@
   --spacing-6xl: 10rem;
 
   /* Borders */
+  --color-border-primary: rgb(223, 223, 223);
+  --color-border-muted: rgb(211, 211, 211);
+  --color-border-accent: #ffffff;
+
   --border-width-sm: 1px;
   --border-width-md: 2px;
   --border-width-lg: 3px;
@@ -143,7 +146,7 @@ button {
 
 
 .container {
-  width: 100%;
+  width: 80%;
   max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
@@ -181,10 +184,10 @@ button {
   position: relative;
 }
 
-.border-sm{
+.border-sm {
   border: var(--border-radius-sm) solid var(--color-border-primary);
 }
 
-.border-md{
+.border-md {
   border: var(--border-radius-md) solid var(--color-border-primary);
 }
