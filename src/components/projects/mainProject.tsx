@@ -190,24 +190,21 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
               <div className={styles.projectStatsAndSoftware}>
                 <ProjectStats stats={project.stats} />
 
-                <div className={styles.software}>
-                  <span className={styles.softwareLabel}>{t('projects.renderedWith')}</span>
-                  <div className={styles.softwareIcons}>
-                    {projectSoftwareWithLogos.map((sw, index) => (
-                      <div key={index} className={styles.softwareIcon}>
-                        <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
-                          <Image
-                            src={sw.logo}
-                            alt={sw.name}
-                            width={24}
-                            height={24}
-                            className={styles.softwareLogo}
-                          />
-                          <span>{sw.name}</span>
-                        </a>
-                      </div>
-                    ))}
-                  </div>
+                <div className={styles.softwareIcons}>
+                  {projectSoftwareWithLogos.map((sw, index) => (
+                    <div key={index} className={styles.softwareIcon}>
+                      <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
+                        <Image
+                          src={sw.logo}
+                          alt={sw.name}
+                          width={24}
+                          height={24}
+                          className={styles.softwareLogo}
+                        />
+                        <span>{sw.name}</span>
+                      </a>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

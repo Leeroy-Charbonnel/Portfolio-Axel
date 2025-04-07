@@ -19,8 +19,7 @@ export const translations = {
         edges: "Edges",
         faces: "Faces",
         triangles: "Triangles"
-      },
-      renderedWith: "Rendered with"
+      }
     },
     gallery: {
       title: "PROJECT GALLERY"
@@ -58,8 +57,7 @@ export const translations = {
         edges: "Arêtes",
         faces: "Faces",
         triangles: "Triangles"
-      },
-      renderedWith: "Rendu avec"
+      }
     },
     gallery: {
       title: "GALERIE DE PROJETS"

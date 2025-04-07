@@ -1,7 +1,7 @@
 .projectWrapper {
-  --thumbnail-gap: 10px;
+  --thumbnail-gap: var(--spacing-xxs);
   width: 100%;
-  margin-bottom: 120px;
+  margin-bottom: var(--spacing-6xl);
   height: 90vh;
   overflow: hidden;
 }
@@ -11,15 +11,14 @@
   align-items: center;
   height: 10vh;
   background: transparent;
-  gap: 10px;
+  gap: var(--spacing-xxs);
 }
 
 .projectNumber {
-  /* make outline */
-  /* make text ouline with no bg */
-  /* text ouline */
-
-
+  font-weight: var(--font-weight-bold);
+  color: transparent;
+  -webkit-text-stroke: var(--border-width-sm) var(--color-text);
+  text-shadow: none;
 }
 
 
@@ -27,13 +26,12 @@
 
 .projectContainer {
   height: var(--project-height);
-  background: #ff00004a;
 }
 
 .projectWrapper {
-  background: #0000ff3b;
+  background: linear-gradient(to right, var(--color-background), var(--color-background-secondary));
   --thumbnail-nb: 3;
-  --thumbnail-gap: 10px;
+  --thumbnail-gap: var(--spacing-xxs);
   --project-height: 90vh;
   --project-header-height: 10vh;
   --project-content-height: 80vh;
@@ -52,22 +50,24 @@
 
 .softwareIcons {
   display: flex;
-  gap: 10px;
+  gap: var(--spacing-xxs);
 }
 
 .softwareIcon a {
   display: flex;
   align-content: center;
   justify-content: center;
+  text-decoration: none;
+  color: var(--color-text);
 }
 
 .softwareIcon {
-  padding: 10px;
-  background: red;
+  padding: var(--spacing-xxs);
+  background: linear-gradient(to bottom, var(--color-background-gray-150), var(--color-background-gray-250));
 }
 
 .projectDescription {
-  padding: 15px 0px;
+  padding: var(--spacing-sm) 0px;
 }
 
 .modelSection {
@@ -79,7 +79,7 @@
 }
 
 .projectStatsAndSoftware {
-  padding-bottom: 15px;
+  padding-bottom: var(--spacing-sm);
 }
 
 
@@ -107,9 +107,8 @@
 .projectContent {
   display: grid;
   height: var(--project-content-height);
-  background: #00800061;
   position: relative;
-  gap: 24px;
+  gap: var(--spacing-xl);
 }
 
 
@@ -183,12 +182,12 @@
 /* Wireframe button */
 .wireframeButton {
   position: absolute;
-  bottom: 16px;
-  right: 16px;
+  bottom: var(--spacing-md);
+  right: var(--spacing-md);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.8);
-  width: 40px;
-  height: 40px;
+  background: var(--color-text-secondary);
+  width: var(--spacing-2xl);
+  height: var(--spacing-2xl);
   display: flex;
   align-items: center;
   justify-content: center;
