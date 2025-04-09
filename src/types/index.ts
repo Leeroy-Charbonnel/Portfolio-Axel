@@ -12,8 +12,20 @@ export interface ProjectThumbnail {
   alt: string;
 }
 
+export interface WireframeLight {
+  index: number;
+  intensity: number;
+  color: string;
+}
+
+export interface WireframeParameters {
+  wireframeColor?: string;
+  whiteMaterialColor?: number[];
+  lights: WireframeLight[];
+}
+
 export interface Project {
-  id: string;
+  id?: string;
   imageFolder: string;
   title: {
     en: string;
@@ -24,8 +36,8 @@ export interface Project {
     fr: string;
   };
   modelId: string;
-  excludedFromWireframe: string[];
   thumbnails: ProjectThumbnail[];
+  wireframeParameters: WireframeParameters;
   stats: ProjectStats;
   software: string[];
 }

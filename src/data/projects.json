@@ -19,42 +19,52 @@
     },
     "mainProjects": [
         {
-            "id": "sample-project-1",
-            "imageFolder": "sample-project-1",
+            "imageFolder": "project-1",
             "title": {
-                "en": "Sample Project 1",
-                "fr": "Projet Exemple 1"
+                "en": "Table/Chair Office",
+                "fr": "Tables/Chaises de bureau"
             },
             "description": {
-                "en": "Incredibly amazing description of a 3D model, what a sick description.",
-                "fr": "Description incroyable d'un modele 3D de folie, si ca c'est pas une description de fou"
+                "en": "Magnificent 3D model of a table, slightly borrowed from my work, with 8 high-quality chairs, raised outdoors. The table is a table-type table, which among other things serves as a table.",
+                "fr": "Modèle 3D de table magnifique, légèrement volé de mon travail, 8 chaises de qualité supérieure, élevées en plein air. La table est une table de type table, qui permet entre autre de servir de table"
             },
-            "modelId": "3633c8c2b3844b33a9d10e4b0793b032",
-            "excludedFromWireframe": [
-                "Ground"
-            ],
+            "modelId": "441d21b8a12a4971ab67eaac5cef0888",
             "thumbnails": [
                 {
                     "src": "thumbnail1.png",
                     "srcWireframe": "thumbnail1-w.png",
-                    "alt": "Sample project 1 detail 1"
+                    "alt": "Thumbnail 1"
                 },
                 {
                     "src": "thumbnail2.png",
                     "srcWireframe": "thumbnail2-w.png",
-                    "alt": "Sample project 1 detail 2"
+                    "alt": "Thumbnail 2"
                 },
                 {
                     "src": "thumbnail3.png",
                     "srcWireframe": "thumbnail3-w.png",
-                    "alt": "Sample project 1 detail 3"
+                    "alt": "Thumbnail 3"
                 }
             ],
+            "wireframeParameters": {
+                "wireframeColor": "00000020",
+                "whiteMaterialColor": [
+                    0.09,
+                    0.09,
+                    0.09
+                ],
+                "lights": [
+                    {
+                        "index": 0,
+                        "intensity": 2.0,
+                        "color": "#00ddff"
+                    }
+                ]
+            },
             "stats": {
                 "vertices": 46091,
                 "edges": 92096,
-                "faces": 46060,
-                "triangles": 92120
+                "faces": 46060
             },
             "software": [
                 "Blender",
@@ -63,43 +73,52 @@
             ]
         },
         {
-            "id": "sample-project-2",
-            "imageFolder": "sample-project-2",
+            "imageFolder": "project-2",
             "title": {
-                "en": "Sample Project 2",
-                "fr": "Projet Exemple 2"
+                "en": "Cylinder seat / Table / Bamboo lamp",
+                "fr": "Siège cylindrique / Table / Lampe en bambou"
             },
             "description": {
-                "en": "Still an awesome description, i'm a fine writter",
-                "fr": "Toujours une description de fantastiqeu, je suis un auteur"
+                "en": "Cylinder-type seats around a solid wood table (that's not true, it's clearly IKEA plywood with vinyl on top), accompanied by its bamboo lamp (not at all from IKEA either, please don't sue me).",
+                "fr": "Siège de type cylindre, autour d'une table en bois massif (c'est faux, c'est clairement du contreplaqué ikea avec un vinyl dessus), accompagné de sa lampe en bambou (pas du tout de ikea non plus d'ailleurs, m'attaquez pas en justice svp)"
             },
-            "modelId": "c1e00825937b4b01a7d194336566eb9b",
-            "excludedFromWireframe": [
-                "Ground",
-                "Black"
-            ],
+            "modelId": "a7bccdc2d8d24ef6814bfed7a3ed3922",
             "thumbnails": [
                 {
                     "src": "thumbnail1.png",
                     "srcWireframe": "thumbnail1-w.png",
-                    "alt": "Sample project 2 detail 1"
+                    "alt": "Thumbnail 1"
                 },
                 {
                     "src": "thumbnail2.png",
                     "srcWireframe": "thumbnail2-w.png",
-                    "alt": "Sample project 2 detail 2"
+                    "alt": "Thumbnail 2"
                 },
                 {
                     "src": "thumbnail3.png",
                     "srcWireframe": "thumbnail3-w.png",
-                    "alt": "Sample project 2 detail 3"
+                    "alt": "Thumbnail 3"
                 }
             ],
+            "wireframeParameters": {
+                "wireframeColor": "00000020",
+                "whiteMaterialColor": [
+                    0.09,
+                    0.09,
+                    0.09
+                ],
+                "lights": [
+                    {
+                        "index": 2,
+                        "intensity": 3.0,
+                        "color": "#00ddff"
+                    }
+                ]
+            },
             "stats": {
                 "vertices": 25600,
                 "edges": 51200,
-                "faces": 25550,
-                "triangles": 51100
+                "faces": 25550
             },
             "software": [
                 "Photoshop",
@@ -108,44 +127,52 @@
             ]
         },
         {
-            "id": "sample-project-3",
             "imageFolder": "sample-project-3",
             "title": {
-                "en": "Sample Project 3",
-                "fr": "Projet Exemple 3"
+                "en": "High Table / High chairs",
+                "fr": "Table haute / Chaises hautes"
             },
             "description": {
-                "en": "Last but not least, a description ! as well written as the previous ones",
-                "fr": "Dernier mais pas des moindres, une description ! bien ecrite comme les precedente"
+                "en": "Yet more furniture, once again borrowed from my 3D model of my workplace cafeteria. Please still don't sue me, I would appreciate not going to prison, thanks.",
+                "fr": "Encore et toujours des meubles, toujours et encore yoinké de mon modèle 3D de cafète de mon boulot, ne m'attaquez toujours pas en justice, ça me ferait plaisir de pas aller en prison, merci"
             },
-            "modelId": "c0bde64524c0426ea6cd74cee2dc9707",
-            "excludedFromWireframe": [
-                "Ground",
-                "Dust",
-                "Black"
-            ],
+            "modelId": "07dc155556b9403bb4853c9ba2a44a84",
             "thumbnails": [
                 {
                     "src": "thumbnail1.png",
                     "srcWireframe": "thumbnail1-w.png",
-                    "alt": "Sample project 3 detail 1"
+                    "alt": "Thumbnail 1"
                 },
                 {
                     "src": "thumbnail2.png",
                     "srcWireframe": "thumbnail2-w.png",
-                    "alt": "Sample project 3 detail 2"
+                    "alt": "Thumbnail 2"
                 },
                 {
                     "src": "thumbnail3.png",
                     "srcWireframe": "thumbnail3-w.png",
-                    "alt": "Sample project 3 detail 3"
+                    "alt": "Thumbnail 3"
                 }
             ],
+            "wireframeParameters": {
+                "wireframeColor": "00000020",
+                "whiteMaterialColor": [
+                    0.09,
+                    0.09,
+                    0.09
+                ],
+                "lights": [
+                    {
+                        "index": 0,
+                        "intensity": 1.2,
+                        "color": "#00ddff"
+                    }
+                ]
+            },
             "stats": {
                 "vertices": 85700,
                 "edges": 171400,
-                "faces": 85650,
-                "triangles": 171300
+                "faces": 85650
             },
             "software": [
                 "Blender",
@@ -156,7 +183,42 @@
     ],
     "galleryProjects": [
         {
-            "id": "sample-project-1",
+            "title": {
+                "en": "Table/Chair Office",
+                "fr": "Tables/Chaises de bureau"
+            },
+            "imageFolder": "project-1",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 46091,
+                "edges": 92096
+            }
+        },
+        {
+            "title": {
+                "en": "Cylinder seat / Table / Bamboo lamp",
+                "fr": "Siège cylindrique / Table / Lampe en bambou"
+            },
+            "imageFolder": "project-2",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 25600,
+                "edges": 51200
+            }
+        },
+        {
+            "title": {
+                "en": "High Table / High chairs",
+                "fr": "Table haute / Chaises hautes"
+            },
+            "imageFolder": "sample-project-3",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
+            }
+        },
+        {
             "title": {
                 "en": "Sample Project 1",
                 "fr": "Projet Exemple 1"
@@ -169,7 +231,6 @@
             }
         },
         {
-            "id": "sample-project-2",
             "title": {
                 "en": "Sample Project 2",
                 "fr": "Projet Exemple 2"
@@ -182,7 +243,6 @@
             }
         },
         {
-            "id": "sample-project-3",
             "title": {
                 "en": "Sample Project 3",
                 "fr": "Projet Exemple 3"
@@ -195,7 +255,6 @@
             }
         },
         {
-            "id": "sample-project-4",
             "title": {
                 "en": "Sample Project 4",
                 "fr": "Projet Exemple 4"
@@ -208,7 +267,6 @@
             }
         },
         {
-            "id": "sample-project-5",
             "title": {
                 "en": "Sample Project 5",
                 "fr": "Projet Exemple 5"
@@ -221,7 +279,6 @@
             }
         },
         {
-            "id": "sample-project-6",
             "title": {
                 "en": "Sample Project 6",
                 "fr": "Projet Exemple 6"
