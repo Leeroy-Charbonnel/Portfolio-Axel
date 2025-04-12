@@ -103,11 +103,20 @@
             "wireframeParameters": {
                 "wireframeColor": "00000020",
                 "whiteMaterialColor": [
-                    0.09,
-                    0.09,
-                    0.09
+                    0.2,
+                    0.2,
+                    0.2
                 ],
                 "lights": [
+                    {
+                        "index": 0,
+                        "intensity": 5.0,
+                        "color": "#ffffff"
+                    },
+                    {
+                        "index": 1,
+                        "color": "#ffffff"
+                    },
                     {
                         "index": 2,
                         "intensity": 3.0,
@@ -127,7 +136,7 @@
             ]
         },
         {
-            "imageFolder": "sample-project-3",
+            "imageFolder": "project-3",
             "title": {
                 "en": "High Table / High chairs",
                 "fr": "Table haute / Chaises hautes"
@@ -157,9 +166,9 @@
             "wireframeParameters": {
                 "wireframeColor": "00000020",
                 "whiteMaterialColor": [
-                    0.09,
-                    0.09,
-                    0.09
+                    0.5,
+                    0.5,
+                    0.5
                 ],
                 "lights": [
                     {
@@ -187,6 +196,7 @@
                 "en": "Table/Chair Office",
                 "fr": "Tables/Chaises de bureau"
             },
+            "link": "https://sketchfab.com/3d-models/table-chair-office-441d21b8a12a4971ab67eaac5cef0888",
             "imageFolder": "project-1",
             "thumbnail": "main.png",
             "stats": {
@@ -199,6 +209,7 @@
                 "en": "Cylinder seat / Table / Bamboo lamp",
                 "fr": "Siège cylindrique / Table / Lampe en bambou"
             },
+            "link": "https://sketchfab.com/3d-models/cylinder-seat-table-bamboo-lamp-a7bccdc2d8d24ef6814bfed7a3ed3922",
             "imageFolder": "project-2",
             "thumbnail": "main.png",
             "stats": {
@@ -211,84 +222,94 @@
                 "en": "High Table / High chairs",
                 "fr": "Table haute / Chaises hautes"
             },
-            "imageFolder": "sample-project-3",
+            "link": "https://sketchfab.com/3d-models/high-table-high-chairs-07dc155556b9403bb4853c9ba2a44a84",
+            "imageFolder": "project-3",
             "thumbnail": "main.png",
             "stats": {
                 "vertices": 85700,
                 "edges": 171400
             }
         },
+
+
+
+
+
+
+
         {
             "title": {
-                "en": "Sample Project 1",
-                "fr": "Projet Exemple 1"
+                "en": "Low poly dystopian man",
+                "fr": "Homme dystopique - low poly"
             },
-            "imageFolder": "sample-project-1",
-            "thumbnail": "main.png",
-            "stats": {
-                "vertices": 46091,
-                "edges": 92096
-            }
-        },
-        {
-            "title": {
-                "en": "Sample Project 2",
-                "fr": "Projet Exemple 2"
-            },
-            "imageFolder": "sample-project-2",
-            "thumbnail": "main.png",
-            "stats": {
-                "vertices": 25600,
-                "edges": 51200
-            }
-        },
-        {
-            "title": {
-                "en": "Sample Project 3",
-                "fr": "Projet Exemple 3"
-            },
-            "imageFolder": "sample-project-3",
+            "link": "https://sketchfab.com/3d-models/low-poly-dystopian-man-3633c8c2b3844b33a9d10e4b0793b032",
+            "imageFolder": "project-4",
             "thumbnail": "main.png",
             "stats": {
                 "vertices": 85700,
                 "edges": 171400
             }
         },
+
+
         {
             "title": {
-                "en": "Sample Project 4",
-                "fr": "Projet Exemple 4"
+                "en": "Low poly retro futuristic dog",
+                "fr": "Chien rétro-futuriste - low poly"
             },
-            "imageFolder": "sample-project-4",
+            "link": "https://sketchfab.com/3d-models/low-poly-retro-futuristic-dog-c1e00825937b4b01a7d194336566eb9b",
+            "imageFolder": "project-5",
             "thumbnail": "main.png",
             "stats": {
-                "vertices": 75000,
-                "edges": 150000
+                "vertices": 85700,
+                "edges": 171400
             }
         },
+
         {
             "title": {
-                "en": "Sample Project 5",
-                "fr": "Projet Exemple 5"
+                "en": "Dystopian Car",
+                "fr": "Voiture dystopique - low poly"
             },
-            "imageFolder": "sample-project-5",
+            "link": "https://sketchfab.com/3d-models/dystopian-car-c0bde64524c0426ea6cd74cee2dc9707",
+            "imageFolder": "project-6",
             "thumbnail": "main.png",
             "stats": {
-                "vertices": 180000,
-                "edges": 360000
+                "vertices": 85700,
+                "edges": 171400
             }
         },
+
+
         {
             "title": {
-                "en": "Sample Project 6",
-                "fr": "Projet Exemple 6"
+                "en": "Cute Plesio",
+                "fr": "Plésiosaure mignon"
             },
-            "imageFolder": "sample-project-6",
+            "link": "https://sketchfab.com/3d-models/cute-plesio-340770d2e7f245798fcf93e232378f4a",
+            "imageFolder": "project-7",
             "thumbnail": "main.png",
             "stats": {
-                "vertices": 45000,
-                "edges": 90000
+                "vertices": 85700,
+                "edges": 171400
+            }
+        },
+
+        {
+            "title": {
+                "en": "Cute Spino",
+                "fr": "Spinosaure mignon"
+            },
+            "link": "https://sketchfab.com/3d-models/cute-spino-701f055847224f7c928787733254ae2c",
+            "imageFolder": "project-8",
+            "thumbnail": "main.png",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
             }
         }
+
+
+
     ]
 }

@@ -10,30 +10,26 @@
 .gradient1,
 .gradient2 {
   background-size: 100% 100%;
-  background-position:
-    0px 0px, 0px 0px, 0px 0px;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, var(--intensity)) 0%, rgba(0, 0, 0, 0) 50%);
+  background-position: 0px 0px, 0px 0px, 0px 0px;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, var(--intensity)) 0%, rgba(0, 0, 0, 0) 25%);
   position: absolute;
-  width: calc(var(--size)*2);
+  width: var(--size);
   height: var(--size);
+  pointer-events: none;
 }
 
 .gradient1 {
-  --size: 90%;
-  --intensity: 50%;
+  --size: 300vw;
+  --intensity: 20%;
   top: calc(-1 * var(--size) / 2);
-  right: calc(-1 * var(--size));
-  height: calc(var(--size) * 2);
-  transform: translateY(-25%);
+  right: calc(-1 * var(--size) / 2);
 }
 
 .gradient2 {
-  --size: 70%;
-  --intensity: 39%;
+  --size: 250vw;
+  --intensity: 20%;
   bottom: calc(-1 * var(--size) / 2);
-  left: calc(-1 * var(--size));
-  height: calc(var(--size) * 2);
-  transform: translateY(25%);
+  left: calc(-1 * var(--size) / 2);
 }
 
 
@@ -110,6 +106,23 @@
   pointer-events: none;
 }
 
+
+
+@media (pointer:none),
+(pointer:coarse) {
+
+  .homeContainer {
+    --margin: 0px;
+    /* height: fit-content; */
+    /* padding: var(--margin) 0px; */
+    border: none;
+  }
+
+}
+
+
+
+
 @media (max-width: 768px) {
   .title {
     font-size: 3rem;
@@ -123,6 +136,10 @@
     margin-bottom: 2rem;
     padding: 1.5rem;
   }
+
+
+
+
 }
 
 @media (max-width: 480px) {

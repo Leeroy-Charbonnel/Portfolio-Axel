@@ -4,8 +4,8 @@ import { motion, useInView } from 'framer-motion';
 import { Grid } from 'lucide-react';
 import { Project, Software } from '../../types';
 import { LanguageContext, LanguageContextType } from '../languageProvider';
-import ProjectStats from './projectStats';
 import styles from './mainProject.module.css';
+import AnimatedCounter from '../AnimatedCounter';
 
 declare global {
   interface Window {
@@ -28,12 +28,11 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const { language, t } = useContext(LanguageContext) as LanguageContextType;
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  
-  // Check if the component is in view
-  const isInView = useInView(containerRef, { 
-    once: true, // Only trigger once
-    amount: 0.3, // Trigger when 30% of the element is in view
-    margin: "0px 0px -200px 0px" // Start loading a bit before it comes into view
+
+  const isInView = useInView(containerRef, {
+    once: true,
+    amount: 0.3,
+    margin: "0px 0px -200px 0px" //Load before fully in view
   });
 
   const [sketchfabLoaded, setSketchfabLoaded] = useState<boolean>(false);
@@ -48,14 +47,14 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const geometryNodes = useRef<any[]>([]);
   const whiteMaterial = useRef<string | null>(null);
   const originalLights = useRef<Record<number, LightSetting>>({});
-  
+
   //Constants for wireframe visualization
-  const wireframeColor = project.wireframeParameters?.wireframeColor || "00000020"; //Transparent black for wireframe lines
-  const whiteMaterialColor = project.wireframeParameters?.whiteMaterialColor || [0.09, 0.09, 0.09]; //Default dark gray for materials in wireframe mode
+  const wireframeColor = project.wireframeParameters?.wireframeColor || "00000020";
+  const whiteMaterialColor = project.wireframeParameters?.whiteMaterialColor || [0.09, 0.09, 0.09];
 
   const initSketchfab = () => {
     if (!iframeRef.current || !isInView || sketchfabInitialized) return;
-    
+
     setIsLoading(true);
     setSketchfabInitialized(true);
 
@@ -87,26 +86,22 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
   const onViewerReady = () => {
     if (!sketchfabAPI.current) return;
-    
-    //Initialize white material for wireframe mode
+
     initWhiteMaterial();
-    
-    //Store original light settings
     storeOriginalLightSettings();
-    
-    //Get node map to find geometry nodes and their materials
+
     sketchfabAPI.current.getNodeMap((err: any, nodes: any) => {
       if (err) {
         console.error("Error getting node map:", err);
         return;
       }
-      
+
       //Get all geometry nodes
-      geometryNodes.current = Object.values(nodes).filter((node: any) => 
+      geometryNodes.current = Object.values(nodes).filter((node: any) =>
         node.type === "Geometry"
       );
-      
-      //Save original materials for later restoration
+
+      //Save original materials
       geometryNodes.current.forEach((node: any) => {
         originalMaterials.current[node.name] = node.materialID;
       });
@@ -116,27 +111,24 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   //Store original light settings for all 3 lights
   const storeOriginalLightSettings = () => {
     if (!sketchfabAPI.current) return;
-    
-    //Sketchfab has 3 lights (indices 0, 1, 2)
+
     for (let i = 0; i < 3; i++) {
       sketchfabAPI.current.getLight(i, (err: any, light: any) => {
         if (err) {
           console.error(`Error getting light ${i}:`, err);
           return;
         }
-        
         originalLights.current[i] = {
-          intensity: light.intensity || 1.0,
-          color: light.color || [1, 1, 1]
+          intensity: light.intensity,
+          color: light.color
         };
       });
     }
   };
 
-  //Create a white material for wireframe mode
   const initWhiteMaterial = () => {
     if (!sketchfabAPI.current) return;
-    
+
     sketchfabAPI.current.createMaterial({
       channels: {
         AlbedoPBR: { color: whiteMaterialColor },
@@ -158,19 +150,17 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
     });
   };
 
-  //Set lights based on wireframeParameters settings
   const setLightsForWireframeMode = () => {
     if (!sketchfabAPI.current || !project.wireframeParameters?.lights) return;
-    
-    //Apply light settings based on index
+
     project.wireframeParameters.lights.forEach(light => {
       if (light.index !== undefined && light.index >= 0 && light.index < 3) {
         const intensity = light.intensity || 1.0;
         const color = hexToRgb(light.color || "#ffffff");
-        
+
         sketchfabAPI.current.setLight(light.index, {
-          intensity: intensity,
-          color: color
+          intensity: intensity || originalLights.current[light.index].intensity,
+          color: color || originalLights.current[light.index].color,
         });
       }
     });
@@ -179,7 +169,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   //Restore original light settings
   const restoreOriginalLights = () => {
     if (!sketchfabAPI.current) return;
-    
+
     //Restore each light to its original settings
     Object.entries(originalLights.current).forEach(([indexStr, settings]) => {
       const index = parseInt(indexStr);
@@ -190,16 +180,15 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
     });
   };
 
-  //Helper to convert hex color to RGB array
   const hexToRgb = (hex: string): number[] => {
     //Remove # if present
     hex = hex.replace(/^#/, '');
-    
+
     //Parse the hex values
     const r = parseInt(hex.substring(0, 2), 16) / 255;
     const g = parseInt(hex.substring(2, 4), 16) / 255;
     const b = parseInt(hex.substring(4, 6), 16) / 255;
-    
+
     return [r, g, b];
   };
 
@@ -212,43 +201,26 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
     }
 
     const newWireframeState = !isWireframe;
-    
-    //Set wireframe visibility with color
+
     sketchfabAPI.current.setWireframe(true, {
-      color: newWireframeState ? wireframeColor : "00000000" //Transparent when not in wireframe mode
+      color: newWireframeState ? wireframeColor : "00000000"
     });
-    
+
     if (newWireframeState) {
-      //Switch to wireframe mode
       setLightsForWireframeMode();
-      
-      //Apply white material to all geometry nodes
+
       geometryNodes.current.forEach((node: any) => {
         sketchfabAPI.current.assignMaterial(node, whiteMaterial.current);
       });
     } else {
-      //Switch back to normal mode
       restoreOriginalLights();
-      
-      //Restore original materials
+
       geometryNodes.current.forEach((node: any) => {
         sketchfabAPI.current.assignMaterial(node, originalMaterials.current[node.name]);
       });
     }
-    
-    setIsWireframe(newWireframeState);
-  };
 
-  // Get project stats with calculated triangles if not provided
-  const getProjectStats = () => {
-    const stats = {...project.stats};
-    
-    // Calculate triangles if not provided (faces * 2)
-    if (stats.faces && !stats.triangles) {
-      stats.triangles = stats.faces * 2;
-    }
-    
-    return stats;
+    setIsWireframe(newWireframeState);
   };
 
   const mainImagePath = `/images/projects/${project.imageFolder}/main.png`;
@@ -259,11 +231,8 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const showSketchfab = project.modelId && !sketchfabError && isInView;
   const showMainImage = !showSketchfab || isLoading;
 
-  // Initialize Sketchfab when the component comes into view
   useEffect(() => {
-    if (isInView && !sketchfabInitialized) {
-      initSketchfab();
-    }
+    if (isInView && !sketchfabInitialized) { initSketchfab(); }
   }, [isInView, sketchfabInitialized]);
 
   return (
@@ -282,73 +251,6 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
         </div>
 
         <div className={styles.projectContent}>
-          <div className={`${styles.modelSection} noGrainOverlay`}>
-            <div className={`${styles.modelContainer} border-sm`}>
-              {showMainImage && (
-                <Image
-                  src={isWireframe ? wireframeImagePath : mainImagePath}
-                  alt={project.title[language]}
-                  fill={true}
-                  className={styles.projectMainImage}
-                  priority
-                />
-              )}
-              
-              {/* Always render iframe but it will only initialize when in view */}
-              {project.modelId && (
-                <iframe
-                  ref={iframeRef}
-                  title={`Sketchfab Model - ${project.title[language]}`}
-                  className={`${styles.modelEmbed} ${showSketchfab && !isLoading ? '' : styles.hidden}`}
-                ></iframe>
-              )}
-              
-              {/* Loading indicator */}
-              {isLoading && (
-                <div className={styles.loadingContainer}>
-                  <div className={styles.loadingSpinner}></div>
-                </div>
-              )}
-              
-              <button
-                className={`${styles.wireframeButton} ${isWireframe ? styles.active : 'border-sm'} `}
-                onClick={toggleWireframe}
-                aria-label="Toggle wireframe"
-                disabled={!sketchfabLoaded}
-              >
-                <Grid size={16} className={styles.wireframeIcon} />
-              </button>
-            </div>
-          </div>
-
-          <div className={`${styles.projectDetails} noGrainOverlay`}>
-            <div className={styles.projectInfo}>
-              <div className={styles.projectDescription}>
-                <p>{project.description[language]}</p>
-              </div>
-
-              <div className={styles.projectStatsAndSoftware}>
-                <ProjectStats stats={getProjectStats()} animate={true} />
-
-                <div className={styles.softwareIcons}>
-                  {projectSoftwareWithLogos.map((sw, index) => (
-                    <div key={index} className={styles.softwareIcon}>
-                      <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
-                        <Image
-                          src={sw.logo}
-                          alt={sw.name}
-                          width={24}
-                          height={24}
-                          className={styles.softwareLogo}
-                        />
-                        <span>{sw.name}</span>
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div className={`${styles.thumbnailsContainer} noGrainOverlay`}>
             {project.thumbnails.map((thumbnail, index) => (
@@ -365,6 +267,95 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
               </div>
             ))}
           </div>
+
+
+          <div className={styles.panel1}>
+            <div className={`${styles.modelSection} noGrainOverlay`}>
+              <div className={`${styles.modelContainer} border-sm`}>
+                {showMainImage && (
+                  <Image
+                    src={isWireframe ? wireframeImagePath : mainImagePath}
+                    alt={project.title[language]}
+                    fill={true}
+                    className={styles.projectMainImage}
+                    priority
+                  />
+                )}
+
+                {project.modelId && (
+                  <iframe
+                    ref={iframeRef}
+                    title={`Sketchfab Model - ${project.title[language]}`}
+                    className={`${styles.modelEmbed} ${showSketchfab && !isLoading ? '' : styles.hidden}`}
+                  ></iframe>
+                )}
+
+                <button
+                  className={`${styles.wireframeButton} ${isWireframe ? styles.active : 'border-sm'} `}
+                  onClick={toggleWireframe}
+                  aria-label="Toggle wireframe"
+                  disabled={!sketchfabLoaded}
+                >
+                  <Grid size={16} className={styles.wireframeIcon} />
+                </button>
+              </div>
+            </div>
+
+            <div className={`${styles.projectDetails} noGrainOverlay`}>
+              <div className={styles.projectInfo}>
+                <div className={styles.projectDescription}>
+                  <p>{project.description[language]}</p>
+                </div>
+
+                <div className={styles.projectStatsAndSoftware}>
+
+
+                  <div className={styles.statsContainer}>
+                    {[
+                      { key: 'vertices', value: project.stats.vertices! },
+                      { key: 'edges', value: project.stats.edges! },
+                      { key: 'faces', value: project.stats.faces! }
+                    ].map((item, index) => (
+                      <motion.div
+                        key={item.key}
+                        className={styles.statItem}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                        transition={{ delay: index * 0.1 + 0.3, duration: 0.5 }}
+                      >
+
+                        <div className={styles.statLabel}>{t(`projects.stats.${item.key}`)}</div>
+                        <AnimatedCounter from={0} to={item.value} duration={2} />
+                      </motion.div>
+                    ))}
+                  </div>
+
+
+
+
+                  <div className={styles.softwareIcons}>
+                    {projectSoftwareWithLogos.map((sw, index) => (
+                      <div key={index} className={styles.softwareIcon}>
+                        <a href={sw.url} target="_blank" rel="noopener noreferrer" className={styles.softwareLink}>
+                          <Image
+                            src={sw.logo}
+                            alt={sw.name}
+                            width={24}
+                            height={24}
+                            className={styles.softwareLogo}
+                          />
+                          <span className={styles.softwareName}>{sw.name}</span>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+
         </div>
       </div>
     </motion.div>

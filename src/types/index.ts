@@ -3,7 +3,6 @@ export interface ProjectStats {
   vertices: number;
   edges: number;
   faces?: number;
-  triangles?: number;
 }
 
 export interface ProjectThumbnail {
