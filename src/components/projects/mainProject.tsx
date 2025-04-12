@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import Image from 'next/image';
-import { color, motion, useInView } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import { Grid } from 'lucide-react';
 import { Project, Software } from '../../types';
 import { LanguageContext, LanguageContextType } from '../languageProvider';
@@ -43,10 +43,13 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const sketchfabAPI = useRef<any>(null);
+
   const sketchfabClient = useRef<any>(null);
 
+  const geometryNodes = useRef<any[]>([]);
   const originalMaterials = useRef<Record<string, any>>({});
-  const newMaterials = useRef<Record<string, any>>({});
+
+
 
   const whiteMaterial = useRef<string | null>(null);
   const emissiveMaterial = useRef<string | null>(null);
@@ -54,8 +57,8 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
   //Constants for wireframe visualization
   const wireframeColor = project.wireframeParameters?.wireframeColor || "00000020";
-  const whiteMaterialColor = project.wireframeParameters?.whiteMaterialColor || "#ffffff20";
-  const emissiveMaterialsColor = project.wireframeParameters?.emissiveMaterialsColor || "#00ddff";
+  const whiteMaterialColor = project.wireframeParameters?.whiteMaterialColor || [0.09, 0.09, 0.09];
+  const emissiveMaterialColor = project.wireframeParameters?.emissiveMaterialsColor || [0.5, 0.5, 0.5];
 
   const initSketchfab = () => {
     if (!iframeRef.current || !isInView || sketchfabInitialized) return;
@@ -92,7 +95,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const onViewerReady = () => {
     if (!sketchfabAPI.current) return;
 
-    initNewMaterial();
+    initMaterial();
     storeOriginalLightSettings();
 
     sketchfabAPI.current.getNodeMap((err: any, nodes: any) => {
@@ -102,30 +105,15 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
       }
 
       //Get all geometry nodes
-      console.log(Object.values(nodes).filter((node: any) =>
+      geometryNodes.current = Object.values(nodes).filter((node: any) =>
         node.type === "Geometry"
-      ));
+      );
 
-      // //Get all geometry nodes
-      // geometryNodes.current = Object.values(nodes).filter((node: any) =>
-      //   node.type === "Geometry"
-      // );
-
-      
-
-
-      sketchfabAPI.current.getMaterialList(function (err: any, materials: any) {
-        originalMaterials.current = materials;
-      })
-
-      originalMaterials.current.forEach((material: any) => {
-        newMaterials.current[material.id] = material;
-      })
 
       //Save original materials
-      // geometryNodes.current.forEach((node: any) => {
-      //   originalMaterials.current[node.name] = node.materialID;
-      // });
+      geometryNodes.current.forEach((node: any) => {
+        originalMaterials.current[node.name] = node.materialID;
+      });
     });
   };
 
@@ -147,8 +135,31 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
     }
   };
 
-  const initNewMaterial = () => {
+  const initMaterial = () => {
     if (!sketchfabAPI.current) return;
+
+    sketchfabAPI.current.createMaterial({
+      channels: {
+        AlbedoPBR: { color: emissiveMaterialColor },
+        EmitColor: { factor: 1, color: emissiveMaterialColor },
+        Matcap: { factor: 0 },
+        ClearCoat: { factor: 0 },
+        ClearCoatNormalMap: { factor: 0 },
+        ClearCoatRoughness: { factor: 0 },
+        GlossinessPBR: { factor: 0 },
+        RoughnessPBR: { factor: 1 },
+        MetalnessPBR: { factor: 0 },
+      }
+    }, (err: any, material: any) => {
+      if (err) {
+        console.error("Error creating white material:", err);
+        return;
+      }
+      whiteMaterial.current = material.id;
+    });
+
+
+
 
     sketchfabAPI.current.createMaterial({
       channels: {
@@ -167,33 +178,12 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
         console.error("Error creating white material:", err);
         return;
       }
-      whiteMaterial.current = material.id;
-    });
-
-
-    sketchfabAPI.current.createMaterial({
-      channels: {
-        AlbedoPBR: { color: emissiveMaterialsColor },
-        EmitColor: { factor: 1, color: emissiveMaterialsColor },
-        Matcap: { factor: 0 },
-        ClearCoat: { factor: 0 },
-        ClearCoatNormalMap: { factor: 0 },
-        ClearCoatRoughness: { factor: 0 },
-        GlossinessPBR: { factor: 0 },
-        RoughnessPBR: { factor: 1 },
-        MetalnessPBR: { factor: 0 },
-      }
-    }, (err: any, material: any) => {
-      if (err) {
-        console.error("Error creating white material:", err);
-        return;
-      }
       emissiveMaterial.current = material.id;
     });
   };
 
   const setLightsForWireframeMode = () => {
-    if (!sketchfabAPI.current || !project.wireframeParameters?.lights) return;
+    if (!sketchfabAPI.current || !project.wireframeParameters?.lightsOverwrite) return;
 
     project.wireframeParameters.lightsOverwrite.forEach(light => {
       if (light.index !== undefined && light.index >= 0 && light.index < 3) {
@@ -240,8 +230,6 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
     if (newWireframeState) {
       setLightsForWireframeMode();
-
-
 
       geometryNodes.current.forEach((node: any) => {
         sketchfabAPI.current.assignMaterial(node, whiteMaterial.current);
