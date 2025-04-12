@@ -1,7 +1,7 @@
 .projectWrapper {
   --thumbnail-gap: var(--spacing-xxs);
   width: 100%;
-  margin-bottom: var(--spacing-6xl);
+  margin-bottom: var(--spacing-3xl);
   height: var(--project-height);
   overflow: hidden;
   padding-bottom: var(--spacing-lg);
@@ -45,6 +45,7 @@
 .softwareIcons {
   display: flex;
   gap: var(--spacing-xs);
+  flex-wrap: wrap;
 }
 
 .softwareIcon a {
@@ -56,15 +57,16 @@
   padding: var(--spacing-xs);
   border-radius: var(--border-radius-md);
   height: fit-content;
+  flex-grow: 1;
 }
 
 
 .softwareIcon {
   border-radius: var(--border-radius-md);
-  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-grow: 1;
 }
 
 .projectDescription {
@@ -183,6 +185,7 @@
 .statsContainer {
   display: flex;
   gap: var(--spacing-xs);
+  flex-wrap: wrap;
 }
 
 .statItem {
@@ -190,6 +193,7 @@
   flex-direction: column;
   align-items: center;
   min-width: 100px;
+  flex-grow: 1;
 }
 
 .statLabel {
@@ -211,6 +215,21 @@
 
 
 @media (max-width: 768px) {
+  .statsContainer {
+    flex-wrap: nowrap;
+  }
+
+
+  .projectHeader {
+    font-size: var(--font-size-base);
+  }
+
+  .projectHeader .projectTitle {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
   .layout0 .projectContent {
     flex-direction: column;
   }
@@ -218,6 +237,10 @@
   .layout1 .projectContent {
     flex-direction: column;
 
+  }
+
+  .panel1 {
+    height: inherit;
   }
 
   .projectDescription {
@@ -235,14 +258,8 @@
   .thumbnailsContainer {
     flex-direction: row;
     height: fit-content;
-    background: #ff000052;
   }
 
-
-  .projectContent {
-    height: fit-content;
-
-  }
 
   .softwareIcons {
     align-content: center;
@@ -283,10 +300,8 @@
 
 
 @media (max-width: 400px) {
-
   .softwareName {
     display: none;
   }
-
 
 }

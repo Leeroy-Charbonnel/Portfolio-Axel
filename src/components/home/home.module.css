@@ -112,10 +112,10 @@
 (pointer:coarse) {
 
   .homeContainer {
-    --margin: 0px;
+    --margin: 20px;
     /* height: fit-content; */
     /* padding: var(--margin) 0px; */
-    border: none;
+    /* border: none; */
   }
 
 }
@@ -136,10 +136,6 @@
     margin-bottom: 2rem;
     padding: 1.5rem;
   }
-
-
-
-
 }
 
 @media (max-width: 480px) {

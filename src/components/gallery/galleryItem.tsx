@@ -4,11 +4,12 @@ import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
 import styles from './projectGallery.module.css';
 
-// Context consumer for class components
 import { LanguageContext } from '../languageProvider';
 
 interface GalleryItemProps {
   id: string;
+  link: string;
+  imageFolder: string;
   title: {
     en: string;
     fr: string;
@@ -34,7 +35,6 @@ class GalleryItem extends Component<GalleryItemProps> {
 
   render() {
     const { id, title, thumbnail, stats, index } = this.props;
-    // Get language from context
     const { language } = this.context as LanguageContextType;
 
     return (
@@ -45,7 +45,7 @@ class GalleryItem extends Component<GalleryItemProps> {
         transition={{ duration: 0.6, delay: index * 0.1 }}
         viewport={{ once: true, margin: "-50px" }}
       >
-        <div className={styles.thumbnailContainer}>
+        <div className={`${styles.thumbnailContainer} noGrainOverlay`}>
           <Image
             src={thumbnail}
             alt={title[language]}
@@ -55,7 +55,7 @@ class GalleryItem extends Component<GalleryItemProps> {
           />
         </div>
 
-        <div className={styles.itemDetails}>
+        <div className={`${styles.itemDetails} noGrainOverlay`}>
           <h3 className={styles.itemTitle}>{title[language]}</h3>
 
           <div className={styles.itemStats}>
@@ -67,7 +67,7 @@ class GalleryItem extends Component<GalleryItemProps> {
             </div>
           </div>
         </div>
-      </motion.div>
+      </motion.div >
     );
   }
 }

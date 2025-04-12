@@ -19,8 +19,9 @@ export interface WireframeLight {
 
 export interface WireframeParameters {
   wireframeColor?: string;
-  whiteMaterialColor?: number[];
-  lights: WireframeLight[];
+  whiteMaterialColor: string;
+  emissiveMaterialsColor: string;
+  lightsOverwrite: WireframeLight[];
 }
 
 export interface Project {

@@ -17,6 +17,8 @@ interface HomePageProps {
   softwares: Record<string, Software>;
   galleryProjects: {
     id: string;
+    link: string;
+    imageFolder: string;
     title: {
       en: string;
       fr: string;

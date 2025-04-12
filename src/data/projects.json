@@ -48,17 +48,17 @@
             ],
             "wireframeParameters": {
                 "wireframeColor": "00000020",
-                "whiteMaterialColor": [
-                    0.09,
-                    0.09,
-                    0.09
-                ],
+                "whiteMaterialColor": "#ffffff20",
+                "emissiveMaterialsColor":"#00ddff",
                 "lights": [
                     {
                         "index": 0,
                         "intensity": 2.0,
                         "color": "#00ddff"
                     }
+                ],
+                "emissiveMaterialsOverwrite": [
+                    "6ee4a74a-df95-4a94-ac64-34308e85fcdf"
                 ]
             },
             "stats": {
@@ -102,16 +102,13 @@
             ],
             "wireframeParameters": {
                 "wireframeColor": "00000020",
-                "whiteMaterialColor": [
-                    0.2,
-                    0.2,
-                    0.2
-                ],
+                "whiteMaterialColor":"#ffffff20",
+                "emissiveMaterialsColor":"#00ddff",
                 "lights": [
                     {
                         "index": 0,
                         "intensity": 5.0,
-                        "color": "#ffffff"
+                        "color": "#00ddff"
                     },
                     {
                         "index": 1,
@@ -120,8 +117,11 @@
                     {
                         "index": 2,
                         "intensity": 3.0,
-                        "color": "#00ddff"
+                        "color": "#ffffff"
                     }
+                ],
+                "emissiveMaterialsOverwrite": [
+                    "a57c5585-8173-4f73-a4b7-b3b412314a2e"
                 ]
             },
             "stats": {
@@ -165,17 +165,17 @@
             ],
             "wireframeParameters": {
                 "wireframeColor": "00000020",
-                "whiteMaterialColor": [
-                    0.5,
-                    0.5,
-                    0.5
-                ],
-                "lights": [
+                "whiteMaterialColor": "#ffffff20",
+                "emissiveMaterialsColor":"#00ddff",
+                "lightsOverwrite": [
                     {
                         "index": 0,
                         "intensity": 1.2,
                         "color": "#00ddff"
                     }
+                ],
+                "emissiveMaterialsOverwrite": [
+                    "2aeabc9d-a865-4528-a628-7164611f6ff9"
                 ]
             },
             "stats": {
@@ -230,13 +230,6 @@
                 "edges": 171400
             }
         },
-
-
-
-
-
-
-
         {
             "title": {
                 "en": "Low poly dystopian man",
@@ -250,8 +243,6 @@
                 "edges": 171400
             }
         },
-
-
         {
             "title": {
                 "en": "Low poly retro futuristic dog",
@@ -265,7 +256,6 @@
                 "edges": 171400
             }
         },
-
         {
             "title": {
                 "en": "Dystopian Car",
@@ -279,8 +269,6 @@
                 "edges": 171400
             }
         },
-
-
         {
             "title": {
                 "en": "Cute Plesio",
@@ -294,7 +282,6 @@
                 "edges": 171400
             }
         },
-
         {
             "title": {
                 "en": "Cute Spino",
@@ -308,8 +295,5 @@
                 "edges": 171400
             }
         }
-
-
-
     ]
 }
