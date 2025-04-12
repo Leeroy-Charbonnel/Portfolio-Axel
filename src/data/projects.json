@@ -48,13 +48,12 @@
             ],
             "wireframeParameters": {
                 "wireframeColor": "00000020",
-                "whiteMaterialColor": "#ffffff20",
-                "emissiveMaterialsColor":"#00ddff",
-                "lights": [
+                "whiteMaterialColor": "151515",
+                "lightsOverwrite": [
                     {
                         "index": 0,
                         "intensity": 2.0,
-                        "color": "#00ddff"
+                        "color": "00ddff"
                     }
                 ],
                 "emissiveMaterialsOverwrite": [
@@ -102,22 +101,20 @@
             ],
             "wireframeParameters": {
                 "wireframeColor": "00000020",
-                "whiteMaterialColor":"#ffffff20",
-                "emissiveMaterialsColor":"#00ddff",
-                "lights": [
+                "whiteMaterialColor": "151515",
+                "lightsOverwrite": [
                     {
                         "index": 0,
-                        "intensity": 5.0,
-                        "color": "#00ddff"
+                        "color": "ffffff"
                     },
                     {
                         "index": 1,
-                        "color": "#ffffff"
+                        "color": "ffffff"
                     },
                     {
                         "index": 2,
-                        "intensity": 3.0,
-                        "color": "#ffffff"
+                        "intensity": 1.0,
+                        "color": "00ddff"
                     }
                 ],
                 "emissiveMaterialsOverwrite": [
@@ -165,13 +162,12 @@
             ],
             "wireframeParameters": {
                 "wireframeColor": "00000020",
-                "whiteMaterialColor": "#ffffff20",
-                "emissiveMaterialsColor":"#00ddff",
+                "whiteMaterialColor": "707070",
                 "lightsOverwrite": [
                     {
                         "index": 0,
-                        "intensity": 1.2,
-                        "color": "#00ddff"
+                        "intensity": 0.4,
+                        "color": "00ddff"
                     }
                 ],
                 "emissiveMaterialsOverwrite": [

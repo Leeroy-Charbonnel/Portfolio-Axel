@@ -43,13 +43,10 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const sketchfabAPI = useRef<any>(null);
-
   const sketchfabClient = useRef<any>(null);
-
   const geometryNodes = useRef<any[]>([]);
   const originalMaterials = useRef<Record<string, any>>({});
-
-
+  const materialNodes = useRef<Record<string, any[]>>({});
 
   const whiteMaterial = useRef<string | null>(null);
   const emissiveMaterial = useRef<string | null>(null);
@@ -57,8 +54,14 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
   //Constants for wireframe visualization
   const wireframeColor = project.wireframeParameters?.wireframeColor || "00000020";
-  const whiteMaterialColor = project.wireframeParameters?.whiteMaterialColor || [0.09, 0.09, 0.09];
-  const emissiveMaterialColor = project.wireframeParameters?.emissiveMaterialsColor || [0.5, 0.5, 0.5];
+  const whiteMaterialColor = project.wireframeParameters?.whiteMaterialColor || "ffffff"
+  const emissiveMaterialsOverwrite = project.wireframeParameters?.emissiveMaterialsOverwrite || [];
+
+
+  const emissiveMaterialColor = "#85efff";
+
+
+
 
   const initSketchfab = () => {
     if (!iframeRef.current || !isInView || sketchfabInitialized) return;
@@ -109,10 +112,16 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
         node.type === "Geometry"
       );
 
-
-      //Save original materials
+      //Save original materials and group nodes by material ID
       geometryNodes.current.forEach((node: any) => {
-        originalMaterials.current[node.name] = node.materialID;
+        const materialID = node.materialID;
+        originalMaterials.current[node.name] = materialID;
+
+        //Group nodes by material ID for easier handling during wireframe toggle
+        if (!materialNodes.current[materialID]) {
+          materialNodes.current[materialID] = [];
+        }
+        materialNodes.current[materialID].push(node);
       });
     });
   };
@@ -138,17 +147,32 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const initMaterial = () => {
     if (!sketchfabAPI.current) return;
 
+    //Create emissive material for highlighted parts
     sketchfabAPI.current.createMaterial({
       channels: {
-        AlbedoPBR: { color: emissiveMaterialColor },
-        EmitColor: { factor: 1, color: emissiveMaterialColor },
-        Matcap: { factor: 0 },
-        ClearCoat: { factor: 0 },
-        ClearCoatNormalMap: { factor: 0 },
-        ClearCoatRoughness: { factor: 0 },
-        GlossinessPBR: { factor: 0 },
+        AlbedoPBR: { color: [hexToRgb(emissiveMaterialColor)] },
+        EmitColor: {
+          enable: true,
+          type: "additive",
+          factor: 1,
+          color: hexToRgb(emissiveMaterialColor)
+        },
         RoughnessPBR: { factor: 1 },
-        MetalnessPBR: { factor: 0 },
+      }
+    }, (err: any, material: any) => {
+      if (err) {
+        console.error("Error creating emissive material:", err);
+        return;
+      }
+      emissiveMaterial.current = material.id;
+    });
+
+    //Create white material for non-highlighted parts
+    sketchfabAPI.current.createMaterial({
+      channels: {
+        AlbedoPBR: { color: hexToRgb(whiteMaterialColor) },
+        EmitColor: { enable: false },
+        RoughnessPBR: { factor: 1 }
       }
     }, (err: any, material: any) => {
       if (err) {
@@ -156,29 +180,6 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
         return;
       }
       whiteMaterial.current = material.id;
-    });
-
-
-
-
-    sketchfabAPI.current.createMaterial({
-      channels: {
-        AlbedoPBR: { color: whiteMaterialColor },
-        EmitColor: { factor: 0 },
-        Matcap: { factor: 0 },
-        ClearCoat: { factor: 0 },
-        ClearCoatNormalMap: { factor: 0 },
-        ClearCoatRoughness: { factor: 0 },
-        GlossinessPBR: { factor: 0 },
-        RoughnessPBR: { factor: 1 },
-        MetalnessPBR: { factor: 0 },
-      }
-    }, (err: any, material: any) => {
-      if (err) {
-        console.error("Error creating white material:", err);
-        return;
-      }
-      emissiveMaterial.current = material.id;
     });
   };
 
@@ -212,12 +213,10 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
     });
   };
 
-
-
   const toggleWireframe = (e: React.MouseEvent) => {
     e.preventDefault();
 
-    if (!sketchfabAPI.current || whiteMaterial.current === null) {
+    if (!sketchfabAPI.current || whiteMaterial.current === null || emissiveMaterial.current === null) {
       setIsWireframe(false);
       return;
     }
@@ -231,12 +230,21 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
     if (newWireframeState) {
       setLightsForWireframeMode();
 
+      //Apply materials based on emissiveMaterialsOverwrite list
       geometryNodes.current.forEach((node: any) => {
-        sketchfabAPI.current.assignMaterial(node, whiteMaterial.current);
+        const materialID = originalMaterials.current[node.name];
+
+        //Check if this material should be emissive in wireframe mode
+        if (emissiveMaterialsOverwrite.includes(materialID)) {
+          sketchfabAPI.current.assignMaterial(node, emissiveMaterial.current);
+        } else {
+          sketchfabAPI.current.assignMaterial(node, whiteMaterial.current);
+        }
       });
     } else {
       restoreOriginalLights();
 
+      //Restore original materials
       geometryNodes.current.forEach((node: any) => {
         sketchfabAPI.current.assignMaterial(node, originalMaterials.current[node.name]);
       });
@@ -254,7 +262,9 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const showMainImage = !showSketchfab || isLoading;
 
   useEffect(() => {
-    if (isInView && !sketchfabInitialized) { initSketchfab(); }
+    if (isInView && !sketchfabInitialized) {
+      initSketchfab();
+    }
   }, [isInView, sketchfabInitialized]);
 
   return (
