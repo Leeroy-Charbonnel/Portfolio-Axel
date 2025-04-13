@@ -11,6 +11,21 @@ export interface ProjectThumbnail {
   alt: string;
 }
 
+export interface GalleryProject {
+  id: string;
+  title: {
+    en: string;
+    fr: string;
+  };
+  imageFolder: string;
+  link: string;
+  stats: {
+    vertices: number;
+    edges: number;
+  };
+}
+
+
 export interface WireframeLight {
   index: number;
   intensity: number;
@@ -21,11 +36,11 @@ export interface WireframeParameters {
   wireframeColor?: string;
   whiteMaterialColor: string;
   lightsOverwrite: WireframeLight[];
-  emissiveMaterialsOverwrite:string[]
+  emissiveMaterialsOverwrite: string[]
 }
 
 export interface Project {
-  id?: string;
+  modelId: string;
   imageFolder: string;
   title: {
     en: string;
@@ -35,8 +50,10 @@ export interface Project {
     en: string;
     fr: string;
   };
-  modelId: string;
-  thumbnails: ProjectThumbnail[];
+  thumbnailsDescriptions: {
+    en: string;
+    fr: string;
+  }[];
   wireframeParameters: WireframeParameters;
   stats: ProjectStats;
   software: string[];
@@ -50,8 +67,20 @@ export interface Software {
 
 export type Language = 'en' | 'fr';
 
+export interface NavItem {
+  id: string;
+  label: {
+    en: string;
+    fr: string;
+  };
+}
+
+
 export interface Experience {
-  period: string;
+  period: {
+    en: string;
+    fr: string;
+  };
   title: {
     en: string;
     fr: string;
@@ -64,10 +93,41 @@ export interface Experience {
   };
 }
 
-export interface NavItem {
-  id: string;
-  label: {
+
+
+export interface ExperienceProps {
+  experiences: Experience[];
+  about: {
     en: string;
     fr: string;
+  };
+  contact: {
+    phone: string;
+    email: string;
+    instagram: string;
+  };
+  interests: {
+    games: string[];
+    art: string[];
+  };
+}
+
+
+
+
+
+export interface AboutProps {
+  about: {
+    en: string;
+    fr: string;
+  };
+  contact: {
+    phone: string;
+    email: string;
+    instagram: string;
+  };
+  interests: {
+    games: string[];
+    art: string[];
   };
 }

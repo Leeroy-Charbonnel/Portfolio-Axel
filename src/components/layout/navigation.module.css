@@ -6,7 +6,6 @@
   left: 0;
   z-index: 100;
   transform: translateY(-50%);
-
   transition: padding 0.3s;
   padding: 50px;
   /* Distance from mouse to trigger animation */

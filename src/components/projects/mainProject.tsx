@@ -5,8 +5,8 @@ import { Grid } from 'lucide-react';
 import { Project, Software } from '../../types';
 import { LanguageContext, LanguageContextType } from '../languageProvider';
 import styles from './mainProject.module.css';
-import AnimatedCounter from '../AnimatedCounter';
 import { hexToRgb } from '@/utils/Utils';
+import AnimatedCounter from '@/animatedCounter';
 
 declare global {
   interface Window {
@@ -59,9 +59,6 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
 
   const emissiveMaterialColor = "#85efff";
-
-
-
 
   const initSketchfab = () => {
     if (!iframeRef.current || !isInView || sketchfabInitialized) return;
@@ -188,8 +185,8 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
     project.wireframeParameters.lightsOverwrite.forEach(light => {
       if (light.index !== undefined && light.index >= 0 && light.index < 3) {
-        const intensity = light.intensity || 1.0;
-        const color = hexToRgb(light.color || "#ffffff");
+        const intensity = light.intensity || null;
+        const color = hexToRgb(light.color) || null;
 
         sketchfabAPI.current.setLight(light.index, {
           intensity: intensity || originalLights.current[light.index].intensity,
@@ -269,6 +266,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
   return (
     <motion.div
+      id='projects'
       className={styles.projectWrapper}
       initial={{ opacity: 0, y: 100 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -285,14 +283,15 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
         <div className={styles.projectContent}>
 
           <div className={`${styles.thumbnailsContainer} noGrainOverlay`}>
-            {project.thumbnails.map((thumbnail, index) => (
+            {[1, 2, 3].map((i) => (
               <div
                 key={index}
                 className={`${styles.thumbnailWrapper} border-sm`}
               >
                 <Image
-                  src={`/images/projects/${project.imageFolder}/${isWireframe ? thumbnail.srcWireframe : thumbnail.src}`}
-                  alt={thumbnail.alt}
+                  src={`/images/projects/${project.imageFolder}/thumbnail${i}${isWireframe ? "-w" : ""}.png`}
+                  alt={project.thumbnailsDescriptions[i - 1][language]}
+                  title={project.thumbnailsDescriptions[i - 1][language]}
                   fill={true}
                   className={styles.thumbnailImage}
                 />
@@ -348,6 +347,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
                       { key: 'edges', value: project.stats.edges! },
                       { key: 'faces', value: project.stats.faces! }
                     ].map((item, index) => (
+                      
                       <motion.div
                         key={item.key}
                         className={styles.statItem}

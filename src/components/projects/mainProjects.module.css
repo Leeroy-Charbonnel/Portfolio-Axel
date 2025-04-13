@@ -1,29 +1,8 @@
 .projectsSection {
-  padding-top: 8rem;
+  padding-top: var(--spacing-2xl);
 }
 
-.sectionTitle {
-  font-size: 3rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  margin-bottom: 4rem;
-  text-align: center;
-  position: relative;
-  display: inline-block;
-  left: 50%;
-  transform: translateX(-50%);
-}
 
-.sectionTitle::after {
-  content: '';
-  position: absolute;
-  width: 50%;
-  height: 3px;
-  background-color: #ffffff;
-  bottom: -1rem;
-  left: 25%;
-}
 
 .projectsList {
   margin-top: 4rem;

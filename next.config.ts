@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // swcMinify: true,
   images: {
-    domains: [],
+    domains: ["media.sketchfab.com"],
   },
   i18n: {
     locales: ['en', 'fr'],

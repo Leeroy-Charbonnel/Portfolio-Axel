@@ -53,13 +53,26 @@
   text-decoration: none;
   color: var(--color-text);
   gap: var(--spacing-xs);
-  background: linear-gradient(to bottom right, var(--color-background-gray-100), var(--color-background-gray-300));
+  background: linear-gradient(to bottom right, var(--color-background-gray-100), var(--color-background-gray-150));
   padding: var(--spacing-xs);
   border-radius: var(--border-radius-md);
   height: fit-content;
   flex-grow: 1;
 }
 
+.softwareIcon a img {
+  filter: brightness(0.8);
+}
+
+.softwareIcon a:hover img {
+  filter: brightness(1);
+}
+
+
+
+.softwareIcon a:hover * {
+  color: var(--color-text-hover);
+}
 
 .softwareIcon {
   border-radius: var(--border-radius-md);
@@ -70,8 +83,8 @@
 }
 
 .projectDescription {
-  margin-top: var(--spacing-sm);
-  padding: var(--spacing-md) 0px;
+  text-align: justify;
+  margin: var(--spacing-xl) 0px;
 }
 
 .modelContainer iframe {
@@ -80,6 +93,7 @@
 
 .modelContainer {
   height: 100%;
+  width: 100%;
   position: relative;
 }
 
@@ -102,7 +116,9 @@
 }
 
 .modelSection {
-  height: 100%;
+  display: flex;
+  width: 100%;
+  flex-grow: 1;
 }
 
 .projectDetails {
@@ -142,8 +158,6 @@
   flex-direction: row-reverse;
 }
 
-
-
 /* Wireframe button */
 .wireframeButton {
   position: absolute;
@@ -180,7 +194,7 @@
 }
 
 
-
+/* Stats */
 
 .statsContainer {
   display: flex;
@@ -197,11 +211,10 @@
 }
 
 .statLabel {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--font-size-base);
+  color: var(--color-background-gray-300);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.25rem;
+  letter-spacing: var(--letter-spacing-normal);
 }
 
 .statValue {
@@ -243,10 +256,6 @@
     height: inherit;
   }
 
-  .projectDescription {
-    text-align: justify;
-    margin-bottom: var(--spacing-md);
-  }
 
   .thumbnailWrapper {
     aspect-ratio: 1;

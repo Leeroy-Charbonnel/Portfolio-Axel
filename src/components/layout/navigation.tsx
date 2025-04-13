@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { motion } from 'framer-motion';
+import { calcGeneratorDuration, motion } from 'framer-motion';
 import * as LucideIcons from 'lucide-react';
 import styles from './navigation.module.css';
 
@@ -45,9 +45,8 @@ export default class Navigation extends Component<NavigationProps, NavigationSta
   handleScroll = () => {
     const scrollPosition = window.scrollY;
 
-    //Update active section
     for (const [section] of this.props.sections) {
-      const element = document.getElementById(section);
+      const element = document.getElementById(section.toLocaleLowerCase());
       if (element) {
         const { offsetTop, offsetHeight } = element;
         if (
@@ -104,7 +103,7 @@ export default class Navigation extends Component<NavigationProps, NavigationSta
                 className={`${styles.navItem} ${activeSection === section ? styles.active : ''}`}
               >
                 <button
-                  onClick={() => this.scrollToSection(section)}
+                  onClick={() => this.scrollToSection(section.toLocaleLowerCase())}
                   className={styles.navButton}>
                   <div className={styles.navItemContent}>
                     {this.renderIcon(iconName)}

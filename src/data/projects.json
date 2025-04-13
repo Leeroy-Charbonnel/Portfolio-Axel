@@ -19,6 +19,7 @@
     },
     "mainProjects": [
         {
+            "modelId": "441d21b8a12a4971ab67eaac5cef0888",
             "imageFolder": "project-1",
             "title": {
                 "en": "Table/Chair Office",
@@ -28,22 +29,18 @@
                 "en": "Magnificent 3D model of a table, slightly borrowed from my work, with 8 high-quality chairs, raised outdoors. The table is a table-type table, which among other things serves as a table.",
                 "fr": "Modèle 3D de table magnifique, légèrement volé de mon travail, 8 chaises de qualité supérieure, élevées en plein air. La table est une table de type table, qui permet entre autre de servir de table"
             },
-            "modelId": "441d21b8a12a4971ab67eaac5cef0888",
-            "thumbnails": [
+            "thumbnailsDescriptions": [
                 {
-                    "src": "thumbnail1.png",
-                    "srcWireframe": "thumbnail1-w.png",
-                    "alt": "Thumbnail 1"
+                    "en": "Thumbnail 1",
+                    "fr": "Miniature 1"
                 },
                 {
-                    "src": "thumbnail2.png",
-                    "srcWireframe": "thumbnail2-w.png",
-                    "alt": "Thumbnail 2"
+                    "en": "Thumbnail 2",
+                    "fr": "Miniature 2"
                 },
                 {
-                    "src": "thumbnail3.png",
-                    "srcWireframe": "thumbnail3-w.png",
-                    "alt": "Thumbnail 3"
+                    "en": "Thumbnail 3",
+                    "fr": "Miniature 3"
                 }
             ],
             "wireframeParameters": {
@@ -72,6 +69,7 @@
             ]
         },
         {
+            "modelId": "a7bccdc2d8d24ef6814bfed7a3ed3922",
             "imageFolder": "project-2",
             "title": {
                 "en": "Cylinder seat / Table / Bamboo lamp",
@@ -81,27 +79,23 @@
                 "en": "Cylinder-type seats around a solid wood table (that's not true, it's clearly IKEA plywood with vinyl on top), accompanied by its bamboo lamp (not at all from IKEA either, please don't sue me).",
                 "fr": "Siège de type cylindre, autour d'une table en bois massif (c'est faux, c'est clairement du contreplaqué ikea avec un vinyl dessus), accompagné de sa lampe en bambou (pas du tout de ikea non plus d'ailleurs, m'attaquez pas en justice svp)"
             },
-            "modelId": "a7bccdc2d8d24ef6814bfed7a3ed3922",
-            "thumbnails": [
+            "thumbnailsDescriptions": [
                 {
-                    "src": "thumbnail1.png",
-                    "srcWireframe": "thumbnail1-w.png",
-                    "alt": "Thumbnail 1"
+                    "en": "Thumbnail 1",
+                    "fr": "Miniature 1"
                 },
                 {
-                    "src": "thumbnail2.png",
-                    "srcWireframe": "thumbnail2-w.png",
-                    "alt": "Thumbnail 2"
+                    "en": "Thumbnail 2",
+                    "fr": "Miniature 2"
                 },
                 {
-                    "src": "thumbnail3.png",
-                    "srcWireframe": "thumbnail3-w.png",
-                    "alt": "Thumbnail 3"
+                    "en": "Thumbnail 3",
+                    "fr": "Miniature 3"
                 }
             ],
             "wireframeParameters": {
                 "wireframeColor": "00000020",
-                "whiteMaterialColor": "151515",
+                "whiteMaterialColor": "303030",
                 "lightsOverwrite": [
                     {
                         "index": 0,
@@ -133,6 +127,7 @@
             ]
         },
         {
+            "modelId": "07dc155556b9403bb4853c9ba2a44a84",
             "imageFolder": "project-3",
             "title": {
                 "en": "High Table / High chairs",
@@ -142,22 +137,18 @@
                 "en": "Yet more furniture, once again borrowed from my 3D model of my workplace cafeteria. Please still don't sue me, I would appreciate not going to prison, thanks.",
                 "fr": "Encore et toujours des meubles, toujours et encore yoinké de mon modèle 3D de cafète de mon boulot, ne m'attaquez toujours pas en justice, ça me ferait plaisir de pas aller en prison, merci"
             },
-            "modelId": "07dc155556b9403bb4853c9ba2a44a84",
-            "thumbnails": [
+            "thumbnailsDescriptions": [
                 {
-                    "src": "thumbnail1.png",
-                    "srcWireframe": "thumbnail1-w.png",
-                    "alt": "Thumbnail 1"
+                    "en": "Thumbnail 1",
+                    "fr": "Miniature 1"
                 },
                 {
-                    "src": "thumbnail2.png",
-                    "srcWireframe": "thumbnail2-w.png",
-                    "alt": "Thumbnail 2"
+                    "en": "Thumbnail 2",
+                    "fr": "Miniature 2"
                 },
                 {
-                    "src": "thumbnail3.png",
-                    "srcWireframe": "thumbnail3-w.png",
-                    "alt": "Thumbnail 3"
+                    "en": "Thumbnail 3",
+                    "fr": "Miniature 3"
                 }
             ],
             "wireframeParameters": {
@@ -181,7 +172,6 @@
             },
             "software": [
                 "Blender",
-                "ZBrush",
                 "Substance"
             ]
         }
@@ -194,7 +184,6 @@
             },
             "link": "https://sketchfab.com/3d-models/table-chair-office-441d21b8a12a4971ab67eaac5cef0888",
             "imageFolder": "project-1",
-            "thumbnail": "main.png",
             "stats": {
                 "vertices": 46091,
                 "edges": 92096
@@ -207,7 +196,6 @@
             },
             "link": "https://sketchfab.com/3d-models/cylinder-seat-table-bamboo-lamp-a7bccdc2d8d24ef6814bfed7a3ed3922",
             "imageFolder": "project-2",
-            "thumbnail": "main.png",
             "stats": {
                 "vertices": 25600,
                 "edges": 51200
@@ -220,7 +208,6 @@
             },
             "link": "https://sketchfab.com/3d-models/high-table-high-chairs-07dc155556b9403bb4853c9ba2a44a84",
             "imageFolder": "project-3",
-            "thumbnail": "main.png",
             "stats": {
                 "vertices": 85700,
                 "edges": 171400
@@ -233,7 +220,6 @@
             },
             "link": "https://sketchfab.com/3d-models/low-poly-dystopian-man-3633c8c2b3844b33a9d10e4b0793b032",
             "imageFolder": "project-4",
-            "thumbnail": "main.png",
             "stats": {
                 "vertices": 85700,
                 "edges": 171400
@@ -246,7 +232,6 @@
             },
             "link": "https://sketchfab.com/3d-models/low-poly-retro-futuristic-dog-c1e00825937b4b01a7d194336566eb9b",
             "imageFolder": "project-5",
-            "thumbnail": "main.png",
             "stats": {
                 "vertices": 85700,
                 "edges": 171400
@@ -259,7 +244,6 @@
             },
             "link": "https://sketchfab.com/3d-models/dystopian-car-c0bde64524c0426ea6cd74cee2dc9707",
             "imageFolder": "project-6",
-            "thumbnail": "main.png",
             "stats": {
                 "vertices": 85700,
                 "edges": 171400
@@ -272,7 +256,6 @@
             },
             "link": "https://sketchfab.com/3d-models/cute-plesio-340770d2e7f245798fcf93e232378f4a",
             "imageFolder": "project-7",
-            "thumbnail": "main.png",
             "stats": {
                 "vertices": 85700,
                 "edges": 171400
@@ -285,7 +268,6 @@
             },
             "link": "https://sketchfab.com/3d-models/cute-spino-701f055847224f7c928787733254ae2c",
             "imageFolder": "project-8",
-            "thumbnail": "main.png",
             "stats": {
                 "vertices": 85700,
                 "edges": 171400

@@ -29,13 +29,12 @@ class MainProjects extends Component<MainProjectsProps> {
           transition={{ duration: 0.8 }}
           viewport={{ once: true, margin: "-100px" }}
         >
-          <h2 className={styles.sectionTitle}>{t('projects.title')}</h2>
+          <h2 className={'sectionTitle'}>{t('projects.title')}</h2>
         </motion.div>
 
         <div className={styles.projectsList}>
           {projects.map((project, index) => (
             <MainProject
-              key={project.id}
               project={project}
               softwares={softwares}
               index={index}

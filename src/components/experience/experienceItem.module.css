@@ -4,27 +4,22 @@
   position: relative;
 }
 
-.experienceItem::before {
+.content::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 120px;
+  left: 0px;
   width: 1px;
   height: 100%;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
+  background: linear-gradient(to bottom, var(--color-background-gray-300), transparent);
   z-index: 1;
 }
 
-.experienceItem:last-child::before {
-  display: none;
-}
 
 .period {
-  width: 120px;
-  font-weight: 700;
-  color: #ffffff;
+  font-weight: var(--font-weight-bold);
+  padding-right: var(--spacing-md);
   text-align: right;
-  padding-right: 2rem;
   flex-shrink: 0;
 }
 
@@ -34,35 +29,22 @@
   position: relative;
 }
 
-.content::before {
-  content: '';
-  position: absolute;
-  top: 0.5rem;
-  left: -5px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: #ffffff;
-  z-index: 2;
-}
 
 .title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  letter-spacing: 0.05em;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-normal);
+  margin-bottom: var(--spacing-sm);
 }
 
 .company {
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin-bottom: 1rem;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
 }
 
 .location {
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-tertiary);
 }
 
 .descriptionList {
@@ -91,25 +73,31 @@
   .experienceItem {
     flex-direction: column;
   }
-  
+
   .experienceItem::before {
     left: 0;
     top: 40px;
     height: calc(100% - 40px);
   }
-  
+
   .period {
     width: 100%;
     text-align: left;
     padding-right: 0;
     padding-left: 1.5rem;
     margin-bottom: 1rem;
+    display: flex;
   }
-  
+
+  .period *:first-child::after {
+    content: '-';
+    margin: 0 0.5rem;
+  }
+
   .content {
     padding-left: 1.5rem;
   }
-  
+
   .content::before {
     left: -6px;
   }

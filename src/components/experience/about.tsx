@@ -2,25 +2,9 @@ import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
 import styles from './about.module.css';
-
-//Context consumer for class components
 import { LanguageContext } from '../languageProvider';
-
-interface AboutProps {
-  about: {
-    en: string;
-    fr: string;
-  };
-  contact: {
-    phone: string;
-    email: string;
-    instagram: string;
-  };
-  interests: {
-    games: string[];
-    art: string[];
-  };
-}
+import { AboutProps } from '@/types';
+import Image from 'next/image';
 
 class About extends Component<AboutProps> {
   static contextType = LanguageContext;
@@ -28,12 +12,11 @@ class About extends Component<AboutProps> {
 
   render() {
     const { about, contact, interests } = this.props;
-    //Get language and translation function from context
     const { language, t } = this.context as LanguageContextType;
-    
+
     return (
       <div className={styles.aboutContainer}>
-        <motion.div 
+        <motion.div
           className={styles.aboutSection}
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -42,13 +25,23 @@ class About extends Component<AboutProps> {
         >
           <h3 className={styles.sectionTitle}>{t('experience.about')}</h3>
           <div className={styles.aboutContent}>
-            <div className={styles.avatar}></div>
+            <div className={styles.avatar}>
+              <a href="https://sketchfab.com/Obambulatesart" target="_blank" rel="noopener noreferrer">
+                <Image
+                  src="https://media.sketchfab.com/avatars/5414de3b61cc449bb3b094e1b5af13e0/aea42c6a1e164c288fb8f965384bb362.png"
+                  alt="Avatar"
+                  width={100}
+                  height={100}
+                />
+              </a>
+
+            </div>
             <p className={styles.aboutText}>{about[language]}</p>
           </div>
         </motion.div>
-        
+
         <div className={styles.infoColumns}>
-          <motion.div 
+          <motion.div
             className={styles.contactSection}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -71,8 +64,8 @@ class About extends Component<AboutProps> {
               </li>
             </ul>
           </motion.div>
-          
-          <motion.div 
+
+          <motion.div
             className={styles.interestsSection}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}

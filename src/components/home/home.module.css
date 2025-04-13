@@ -7,6 +7,17 @@
   height: 100vh;
 }
 
+
+.homeSection::after {
+  content: '';
+  height: var(--border-width-md);
+  background: var(--color-background-gray-200);
+  width: 80%;
+  position: absolute;
+  bottom: 0px;
+}
+
+
 .gradient1,
 .gradient2 {
   background-size: 100% 100%;

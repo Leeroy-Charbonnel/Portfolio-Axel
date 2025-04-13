@@ -1,25 +1,14 @@
 import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
-import GalleryItem from './galleryItem';
-import styles from './galleryItem.module.css';
+import styles from './projectGallery.module.css';
+import Image from 'next/image';
 
 // Context consumer for class components
 import { LanguageContext } from '../languageProvider';
+import { formatNumber } from '@/utils/Utils';
+import { GalleryProject } from '@/types';
 
-interface GalleryProject {
-  id: string;
-  title: {
-    en: string;
-    fr: string;
-  };
-  imageFolder: string;
-  thumbnail: string;
-  stats: {
-    vertices: number;
-    edges: number;
-  };
-}
 
 interface ProjectGalleryProps {
   projects: GalleryProject[];
@@ -31,8 +20,7 @@ class ProjectGallery extends Component<ProjectGalleryProps> {
 
   render() {
     const { projects } = this.props;
-    // Get translation function from context
-    const { t } = this.context as LanguageContextType;
+    const { t, language } = this.context as LanguageContextType;
 
     return (
       <section id="gallery" className={`section ${styles.gallerySection}`}>
@@ -43,19 +31,45 @@ class ProjectGallery extends Component<ProjectGalleryProps> {
             transition={{ duration: 0.8 }}
             viewport={{ once: true, margin: "-100px" }}
           >
-            <h2 className={styles.sectionTitle}>{t('gallery.title')}</h2>
+            <h2 className={'sectionTitle'}>{t('gallery.title')}</h2>
           </motion.div>
 
           <div className={styles.galleryGrid}>
             {projects.map((project, index) => (
-              <GalleryItem
-                key={project.id}
-                id={project.id}
-                title={project.title}
-                thumbnail={`/images/projects/${project.imageFolder}/${project.thumbnail}`}
-                stats={project.stats}
-                index={index}
-              />
+              <motion.div
+                className={styles.galleryItem}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                viewport={{ once: true, margin: "-50px" }}
+              >
+                <a href={project.link} target="_blank" rel="noopener noreferrer">
+                  <div className={`${styles.thumbnailContainer} noGrainOverlay`}>
+                    <Image
+                      src={`/images/projects/${project.imageFolder}/main.png`}
+                      alt={project.title[language]}
+                      width={400}
+                      height={400}
+                      className={styles.thumbnail}
+                    />
+                  </div>
+
+                  <div className={`${styles.itemDetails} noGrainOverlay`}>
+                    <h3 className={styles.itemTitle}>{project.title[language]}</h3>
+
+                    <div className={styles.itemStats}>
+                      <div className={styles.statItem}>
+                        <span className={styles.statIcon}>V</span> {formatNumber(project.stats.vertices)}
+                      </div>
+                      <div className={styles.statItem}>
+                        <span className={styles.statIcon}>E</span> {formatNumber(project.stats.edges)}
+                      </div>
+                    </div>
+                  </div>
+                </a>
+
+
+              </motion.div >
             ))}
           </div>
         </div>

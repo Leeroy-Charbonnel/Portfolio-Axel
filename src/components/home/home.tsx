@@ -14,7 +14,7 @@ function Home(): JSX.Element {
       <div className={styles.gradient1}></div>
       <div className={styles.gradient2}></div>
 
-      <div className={`${styles.homeContainer} border-md`}>
+      <div className={`${styles.homeContainer} border-sm`}>
 
         <motion.div
           className={styles.content}

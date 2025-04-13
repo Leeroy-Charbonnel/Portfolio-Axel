@@ -4,26 +4,7 @@
   padding-bottom: 10rem;
 }
 
-.sectionTitle {
-  font-size: 3rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  margin-bottom: 4rem;
-  text-align: center;
-  position: relative;
-  display: inline-block;
-}
 
-.sectionTitle::after {
-  content: '';
-  position: absolute;
-  width: 50%;
-  height: 3px;
-  background-color: #ffffff;
-  bottom: -1rem;
-  left: 25%;
-}
 
 .experienceContent {
   margin-top: 4rem;

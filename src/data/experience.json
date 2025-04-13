@@ -1,12 +1,15 @@
 {
   "experiences": [
     {
-      "period": "06.2023-ACT.",
+      "period": {
+        "en": "06.2023-CRT.",
+        "fr": "06.2023-ACT."
+      },
       "title": {
         "en": "3D Technical Artist",
         "fr": "Artist Technique 3D"
       },
-      "company": "Alivesim",
+      "company": "Ailivesim",
       "location": "Helsinki",
       "description": {
         "en": [
@@ -26,7 +29,10 @@
       }
     },
     {
-      "period": "12.2022-04.2023",
+      "period": {
+        "en": "12.2022-04.2023",
+        "fr": "12.2022-04.2023"
+      },
       "title": {
         "en": "Multimedia Generalist",
         "fr": "Generalist Multimédia"
@@ -49,7 +55,10 @@
       }
     },
     {
-      "period": "01.2022-12.2022",
+      "period": {
+        "en": "01.2022-12.2022",
+        "fr": "01.2022-12.2022"
+      },
       "title": {
         "en": "3D Artist",
         "fr": "Artiste 3D"
