@@ -1,7 +1,7 @@
 import React, { JSX } from 'react';
-import { motion } from 'framer-motion';
 import { useLanguage } from '../languageProvider';
 import styles from './home.module.css';
+import AnimatedComponent from '../AnimatedComponent';
 
 function Home(): JSX.Element {
   const { t } = useLanguage();
@@ -15,39 +15,44 @@ function Home(): JSX.Element {
       <div className={styles.gradient2}></div>
 
       <div className={`${styles.homeContainer} border-sm`}>
+        <div className={styles.content}>
 
-        <motion.div
-          className={styles.content}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1 }}
-        >
-          <motion.div
+          <AnimatedComponent
+            key={"home"}
+            direction="bottom"
+            distance={50}
+            duration={0.8}
+            once={true}
+            threshold={0.1}
             className={styles.titleWrapper}
-            initial={{ y: 50 }}
-            animate={{ y: 0 }}
-            transition={{ delay: 0.2, duration: 0.8 }}
           >
             <h1 className={styles.title}>{t('home.title')}</h1>
-          </motion.div>
+          </AnimatedComponent>
+          <div className={styles.gridOverlay}></div>
 
-          <motion.div
+          <AnimatedComponent
+            key={"home"}
+            direction="bottom"
+            initialOpacity={0}
+            finalOpacity={1}
+            distance={0}
+            delay={0.5}
+            duration={1}
+            once={true}
             className={styles.infoWrapper}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
           >
-            <div className={styles.gridOverlay}></div>
 
             <div className={styles.subtitle}>
               <div className={styles.part1}>{name.slice(0, name.length - 1).join(' ')}</div>
               <div className={styles.part2}>{name[name.length - 1]}</div>
             </div>
             <p className={styles.role}>{t('home.subtitle')}</p>
-          </motion.div>
-        </motion.div>
+
+          </AnimatedComponent>
+
+        </div>
       </div>
-    </section>
+    </section >
   );
 }
 

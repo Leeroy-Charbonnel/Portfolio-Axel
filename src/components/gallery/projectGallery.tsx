@@ -1,14 +1,11 @@
 import React, { Component } from 'react';
-import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
 import styles from './projectGallery.module.css';
 import Image from 'next/image';
-
-// Context consumer for class components
 import { LanguageContext } from '../languageProvider';
 import { formatNumber } from '@/utils/Utils';
 import { GalleryProject } from '@/types';
-
+import AnimatedComponent from '../AnimatedComponent';
 
 interface ProjectGalleryProps {
   projects: GalleryProject[];
@@ -25,23 +22,27 @@ class ProjectGallery extends Component<ProjectGalleryProps> {
     return (
       <section id="gallery" className={`section ${styles.gallerySection}`}>
         <div className="container">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true, margin: "-100px" }}
+          <AnimatedComponent
+            direction="bottom"
+            distance={50}
+            duration={0.8}
+            once={true}
+            threshold={0.1}
           >
             <h2 className={'sectionTitle'}>{t('gallery.title')}</h2>
-          </motion.div>
+          </AnimatedComponent>
 
           <div className={styles.galleryGrid}>
             {projects.map((project, index) => (
-              <motion.div
+              <AnimatedComponent
+                key={project.id || index}
+                direction="bottom"
+                distance={30}
+                duration={0.6}
+                delay={index * 0.1}
+                once={true}
+                threshold={0.1}
                 className={styles.galleryItem}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                viewport={{ once: true, margin: "-50px" }}
               >
                 <a href={project.link} target="_blank" rel="noopener noreferrer">
                   <div className={`${styles.thumbnailContainer} noGrainOverlay`}>
@@ -67,9 +68,7 @@ class ProjectGallery extends Component<ProjectGalleryProps> {
                     </div>
                   </div>
                 </a>
-
-
-              </motion.div >
+              </AnimatedComponent>
             ))}
           </div>
         </div>

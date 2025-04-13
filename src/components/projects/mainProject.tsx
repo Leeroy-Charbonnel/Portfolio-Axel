@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import Image from 'next/image';
-import { motion, useInView } from 'framer-motion';
 import { Grid } from 'lucide-react';
 import { Project, Software } from '../../types';
 import { LanguageContext, LanguageContextType } from '../languageProvider';
 import styles from './mainProject.module.css';
 import { hexToRgb } from '@/utils/Utils';
 import AnimatedCounter from '@/animatedCounter';
+import AnimatedComponent from '../AnimatedComponent';
 
 declare global {
   interface Window {
@@ -265,15 +265,18 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   }, [isInView, sketchfabInitialized]);
 
   return (
-    <motion.div
-      id='projects'
+    <AnimatedComponent
+      key={"projects"}
+      direction="bottom"
+      distance={100}
+      duration={0.8}
+      once={true}
+      threshold={0.1}
       className={styles.projectWrapper}
-      initial={{ opacity: 0, y: 100 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8 }}
-      viewport={{ once: true, margin: "-100px" }}
-      ref={containerRef}
     >
+
+
+
       <div className={`container ${styles.projectContainer} ${layoutClassName}`}>
         <div className={styles.projectHeader}>
           <h3 className={styles.projectNumber}>{String(index + 1).padStart(2, '0')}</h3>
@@ -347,7 +350,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
                       { key: 'edges', value: project.stats.edges! },
                       { key: 'faces', value: project.stats.faces! }
                     ].map((item, index) => (
-                      
+
                       <motion.div
                         key={item.key}
                         className={styles.statItem}
@@ -390,7 +393,8 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
         </div>
       </div>
-    </motion.div>
+    </AnimatedComponent>
+
   );
 };
 
