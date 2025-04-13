@@ -6,7 +6,7 @@ import { LanguageContext, LanguageContextType } from '../languageProvider';
 import styles from './mainProject.module.css';
 import { hexToRgb } from '@/utils/Utils';
 import AnimatedCounter from '@/animatedCounter';
-import AnimatedComponent from '../AnimatedComponent';
+import AnimatedComponent from '@/components/AnimatedComponent';
 
 declare global {
   interface Window {
@@ -30,12 +30,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const isInView = useInView(containerRef, {
-    once: true,
-    amount: 0.3,
-    margin: "0px 0px -200px 0px" //Load before fully in view
-  });
-
+  const [isInView, setIsInView] = useState(false);
   const [sketchfabLoaded, setSketchfabLoaded] = useState<boolean>(false);
   const [sketchfabInitialized, setSketchfabInitialized] = useState<boolean>(false);
   const [sketchfabError, setSketchfabError] = useState<boolean>(false);
@@ -57,8 +52,29 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
   const whiteMaterialColor = project.wireframeParameters?.whiteMaterialColor || "ffffff"
   const emissiveMaterialsOverwrite = project.wireframeParameters?.emissiveMaterialsOverwrite || [];
 
-
   const emissiveMaterialColor = "#85efff";
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      {
+        threshold: 0.3,
+        rootMargin: "0px 0px 200px 0px" // Load before fully in view
+      }
+    );
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      if (containerRef.current) {
+        observer.unobserve(containerRef.current);
+      }
+    };
+  }, []);
 
   const initSketchfab = () => {
     if (!iframeRef.current || !isInView || sketchfabInitialized) return;
@@ -274,10 +290,7 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
       threshold={0.1}
       className={styles.projectWrapper}
     >
-
-
-
-      <div className={`container ${styles.projectContainer} ${layoutClassName}`}>
+      <div ref={containerRef} className={`container ${styles.projectContainer} ${layoutClassName}`}>
         <div className={styles.projectHeader}>
           <h3 className={styles.projectNumber}>{String(index + 1).padStart(2, '0')}</h3>
           <h3 className={styles.projectTitle}>{project.title[language]}</h3>
@@ -285,11 +298,11 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
         <div className={styles.projectContent}>
 
-          <div className={`${styles.thumbnailsContainer} noGrainOverlay`}>
+          <div className={styles.thumbnailsContainer}>
             {[1, 2, 3].map((i) => (
               <div
                 key={index}
-                className={`${styles.thumbnailWrapper} border-sm`}
+                className={`${styles.thumbnailWrapper} noGrainOverlay border-sm`}
               >
                 <Image
                   src={`/images/projects/${project.imageFolder}/thumbnail${i}${isWireframe ? "-w" : ""}.png`}
@@ -343,30 +356,28 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
 
                 <div className={styles.projectStatsAndSoftware}>
 
-
                   <div className={styles.statsContainer}>
                     {[
                       { key: 'vertices', value: project.stats.vertices! },
                       { key: 'edges', value: project.stats.edges! },
                       { key: 'faces', value: project.stats.faces! }
                     ].map((item, index) => (
-
-                      <motion.div
+                      <AnimatedComponent
                         key={item.key}
+                        direction="bottom"
+                        distance={20}
+                        duration={0.5}
+                        delay={index * 0.1 + 0.3}
+                        once={true}
+                        initialOpacity={0}
+                        finalOpacity={1}
                         className={styles.statItem}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-                        transition={{ delay: index * 0.1 + 0.3, duration: 0.5 }}
                       >
-
                         <div className={styles.statLabel}>{t(`projects.stats.${item.key}`)}</div>
                         <AnimatedCounter from={0} to={item.value} duration={2} />
-                      </motion.div>
+                      </AnimatedComponent>
                     ))}
                   </div>
-
-
-
 
                   <div className={styles.softwareIcons}>
                     {projectSoftwareWithLogos.map((sw, index) => (
@@ -389,12 +400,9 @@ const MainProject: React.FC<MainProjectProps> = ({ project, softwares, index }) 
             </div>
           </div>
 
-
-
         </div>
       </div>
     </AnimatedComponent>
-
   );
 };
 

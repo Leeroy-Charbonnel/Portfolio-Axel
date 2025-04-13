@@ -1,13 +1,11 @@
 import React, { Component } from 'react';
-import { motion } from 'framer-motion';
 import { ExperienceProps } from '@/types';
 import { LanguageContextType } from '../languageProvider';
 import ExperienceItem from './experienceItem';
 import About from './about';
 import styles from './experience.module.css';
 import { LanguageContext } from '../languageProvider';
-
-
+import AnimatedComponent from '../AnimatedComponent';
 
 class Experience extends Component<ExperienceProps> {
   static contextType = LanguageContext;
@@ -20,27 +18,28 @@ class Experience extends Component<ExperienceProps> {
     return (
       <section id="experience" className={`section ${styles.experienceSection}`}>
         <div className="container">
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true, margin: "-100px" }}
+          <AnimatedComponent
+            direction="bottom"
+            distance={50}
+            duration={0.8}
+            once={true}
+            threshold={0.1}
           >
             <h2 className={'sectionTitle'}>{t('experience.title')}</h2>
-          </motion.div>
-          
+          </AnimatedComponent>
+
           <div className={styles.experienceContent}>
             <div className={styles.experienceTimeline}>
               {experiences.map((experience, index) => (
-                <ExperienceItem 
+                <ExperienceItem
                   key={index}
                   experience={experience}
                   index={index}
                 />
               ))}
             </div>
-            
-            <About 
+
+            <About
               about={about}
               contact={contact}
               interests={interests}

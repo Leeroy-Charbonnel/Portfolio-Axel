@@ -1,5 +1,8 @@
-import React, { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useRef, ReactNode, RefObject } from 'react';
+import { useIsInView } from "@/utils/Utils";
+
 export type AnimationDirection = 'top' | 'right' | 'bottom' | 'left' | 'none';
+
 interface AnimatedComponentProps {
   children: ReactNode;
   direction?: AnimationDirection;
@@ -7,13 +10,16 @@ interface AnimatedComponentProps {
   duration?: number;
   delay?: number;
   once?: boolean;
-  threshold?: number; //0 to 1, similar to IntersectionObserver threshold
+  threshold?: number;
   className?: string;
   style?: React.CSSProperties;
   animateOnMount?: boolean;
   initialOpacity?: number;
   finalOpacity?: number;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
+
 const AnimatedComponent: React.FC<AnimatedComponentProps> = ({
   children,
   direction = 'none',
@@ -27,33 +33,20 @@ const AnimatedComponent: React.FC<AnimatedComponentProps> = ({
   animateOnMount = true,
   initialOpacity = 0,
   finalOpacity = 1,
+  onMouseEnter,
+  onMouseLeave
 }) => {
-  const [isVisible, setIsVisible] = useState(!animateOnMount);
-  const [hasAnimated, setHasAnimated] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!ref.current || (once && hasAnimated)) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          if (once) {
-            setHasAnimated(true);
-            observer.disconnect();
-          }
-        } else if (!once) {
-          setIsVisible(false);
-        }
-      },
-      { threshold }
-    );
-    observer.observe(ref.current);
-    return () => {
-      if (ref.current) {
-        observer.unobserve(ref.current);
-      }
-    };
-  }, [once, threshold, hasAnimated]);
+
+  const isInView = useIsInView((ref as RefObject<HTMLDivElement>), {
+    threshold,
+    rootMargin: '0px 0px 100px 0px', //Start animation when element is 100px below viewport
+    once
+  });
+
+  // Determine if we should show the element
+  const isVisible = animateOnMount ? isInView : true;
+
   const getInitialTransform = () => {
     switch (direction) {
       case 'top':
@@ -68,6 +61,7 @@ const AnimatedComponent: React.FC<AnimatedComponentProps> = ({
         return 'none';
     }
   };
+
   const animationStyle = {
     opacity: isVisible ? finalOpacity : initialOpacity,
     transform: isVisible ? 'translate(0, 0)' : getInitialTransform(),
@@ -75,14 +69,18 @@ const AnimatedComponent: React.FC<AnimatedComponentProps> = ({
     transitionDelay: `${delay}s`,
     ...style,
   };
+
   return (
     <div
       ref={ref}
       className={className}
       style={animationStyle}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {children}
     </div>
   );
 };
+
 export default AnimatedComponent;

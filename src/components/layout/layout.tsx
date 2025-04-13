@@ -36,8 +36,8 @@ class Layout extends Component<LayoutProps> {
 
         <Navigation sections={sections} />
         <main className='main'>
-          <div className='grainOverlay'></div>
           {children}
+          <div className='grainOverlay'></div>
         </main>
       </div>
     );

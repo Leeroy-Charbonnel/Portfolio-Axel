@@ -1,10 +1,10 @@
 import React, { Component } from 'react';
-import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
 import styles from './about.module.css';
 import { LanguageContext } from '../languageProvider';
 import { AboutProps } from '@/types';
 import Image from 'next/image';
+import AnimatedComponent from '../AnimatedComponent';
 
 class About extends Component<AboutProps> {
   static contextType = LanguageContext;
@@ -16,12 +16,14 @@ class About extends Component<AboutProps> {
 
     return (
       <div className={styles.aboutContainer}>
-        <motion.div
+        <AnimatedComponent
           className={styles.aboutSection}
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
+          direction="bottom"
+          distance={30}
+          duration={0.6}
+          once={true}
+          initialOpacity={0}
+          finalOpacity={1}
         >
           <h3 className={styles.sectionTitle}>{t('experience.about')}</h3>
           <div className={styles.aboutContent}>
@@ -34,19 +36,21 @@ class About extends Component<AboutProps> {
                   height={100}
                 />
               </a>
-
             </div>
             <p className={styles.aboutText}>{about[language]}</p>
           </div>
-        </motion.div>
+        </AnimatedComponent>
 
         <div className={styles.infoColumns}>
-          <motion.div
+          <AnimatedComponent
             className={styles.contactSection}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            viewport={{ once: true }}
+            direction="bottom"
+            distance={30}
+            duration={0.6}
+            delay={0.2}
+            once={true}
+            initialOpacity={0}
+            finalOpacity={1}
           >
             <h3 className={styles.sectionTitle}>{t('experience.contact')}</h3>
             <ul className={styles.contactList}>
@@ -63,14 +67,17 @@ class About extends Component<AboutProps> {
                 <span className={styles.contactValue}>{contact.instagram}</span>
               </li>
             </ul>
-          </motion.div>
+          </AnimatedComponent>
 
-          <motion.div
+          <AnimatedComponent
             className={styles.interestsSection}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            viewport={{ once: true }}
+            direction="bottom"
+            distance={30}
+            duration={0.6}
+            delay={0.3}
+            once={true}
+            initialOpacity={0}
+            finalOpacity={1}
           >
             <h3 className={styles.sectionTitle}>{t('experience.interest')}</h3>
             <div className={styles.interestsColumns}>
@@ -91,7 +98,7 @@ class About extends Component<AboutProps> {
                 </ul>
               </div>
             </div>
-          </motion.div>
+          </AnimatedComponent>
         </div>
       </div>
     );

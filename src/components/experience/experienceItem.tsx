@@ -1,9 +1,9 @@
 import React, { Component } from 'react';
-import { motion } from 'framer-motion';
 import { Experience } from '@/types';
 import { LanguageContextType } from '../languageProvider';
 import styles from './experienceItem.module.css';
 import { LanguageContext } from '../languageProvider';
+import AnimatedComponent from '../AnimatedComponent';
 
 interface ExperienceItemProps {
   experience: Experience;
@@ -18,13 +18,18 @@ class ExperienceItem extends Component<ExperienceItemProps> {
     const { experience, index } = this.props;
     const { language } = this.context as LanguageContextType;
     const period = experience.period[language].split("-");
+
     return (
-      <motion.div
+      <AnimatedComponent
         className={styles.experienceItem}
-        initial={{ opacity: 0, x: -50 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6, delay: index * 0.2 }}
-        viewport={{ once: true, margin: "-50px" }}
+        direction="left"
+        distance={50}
+        duration={0.6}
+        delay={index * 0.2}
+        once={true}
+        threshold={0.1}
+        initialOpacity={0}
+        finalOpacity={1}
       >
         <div className={styles.period}>
           <div>{period[0]}</div>
@@ -43,7 +48,7 @@ class ExperienceItem extends Component<ExperienceItemProps> {
             ))}
           </ul>
         </div>
-      </motion.div>
+      </AnimatedComponent>
     );
   }
 }

@@ -47,7 +47,6 @@
 .homeContainer {
   --margin: 170px;
   position: relative;
-  z-index: 10;
   height: calc(100% - var(--margin));
   width: calc(100% - var(--margin));
 }
@@ -113,7 +112,6 @@
   background-image: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
   background-size: 50px 50px;
-  z-index: 1;
   pointer-events: none;
 }
 

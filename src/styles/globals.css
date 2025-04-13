@@ -90,6 +90,7 @@
   /* Tooltip */
   --tootip-delay: 0.7s;
 
+
 }
 
 
@@ -98,7 +99,27 @@
   padding: 0;
   margin: 0;
   color: var(--color-text);
+  /* z-index: 0; */
 }
+
+.grainOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-image: url('/textures/grain.png');
+  background-size: var(--grain-size);
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: var(--grain-opacity);
+  height: 100%;
+  width: 100%;
+}
+
+.noGrainOverlay {
+  /* z-index: 2; */
+}
+
 
 html,
 body {
@@ -160,23 +181,6 @@ button {
 }
 
 
-.grainOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  background-image: url('/textures/grain.png');
-  background-size: var(--grain-size);
-  z-index: 1;
-  pointer-events: none;
-  mix-blend-mode: overlay;
-  opacity: var(--grain-opacity);
-  height: 100%;
-  width: 100%;
-}
-
-.noGrainOverlay {
-  z-index: 2;
-}
 
 .main {
   position: relative;

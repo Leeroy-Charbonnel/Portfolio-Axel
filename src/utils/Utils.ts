@@ -1,3 +1,4 @@
+// Original Utils.ts functions
 export const hexToRgb = (hex: string): number[] => {
     //Remove # if present
     hex = hex.replace(/^#/, '');
@@ -10,7 +11,6 @@ export const hexToRgb = (hex: string): number[] => {
     return [r, g, b];
 };
 
-
 export const formatNumber = (num: number): string => {
     if (num >= 1000000) {
         return `${(num / 1000000).toFixed(2)}M`;
@@ -22,4 +22,56 @@ export const formatNumber = (num: number): string => {
         return `${(num / 1000).toFixed(2)}k`;
     }
     return num.toString();
+};
+
+// New function: useIsInView hook
+import { useState, useEffect, useRef, RefObject } from 'react';
+
+export const useIsInView = (
+    ref: RefObject<HTMLElement>,
+    options: {
+        threshold?: number;
+        rootMargin?: string;
+        once?: boolean;
+    } = {}
+): boolean => {
+    const [isIntersecting, setIntersecting] = useState(false);
+    const hasSeenRef = useRef(false);
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                //If element is intersecting and we're using "once" option
+                if (entry.isIntersecting && options.once) {
+                    hasSeenRef.current = true;
+                    setIntersecting(true);
+                    observer.disconnect();
+                } else if (!options.once) {
+                    //Normal behavior - update state based on visibility
+                    setIntersecting(entry.isIntersecting);
+                }
+            },
+            {
+                threshold: options.threshold || 0,
+                rootMargin: options.rootMargin || '0px'
+            }
+        );
+
+        //If using "once" option and element was already seen, don't observe again
+        if (options.once && hasSeenRef.current) {
+            setIntersecting(true);
+            return;
+        }
+
+        observer.observe(element);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [ref, options.threshold, options.rootMargin, options.once]);
+
+    return isIntersecting;
 };

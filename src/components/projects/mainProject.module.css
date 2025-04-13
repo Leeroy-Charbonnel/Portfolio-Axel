@@ -8,7 +8,7 @@
 }
 
 .projectWrapper {
-  background: linear-gradient(to right, var(--color-background), var(--color-background-secondary));
+  background: linear-gradient(to right, #0000, var(--color-background-secondary));
   --thumbnail-nb: 3;
   --thumbnail-gap: var(--spacing-xxs);
   --project-height: 90vh;

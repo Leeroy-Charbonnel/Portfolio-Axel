@@ -1,10 +1,9 @@
 import React, { Component } from 'react';
-import { motion } from 'framer-motion';
 import { LanguageContextType } from '../languageProvider';
 import MainProject from './mainProject';
 import { Project, Software } from '../../types';
 import styles from './mainProjects.module.css';
-
+import AnimatedComponent from '../AnimatedComponent';
 //Context consumer for class components
 import { LanguageContext } from '../languageProvider';
 
@@ -23,18 +22,22 @@ class MainProjects extends Component<MainProjectsProps> {
 
     return (
       <section id="projects" className={`section ${styles.projectsSection}`}>
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true, margin: "-100px" }}
+        <AnimatedComponent
+          direction="bottom"
+          distance={50}
+          duration={0.8}
+          once={true}
+          threshold={0.1}
+          initialOpacity={0}
+          finalOpacity={1}
         >
           <h2 className={'sectionTitle'}>{t('projects.title')}</h2>
-        </motion.div>
+        </AnimatedComponent>
 
         <div className={styles.projectsList}>
           {projects.map((project, index) => (
             <MainProject
+              key={index}
               project={project}
               softwares={softwares}
               index={index}

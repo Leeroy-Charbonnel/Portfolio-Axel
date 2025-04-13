@@ -4,7 +4,7 @@
   position: fixed;
   top: 50%;
   left: 0;
-  z-index: 100;
+  z-index: 10;
   transform: translateY(-50%);
   transition: padding 0.3s;
   padding: 50px;
@@ -86,7 +86,7 @@
   opacity: 0;
   transition: opacity 0.3s, transform 0.3s;
   margin-left: 10px;
-  z-index: 101;
+  z-index: 20;
   backdrop-filter: blur(var(--filter-blur));
   border: var(--border-width-sm) solid var(--color-gray-medium);
   letter-spacing: var(--letter-spacing-normal);

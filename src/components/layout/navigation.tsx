@@ -1,9 +1,8 @@
 import React, { Component } from 'react';
-import { calcGeneratorDuration, motion } from 'framer-motion';
 import * as LucideIcons from 'lucide-react';
 import styles from './navigation.module.css';
-
 import { LanguageContext, LanguageContextType } from '../languageProvider';
+import AnimatedComponent from '../AnimatedComponent';
 
 interface NavigationProps {
   sections: Array<[string, string]>;
@@ -60,7 +59,6 @@ export default class Navigation extends Component<NavigationProps, NavigationSta
     }
   };
 
-
   scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
@@ -83,22 +81,21 @@ export default class Navigation extends Component<NavigationProps, NavigationSta
     const { t } = this.context as LanguageContextType;
 
     return (
-      <motion.div
-        initial={{ x: -100, y: '-50%' }}
-        animate={{ x: 0, y: '-50%' }}
-        transition={{ duration: 0.3 }}
+      <AnimatedComponent
+        direction="left"
+        distance={100}
+        duration={0.3}
+        animateOnMount={true}
+        style={{ position: 'fixed', top: '50%', transform: 'translateY(-50%)' }}
+        className={`${styles.navItemHover} ${isExpanded ? styles.expanded : ''}`}
         onMouseEnter={this.handleMouseEnter}
         onMouseLeave={this.handleMouseLeave}
-        className={`${styles.navItemHover} ${isExpanded ? styles.expanded : ''}`}
       >
-
         <nav
           className={styles.navigation}
         >
-
           <ul className={styles.navList}>
             {sections.map(([section, iconName]) => (
-
               <li key={section}
                 className={`${styles.navItem} ${activeSection === section ? styles.active : ''}`}
               >
@@ -111,12 +108,10 @@ export default class Navigation extends Component<NavigationProps, NavigationSta
                 </button>
                 <div className={styles.tooltip}>{section}</div>
               </li>
-
             ))}
           </ul>
-        </nav >
-      </motion.div >
-
+        </nav>
+      </AnimatedComponent>
     );
   }
 }
