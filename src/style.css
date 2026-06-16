@@ -160,7 +160,7 @@ through the whole UI.*/
 
   --grid-size:     1rem;
   --grain-size:    150px;
-  --grain-opacity: 0.45;
+  --grain-opacity: 0.12;
   --filter-blur:   6px;
   --tooltip-delay: 0.7s;
 
@@ -278,26 +278,19 @@ where 'border-radius-sm' was misused as a width. Now they correctly use the
   left: 25%;
 }
 
-/*Full-bleed grain overlay layer (applied inside the App.vue root). Absolute
-positioning makes it scroll with the page content - the parent .portfolio-app
-expands to the full document height so inset:0 covers every section.
-Sits at z-index:1 so anything tagged .no-grain can escape it via z-index:2.*/
+/*Full-bleed grain overlay - film-grain look. Sits on top of EVERYTHING at a
+very low opacity, no blend mode, so it adds a uniform analog texture without
+darkening images or weirding out the Sketchfab embed. Scrolls with the page
+since the parent .portfolio-app expands to the full document height.*/
 .grain-overlay {
   position: absolute;
   inset: 0;
   background-image: url('/textures/grain.png');
   background-size: var(--grain-size);
-  z-index: 1;
+  z-index: 1000;
   pointer-events: none;
-  mix-blend-mode: overlay;
   opacity: var(--grain-opacity);
 }
 
-/*Helper class: lift an element above the grain overlay. Apply to anything that
-should render clean (Sketchfab embeds, project images, gallery thumbnails,
-avatar) so the noise doesn't bleed onto their content. Mirrors the original
-portfolio's noGrainOverlay convention.*/
-.no-grain {
-  position: relative;
-  z-index: 2;
-}
+/*Legacy helper - kept as a no-op for any consumer that still applies it.*/
+.no-grain { position: relative; }
