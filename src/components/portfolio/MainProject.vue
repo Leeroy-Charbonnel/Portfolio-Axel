@@ -493,31 +493,26 @@ async function replaceThumbnailWireframe(idx: number) {
 </template>
 
 <style scoped>
-/*MAIN PROJECT - editorial / showcase layout
+/*MAIN PROJECT - clean editorial layout, 4 body variants
 ================================================================================
-Inspired by independent 3D artist portfolios (Vitaly Bulgarov, Maxime Lebled
-and the editorial-style ArtStation premium pages). Visual language:
+The article stacks vertically: header > body > description > meta. Only the
+BODY varies per layout (viewer + thumbnails arrangement). Everything below
+the body is always full-width single-column - no sidebars, no empty zones.
 
-  - HUGE project number, watermark-style (transparent + thin outline). Acts as
-    a graphic device, not a label.
-  - Bold sans-serif title sits alongside the number with strong size contrast.
-  - The viewer dominates the visual space. Aspect ratios vary per layout for
-    rhythm: 16/9 cinematic in viewer-only, more compact 4/3 in the side
-    variants where the thumbnail column shares the row.
-  - Description constrained to ~62ch for editorial readability.
-  - Stats: small uppercase labels with prominent bold values.
-  - Software: minimal monospace-ish chips.
-  - Plenty of vertical breathing room - projects don't fight for attention.
+  - Consistent 16/9 viewer aspect across all layouts (rhythm via arrangement,
+    not aspect math).
+  - Square thumbnails everywhere.
+  - Description always full-width with a max-content cap for readability.
+  - Meta row: stats LEFT + software RIGHT in a single flex line.
 
-Structure stays: header / body (viewer + thumbnails) / details (description +
-meta). Layout picker floats absolute top-right of the article. Body grid is
-driven by the layout class on .main-project.
+Layout picker pins top-right of the article (absolute), never clips.
 */
 
 .main-project {
-  --thumbnail-aspect: 1;
-  --viewer-aspect:   16 / 10;
-  --content-max:     62ch;
+  --thumb-aspect:  1;
+  --viewer-aspect: 16 / 9;
+  --thumb-strip:   16%;     /*width of the side thumbnail column*/
+  --content-max:   62ch;
   position: relative;
   width: 100%;
   margin-bottom: var(--spacing-6xl);
@@ -593,35 +588,34 @@ driven by the layout class on .main-project.
   background-color: hsl(var(--primary) / 0.12);
 }
 
-/*BODY - viewer + (optional) thumbnails. Grid template + aspect-ratio
-override depending on the layout for visual rhythm.*/
+/*BODY - viewer + (optional) thumbnails. ALL layouts share the same 16/9
+viewer aspect. The arrangement is what varies, not the maths.*/
 .main-project__body {
   display: grid;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
+  align-items: stretch;
 }
 
-/*thumbs-left: thin thumbnail column, viewer dominant. Compact 4/3 viewer.*/
+/*thumbs-left: vertical thumbnail column on the left, viewer fills the rest.*/
 .main-project--layout-thumbs-left .main-project__body {
-  grid-template-columns: minmax(140px, 16%) 1fr;
+  grid-template-columns: var(--thumb-strip) 1fr;
 }
 .main-project--layout-thumbs-left .main-project__thumbnails { order: 1; }
 .main-project--layout-thumbs-left .main-project__viewer     { order: 2; }
-.main-project--layout-thumbs-left .main-project__viewer { --viewer-aspect: 4 / 3; }
 
-/*thumbs-right: mirror of thumbs-left.*/
+/*thumbs-right: mirror.*/
 .main-project--layout-thumbs-right .main-project__body {
-  grid-template-columns: 1fr minmax(140px, 16%);
+  grid-template-columns: 1fr var(--thumb-strip);
 }
 .main-project--layout-thumbs-right .main-project__viewer     { order: 1; }
 .main-project--layout-thumbs-right .main-project__thumbnails { order: 2; }
-.main-project--layout-thumbs-right .main-project__viewer { --viewer-aspect: 4 / 3; }
 
-/*thumbs-bottom: cinematic 21/9 viewer with horizontal thumbnail strip below.*/
+/*thumbs-bottom: viewer full-width, thumbnails in a 4-up horizontal row below.*/
 .main-project--layout-thumbs-bottom .main-project__body {
   grid-template-columns: 1fr;
   grid-template-rows: auto auto;
 }
-.main-project--layout-thumbs-bottom .main-project__viewer    { order: 1; }
+.main-project--layout-thumbs-bottom .main-project__viewer { order: 1; }
 .main-project--layout-thumbs-bottom .main-project__thumbnails {
   order: 2;
   flex-direction: row;
@@ -629,18 +623,17 @@ override depending on the layout for visual rhythm.*/
 }
 .main-project--layout-thumbs-bottom .main-project__thumbnail,
 .main-project--layout-thumbs-bottom .main-project__thumbnail-add {
-  flex: 1 1 calc(25% - var(--spacing-xs));
-  max-width: calc(25% - var(--spacing-xs));
+  flex: 1 1 calc(25% - var(--spacing-sm));
+  max-width: calc(25% - var(--spacing-sm));
 }
-.main-project--layout-thumbs-bottom .main-project__viewer { --viewer-aspect: 21 / 9; }
 
-/*viewer-only: full cinema mode. 16/9 ultra-wide-ish, no thumbs.*/
+/*viewer-only: just the viewer, full width, no thumbnail strip rendered.*/
 .main-project--layout-viewer-only .main-project__body {
   grid-template-columns: 1fr;
 }
-.main-project--layout-viewer-only .main-project__viewer { --viewer-aspect: 16 / 9; }
 
-/*VIEWER (Sketchfab embed / main image / wireframe toggle) ------------------*/
+/*VIEWER - same aspect across every layout, only the surrounding arrangement
+changes. Inner img / iframe fill the absolute box.*/
 .main-project__viewer {
   position: relative;
   aspect-ratio: var(--viewer-aspect);
@@ -696,18 +689,30 @@ override depending on the layout for visual rhythm.*/
 .main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .main-project__wireframe-btn--active  { background-color: var(--color-accent); }
 
-/*THUMBNAILS strip ----------------------------------------------------------*/
+/*THUMBNAILS strip ----------------------------------------------------------
+In thumbs-left/right layouts the strip is a flex COLUMN that grows to match
+the viewer height (stretch). Each thumbnail uses flex:1 so they distribute
+evenly and the column never has empty trailing space. In thumbs-bottom the
+strip becomes a horizontal row (handled in the layout-specific rule above).*/
 .main-project__thumbnails {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+  height: 100%;
 }
 
 .main-project__thumbnail {
   position: relative;
-  aspect-ratio: var(--thumbnail-aspect);
+  flex: 1;
+  min-height: 0;
   width: 100%;
   overflow: hidden;
+}
+
+.main-project--layout-thumbs-bottom .main-project__thumbnail {
+  flex: 1 1 calc(25% - var(--spacing-sm));
+  aspect-ratio: var(--thumb-aspect);
+  min-height: 0;
 }
 
 .main-project__thumbnail img {
@@ -736,7 +741,8 @@ override depending on the layout for visual rhythm.*/
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: var(--thumbnail-aspect);
+  flex: 0 1 calc(var(--spacing-3xl) + var(--spacing-md));
+  min-height: calc(var(--spacing-3xl) + var(--spacing-md));
   width: 100%;
   background-color: transparent;
   border: var(--border-width-md) dashed var(--color-gray-medium);
@@ -745,18 +751,24 @@ override depending on the layout for visual rhythm.*/
   transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
 }
 
+.main-project--layout-thumbs-bottom .main-project__thumbnail-add {
+  flex: 1 1 calc(25% - var(--spacing-sm));
+  aspect-ratio: var(--thumb-aspect);
+  min-height: 0;
+}
+
 .main-project__thumbnail-add:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
   background-color: hsl(var(--primary) / 0.05);
 }
 
-/*DETAILS - editorial 2-column block: narrow description + meta sidebar ----*/
+/*DETAILS - single column stack. Description first (max-width capped for
+readability), then optional model-id, then a full-width meta row.*/
 .main-project__details {
-  display: grid;
-  grid-template-columns: minmax(0, var(--content-max)) 1fr;
-  gap: var(--spacing-3xl);
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
   padding-top: var(--spacing-md);
 }
 
@@ -764,11 +776,10 @@ override depending on the layout for visual rhythm.*/
   line-height: 1.75;
   font-size: var(--font-size-base);
   color: var(--color-text);
-  grid-column: 1;
+  max-width: var(--content-max);
 }
 
 .main-project__model-id {
-  grid-column: 1 / -1;
   display: flex;
   gap: var(--spacing-sm);
   align-items: baseline;
@@ -776,6 +787,7 @@ override depending on the layout for visual rhythm.*/
   background-color: hsl(var(--background) / 0.4);
   border-left: var(--border-width-md) solid var(--color-accent);
   font-size: var(--font-size-xs);
+  align-self: flex-start;
 }
 
 .main-project__model-id-label {
@@ -789,20 +801,23 @@ override depending on the layout for visual rhythm.*/
   color: var(--color-text-hover);
 }
 
-/*META - stats stacked vertically, software list below. Sits in the right
-column next to the description.*/
+/*META row - stats LEFT, software list RIGHT. Hairline separator above
+mirrors the article-header hairline, framing the project visually.*/
 .main-project__meta {
-  grid-column: 2;
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--spacing-2xl);
+  flex-wrap: wrap;
+  padding-top: var(--spacing-lg);
+  border-top: var(--border-width-sm) solid var(--color-gray-medium);
 }
 
-/*STATS ---------------------------------------------------------------------*/
+/*STATS - horizontal row of stat columns ----------------------------------*/
 .main-project__stats {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-2xl);
+  flex-wrap: wrap;
 }
 
 .main-project__stat {
@@ -810,11 +825,7 @@ column next to the description.*/
   flex-direction: column;
   align-items: flex-start;
   gap: var(--spacing-xxs);
-  padding-bottom: var(--spacing-sm);
-  border-bottom: var(--border-width-sm) solid var(--color-gray-dark);
 }
-
-.main-project__stat:last-of-type { border-bottom: none; }
 
 .main-project__stat-label {
   font-size: var(--font-size-xs);
@@ -832,20 +843,12 @@ column next to the description.*/
   letter-spacing: -0.01em;
 }
 
-/*SOFTWARE LIST - minimal monospace chips with logos -----------------------*/
+/*SOFTWARE LIST - inline pills, right side of the meta row ----------------*/
 .main-project__software-list {
   display: flex;
-  flex-direction: column;
   gap: var(--spacing-xs);
-}
-
-.main-project__software-list::before {
-  content: "Tools";
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
-  margin-bottom: var(--spacing-xs);
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .main-project__software {
@@ -875,35 +878,38 @@ column next to the description.*/
 @media (max-width: 900px) {
   .main-project { padding: var(--spacing-xl) 0; margin-bottom: var(--spacing-5xl); }
 
-  /*all layouts collapse to single column - viewer + thumbs stacked vertically*/
+  /*every layout collapses to viewer-then-thumbs vertically. Thumbs become a
+  3-up row underneath instead of vertical column or 4-up grid.*/
   .main-project__body,
   .main-project--layout-thumbs-left  .main-project__body,
   .main-project--layout-thumbs-right .main-project__body,
   .main-project--layout-thumbs-bottom .main-project__body,
   .main-project--layout-viewer-only  .main-project__body {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
   }
 
-  /*viewer goes wide on mobile regardless of layout*/
-  .main-project__viewer { --viewer-aspect: 16 / 10; }
+  .main-project--layout-thumbs-left  .main-project__viewer,
+  .main-project--layout-thumbs-right .main-project__viewer { order: 1; }
+  .main-project--layout-thumbs-left  .main-project__thumbnails,
+  .main-project--layout-thumbs-right .main-project__thumbnails { order: 2; }
 
   .main-project__thumbnails {
     flex-direction: row;
     flex-wrap: wrap;
+    height: auto;
   }
-  .main-project__thumbnail,
+  .main-project__thumbnail {
+    flex: 1 1 calc(33.333% - var(--spacing-xs));
+    max-width: calc(33.333% - var(--spacing-xs));
+    aspect-ratio: var(--thumb-aspect);
+    min-height: 0;
+  }
   .main-project__thumbnail-add {
     flex: 1 1 calc(33.333% - var(--spacing-xs));
     max-width: calc(33.333% - var(--spacing-xs));
+    aspect-ratio: var(--thumb-aspect);
+    min-height: 0;
   }
-
-  /*details collapse to one column*/
-  .main-project__details {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-xl);
-  }
-  .main-project__meta { grid-column: 1; }
 
   .main-project__layout-picker {
     position: static;
@@ -917,6 +923,11 @@ column next to the description.*/
 }
 
 @media (max-width: 600px) {
+  .main-project__meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-lg);
+  }
   .main-project__software-name { display: none; }
 }
 </style>

@@ -232,11 +232,6 @@ button {
 }
 
 .vsui-app__main {
-  /*sit above .grain-overlay (z-index:1). Content with opaque backgrounds
-  (viewer, thumbnails, project right-half gradient) covers the grain;
-  transparent areas let the grain texture show through subtly.*/
-  position: relative;
-  z-index: 2;
   padding: 0;
 }
 

@@ -53,8 +53,13 @@ const chromeFreeRoutes = ["/login", "/settings", "/pending", "/banned", "/forgot
   min-height: 100vh;
 }
 
+/*Main content sits above the grain (z-index:1). isolation:isolate creates a
+fresh stacking context so descendants never get clipped by the grain layer,
+regardless of transforms applied inside (AnimatedReveal etc.).*/
 .portfolio-app__main {
   position: relative;
+  z-index: 2;
+  isolation: isolate;
 }
 
 /*Fixed language switch in the top-right corner (matches the original portfolio).*/
