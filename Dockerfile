@@ -22,10 +22,9 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-#STORAGE VOLUME - admin uploads (images, videos) land in /app/storage/files/.
-#Mount a persistent Docker volume here from Dokploy so uploaded files survive
-#container rebuilds:
-#  Dokploy -> Service -> Volumes -> Add: name=portfolio-storage, mount=/app/storage
-VOLUME ["/app/storage"]
+#NOTE: no VOLUME directive on /app/storage. The bind-mount configured in
+#Dokploy (Volumes tab: /home/dokploy/axel/medias -> /app/storage) already
+#handles persistence. Keeping a VOLUME directive AND a bind mount confuses
+#Dokploy's deploy step (it builds the image but never swaps the container).
 
 CMD ["bun", "server.ts"]

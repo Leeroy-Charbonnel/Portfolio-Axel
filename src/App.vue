@@ -22,6 +22,13 @@ const chromeFreeRoutes = ["/login", "/settings", "/pending", "/banned", "/forgot
 
 <template>
   <div class="vsui-app portfolio-app">
+    <!--TEMP build marker - giant red banner at the top of EVERY page.
+    If you can see this, the new container is running. If not, Dokploy
+    is still serving the old image. Remove this once deployment is confirmed.-->
+    <div class="portfolio-app__build-banner">
+      ⚠ BUILD MARKER 2026-06-17 — IF YOU SEE THIS, THE NEW VERSION IS LIVE ⚠
+    </div>
+
     <template v-if="!chromeFreeRoutes.includes(route.path)">
       <SideNav />
 
@@ -81,5 +88,24 @@ regardless of transforms applied inside (AnimatedReveal etc.).*/
 
 .portfolio-app__lang-switch:hover {
   color: var(--color-text-hover);
+}
+
+/*TEMP build banner - bright red strip at the top. Impossible to miss.*/
+.portfolio-app__build-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  padding: 12px 20px;
+  background: #ff003c;
+  color: white;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  border-bottom: 3px solid #fff;
 }
 </style>
