@@ -32,9 +32,11 @@ export interface SoftwareDto {
 }
 
 export interface ThumbnailDto {
-  url:          string | null
-  wireframeUrl: string | null
-  description:  Bilingual
+  fileId:          string | null
+  wireframeFileId: string | null
+  url:             string | null
+  wireframeUrl:    string | null
+  description:     Bilingual
 }
 
 export type MainProjectLayout = "thumbs-left" | "thumbs-right" | "thumbs-bottom" | "viewer-only"

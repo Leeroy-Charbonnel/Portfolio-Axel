@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue"
-import { Grid, PanelLeft, PanelRight, PanelBottom, Square } from "lucide-vue-next"
+import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus } from "lucide-vue-next"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { usePortfolio } from "../../composables/usePortfolio"
@@ -278,6 +278,53 @@ async function onReplaceWireframeImage() {
 async function onDelete() {
   await deleteMainProject(props.project.id)
 }
+
+//THUMBNAIL editing - the thumbnails column is stored as a jsonb array on the
+//main_project row. Mutations replace the whole array via the same PUT route.
+//Server expects {fileId, wireframeFileId, description}; the API GET also
+//exposes resolved URLs which we strip before PUTting to keep the body tight.
+
+function serializeThumbnails(items: { fileId: string | null; wireframeFileId: string | null; description: { en: string; fr: string } }[]): any[] {
+  return items.map((t) => ({
+    fileId:          t.fileId,
+    wireframeFileId: t.wireframeFileId,
+    description:     t.description,
+  }))
+}
+
+async function addThumbnail() {
+  const next = [...(props.project.thumbnails ?? []), {
+    fileId:          null,
+    wireframeFileId: null,
+    description:     { en: "", fr: "" },
+  }] as any
+  await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next) })
+}
+
+async function removeThumbnail(idx: number) {
+  const next = (props.project.thumbnails ?? []).filter((_, i) => i !== idx)
+  await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next as any) })
+}
+
+async function replaceThumbnailImage(idx: number) {
+  const file = await pickImageFile()
+  if (!file) return
+  try {
+    const { id } = await uploadFile(file)
+    const next = (props.project.thumbnails ?? []).map((t, i) => i === idx ? { ...t, fileId: id } : t)
+    await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next as any) })
+  } catch (e) { console.error("[MainProject] replace thumbnail failed:", e) }
+}
+
+async function replaceThumbnailWireframe(idx: number) {
+  const file = await pickImageFile()
+  if (!file) return
+  try {
+    const { id } = await uploadFile(file)
+    const next = (props.project.thumbnails ?? []).map((t, i) => i === idx ? { ...t, wireframeFileId: id } : t)
+    await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next as any) })
+  } catch (e) { console.error("[MainProject] replace thumbnail wireframe failed:", e) }
+}
 </script>
 
 <template>
@@ -327,7 +374,20 @@ async function onDelete() {
             class="main-project__thumbnail border-sm no-grain"
           >
             <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
+            <div v-else class="main-project__thumbnail-empty">No image</div>
+            <RemoveButton v-if="editMode" label="Remove thumbnail" @click="removeThumbnail(i)" />
+            <ReplaceImageButton v-if="editMode" @click="isWireframe ? replaceThumbnailWireframe(i) : replaceThumbnailImage(i)" />
           </div>
+
+          <button
+            v-if="editMode"
+            type="button"
+            class="main-project__thumbnail-add"
+            aria-label="Add thumbnail"
+            @click="addThumbnail"
+          >
+            <Plus :size="20" />
+          </button>
         </div>
 
         <div class="main-project__panel">
@@ -558,6 +618,41 @@ parent flex direction.*/
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.main-project__thumbnail-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-background-gray-100);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+/*Small "+" tile - mirrors the thumbnail aspect ratio so it sits in the strip
+without breaking the layout. Visible only in edit mode (parent v-if).*/
+.main-project__thumbnail-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  height: calc(33% - (var(--thumbnail-gap) * (var(--thumbnail-count) - 2)));
+  background-color: transparent;
+  border: var(--border-width-md) dashed var(--color-gray-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.main-project__thumbnail-add:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background-color: hsl(var(--primary) / 0.05);
 }
 
 .main-project__panel { display: flex; flex-direction: column; }

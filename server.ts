@@ -470,9 +470,13 @@ app.get("/api/portfolio", async (_req, res) => {
       mainWireframeUrl:    urlOf(p.mainWireframeFileId),
       videoUrl:            urlOf(p.videoFileId),
       thumbnails: (p.thumbnails ?? []).map((t) => ({
-        url:          urlOf(t.fileId),
-        wireframeUrl: urlOf(t.wireframeFileId),
-        description:  t.description,
+        //expose both file ids (for round-tripping edits back into the jsonb)
+        //and resolved URLs (for direct img/iframe rendering on the client)
+        fileId:          t.fileId,
+        wireframeFileId: t.wireframeFileId,
+        url:             urlOf(t.fileId),
+        wireframeUrl:    urlOf(t.wireframeFileId),
+        description:     t.description,
       })),
       wireframeParameters: p.wireframeParameters,
       stats:               p.stats,
