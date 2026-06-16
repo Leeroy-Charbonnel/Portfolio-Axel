@@ -2,12 +2,9 @@
 import { useLanguage } from "../../composables/useLanguage"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import MainProject from "./MainProject.vue"
-import type { Project, Software } from "../../types/portfolio"
+import type { MainProjectDto } from "../../types/portfolio"
 
-defineProps<{
-  projects:  Project[]
-  softwares: Record<string, Software>
-}>()
+defineProps<{ projects: MainProjectDto[] }>()
 
 const { t } = useLanguage()
 </script>
@@ -28,9 +25,8 @@ const { t } = useLanguage()
     <div class="main-projects-section__list">
       <MainProject
         v-for="(project, idx) in projects"
-        :key="idx"
+        :key="project.id"
         :project="project"
-        :softwares="softwares"
         :index="idx"
       />
     </div>

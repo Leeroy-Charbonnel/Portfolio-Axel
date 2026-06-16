@@ -276,9 +276,11 @@ button {
   left: 25%;
 }
 
-/*Full-bleed grain overlay layer (applied at the App.vue root).*/
+/*Full-bleed grain overlay layer (applied inside the App.vue root). Absolute
+positioning makes it scroll with the page content - the parent .portfolio-app
+expands to the full document height so inset:0 covers every section.*/
 .grain-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background-image: url('/textures/grain.png');
   background-size: var(--grain-size);

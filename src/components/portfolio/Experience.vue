@@ -3,13 +3,11 @@ import { useLanguage } from "../../composables/useLanguage"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import ExperienceItem from "./ExperienceItem.vue"
 import About from "./About.vue"
-import type { Bilingual, Contact, Experience as ExperienceType, Interests } from "../../types/portfolio"
+import type { ExperienceDto, ProfileDto } from "../../types/portfolio"
 
 defineProps<{
-  experiences: ExperienceType[]
-  about:       Bilingual
-  contact:     Contact
-  interests:   Interests
+  experiences: ExperienceDto[]
+  profile:     ProfileDto
 }>()
 
 const { t } = useLanguage()
@@ -25,14 +23,14 @@ const { t } = useLanguage()
       <div class="experience-section__content">
         <div class="experience-section__timeline">
           <ExperienceItem
-            v-for="(experience, idx) in experiences"
+            v-for="(exp, idx) in experiences"
             :key="idx"
-            :experience="experience"
+            :experience="exp"
             :index="idx"
           />
         </div>
 
-        <About :about="about" :contact="contact" :interests="interests" />
+        <About :profile="profile" />
       </div>
     </div>
   </section>
@@ -45,13 +43,8 @@ const { t } = useLanguage()
   padding-bottom: var(--spacing-6xl);
 }
 
-.experience-section__content {
-  margin-top: var(--spacing-3xl);
-}
-
-.experience-section__timeline {
-  margin-bottom: var(--spacing-3xl);
-}
+.experience-section__content { margin-top: var(--spacing-3xl); }
+.experience-section__timeline { margin-bottom: var(--spacing-3xl); }
 
 @media (max-width: 768px) {
   .experience-section__content { margin-top: var(--spacing-xl); }

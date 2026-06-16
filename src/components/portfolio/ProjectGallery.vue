@@ -2,9 +2,9 @@
 import { useLanguage } from "../../composables/useLanguage"
 import { formatNumber } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
-import type { GalleryProject } from "../../types/portfolio"
+import type { GalleryProjectDto } from "../../types/portfolio"
 
-defineProps<{ projects: GalleryProject[] }>()
+defineProps<{ projects: GalleryProjectDto[] }>()
 
 const { t, lang } = useLanguage()
 </script>
@@ -19,7 +19,7 @@ const { t, lang } = useLanguage()
       <div class="gallery-grid">
         <AnimatedReveal
           v-for="(project, index) in projects"
-          :key="project.id ?? project.imageFolder ?? index"
+          :key="project.id"
           direction="bottom"
           :distance="30"
           :duration="0.6"
@@ -30,7 +30,8 @@ const { t, lang } = useLanguage()
           <a :href="project.link" target="_blank" rel="noopener noreferrer">
             <div class="gallery-item__thumbnail-wrap">
               <img
-                :src="`/images/projects/${project.imageFolder}/main.png`"
+                v-if="project.imageUrl"
+                :src="project.imageUrl"
                 :alt="project.title[lang]"
                 class="gallery-item__thumbnail"
               />
@@ -103,9 +104,7 @@ const { t, lang } = useLanguage()
   transform: scale(1.05);
 }
 
-.gallery-item__details {
-  padding: var(--spacing-md);
-}
+.gallery-item__details { padding: var(--spacing-md); }
 
 .gallery-item__title {
   font-size: var(--font-size-md);
@@ -114,10 +113,7 @@ const { t, lang } = useLanguage()
   letter-spacing: var(--letter-spacing-tight);
 }
 
-.gallery-item__stats {
-  display: flex;
-  gap: var(--spacing-md);
-}
+.gallery-item__stats { display: flex; gap: var(--spacing-md); }
 
 .gallery-item__stat {
   display: flex;

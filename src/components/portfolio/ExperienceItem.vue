@@ -2,9 +2,9 @@
 import { computed } from "vue"
 import { useLanguage } from "../../composables/useLanguage"
 import AnimatedReveal from "./AnimatedReveal.vue"
-import type { Experience } from "../../types/portfolio"
+import type { ExperienceDto } from "../../types/portfolio"
 
-const props = defineProps<{ experience: Experience; index: number }>()
+const props = defineProps<{ experience: ExperienceDto; index: number }>()
 
 const { lang } = useLanguage()
 
@@ -90,14 +90,9 @@ const periodParts = computed(() => props.experience.period[lang.value].split("-"
   margin-bottom: var(--spacing-md);
 }
 
-.experience-item__location {
-  color: var(--color-text-tertiary);
-}
+.experience-item__location { color: var(--color-text-tertiary); }
 
-.experience-item__description-list {
-  list-style: none;
-  padding: 0;
-}
+.experience-item__description-list { list-style: none; padding: 0; }
 
 .experience-item__description {
   margin-bottom: var(--spacing-xs);

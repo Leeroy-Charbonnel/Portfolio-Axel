@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { useLanguage } from "../../composables/useLanguage"
 import AnimatedReveal from "./AnimatedReveal.vue"
-import type { Bilingual, Contact, Interests } from "../../types/portfolio"
+import type { ProfileDto } from "../../types/portfolio"
 
-defineProps<{
-  about:     Bilingual
-  contact:   Contact
-  interests: Interests
-}>()
+defineProps<{ profile: ProfileDto }>()
 
 const { t, lang } = useLanguage()
 </script>
@@ -24,17 +20,12 @@ const { t, lang } = useLanguage()
     >
       <h3 class="about__heading">{{ t("experienceAbout") }}</h3>
       <div class="about__content">
-        <div class="about__avatar">
+        <div v-if="profile.avatarUrl" class="about__avatar">
           <a href="https://sketchfab.com/Obambulatesart" target="_blank" rel="noopener noreferrer">
-            <img
-              src="https://media.sketchfab.com/avatars/5414de3b61cc449bb3b094e1b5af13e0/aea42c6a1e164c288fb8f965384bb362.png"
-              alt="Axel Offret avatar"
-              width="100"
-              height="100"
-            />
+            <img :src="profile.avatarUrl" alt="Axel Offret avatar" width="100" height="100" />
           </a>
         </div>
-        <p class="about__text">{{ about[lang] }}</p>
+        <p class="about__text">{{ profile.about[lang] }}</p>
       </div>
     </AnimatedReveal>
 
@@ -51,15 +42,15 @@ const { t, lang } = useLanguage()
         <ul class="about__contact-list">
           <li class="about__contact-item">
             <span class="about__contact-label">{{ t("experiencePhone") }}</span>
-            <span>{{ contact.phone }}</span>
+            <span>{{ profile.contact.phone }}</span>
           </li>
           <li class="about__contact-item">
             <span class="about__contact-label">{{ t("experienceMail") }}</span>
-            <span>{{ contact.email }}</span>
+            <span>{{ profile.contact.email }}</span>
           </li>
           <li class="about__contact-item">
             <span class="about__contact-label">{{ t("experienceInsta") }}</span>
-            <span>{{ contact.instagram }}</span>
+            <span>{{ profile.contact.instagram }}</span>
           </li>
         </ul>
       </AnimatedReveal>
@@ -77,13 +68,13 @@ const { t, lang } = useLanguage()
           <div>
             <h4 class="about__interest-title">{{ t("experienceGames") }}</h4>
             <ul class="about__interest-list">
-              <li v-for="(game, idx) in interests.games" :key="idx">{{ game }}</li>
+              <li v-for="(game, idx) in profile.interests.games" :key="idx">{{ game }}</li>
             </ul>
           </div>
           <div>
             <h4 class="about__interest-title">{{ t("experienceArt") }}</h4>
             <ul class="about__interest-list">
-              <li v-for="(art, idx) in interests.art" :key="idx">{{ art }}</li>
+              <li v-for="(art, idx) in profile.interests.art" :key="idx">{{ art }}</li>
             </ul>
           </div>
         </div>
@@ -147,10 +138,7 @@ const { t, lang } = useLanguage()
   box-shadow: 0 0 0 var(--border-width-md) var(--color-border-muted);
 }
 
-.about__text {
-  line-height: 1.8;
-  white-space: pre-line;
-}
+.about__text { line-height: 1.8; white-space: pre-line; }
 
 .about__columns {
   display: grid;

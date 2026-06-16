@@ -6,8 +6,18 @@ import { fileURLToPath } from "url"
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node"
 import { auth } from "./auth"
 import { db } from "./db/index"
-import { settings, translations } from "./db/schema"
-import { eq, and, sql } from "drizzle-orm"
+import {
+  settings,
+  translations,
+  file as fileTable,
+  software,
+  mainProject,
+  mainProjectSoftware,
+  galleryProject,
+  experience,
+  profile,
+} from "./db/schema"
+import { eq, and, asc, sql } from "drizzle-orm"
 
 const app       = express()
 const isProd    = process.env.NODE_ENV === "production"
@@ -172,6 +182,120 @@ app.put("/api/settings/:key", requireAuth, async (req, res) => {
     .returning()
   res.json(updated[0])
 })
+
+
+//PORTFOLIO ------------------------------------------------------------------
+//public read endpoint - serves the whole portfolio in one fetch so the
+//Vue side can render the page from a single API call. File ids are
+//resolved to media URLs server-side so the frontend stays unaware of
+//storage internals.
+app.get("/api/portfolio", async (_req, res) => {
+  //load every file row once, then build a lookup from id -> /media URL
+  const fileRows = await db.select({ id: fileTable.id, storedFilename: fileTable.storedFilename }).from(fileTable)
+  const urlById: Record<string, string> = {}
+  for (const f of fileRows) urlById[f.id] = `/media/${f.storedFilename}`
+
+  function urlOf(id: string | null | undefined): string | null {
+    return id ? (urlById[id] ?? null) : null
+  }
+
+  //SOFTWARE - load all rows so we can attach them to each main project
+  const softwareRows = await db
+    .select()
+    .from(software)
+    .orderBy(asc(software.sortOrder), asc(software.id))
+
+  const softwareById: Record<number, typeof softwareRows[number]> = {}
+  for (const s of softwareRows) softwareById[s.id] = s
+
+  //MAIN PROJECTS - keep wireframe / stats / thumbnails as-is; resolve file urls
+  const mainProjectRows = await db
+    .select()
+    .from(mainProject)
+    .orderBy(asc(mainProject.sortOrder), asc(mainProject.id))
+
+  const mpsRows = await db
+    .select()
+    .from(mainProjectSoftware)
+    .orderBy(asc(mainProjectSoftware.sortOrder))
+
+  const mainProjects = mainProjectRows.map((p) => {
+    const projectSoftware = mpsRows
+      .filter((j) => j.mainProjectId === p.id)
+      .map((j) => softwareById[j.softwareId])
+      .filter((s): s is typeof softwareRows[number] => Boolean(s))
+      .map((s) => ({ key: s.key, url: s.url, logoUrl: urlOf(s.logoFileId) }))
+
+    return {
+      id:                  p.id,
+      modelId:             p.modelId,
+      title:               p.title,
+      description:         p.description,
+      mainImageUrl:        urlOf(p.mainImageFileId),
+      mainWireframeUrl:    urlOf(p.mainWireframeFileId),
+      videoUrl:            urlOf(p.videoFileId),
+      thumbnails: (p.thumbnails ?? []).map((t) => ({
+        url:          urlOf(t.fileId),
+        wireframeUrl: urlOf(t.wireframeFileId),
+        description:  t.description,
+      })),
+      wireframeParameters: p.wireframeParameters,
+      stats:               p.stats,
+      software:            projectSoftware,
+    }
+  })
+
+  //GALLERY PROJECTS
+  const galleryRows = await db
+    .select()
+    .from(galleryProject)
+    .orderBy(asc(galleryProject.sortOrder), asc(galleryProject.id))
+
+  const galleryProjects = galleryRows.map((g) => ({
+    id:       g.id,
+    title:    g.title,
+    link:     g.link,
+    imageUrl: urlOf(g.imageFileId),
+    stats:    g.stats,
+  }))
+
+  //EXPERIENCE
+  const experienceRows = await db
+    .select()
+    .from(experience)
+    .orderBy(asc(experience.sortOrder), asc(experience.id))
+
+  //PROFILE - only one row
+  const [profileRow] = await db.select().from(profile)
+
+  res.json({
+    software:        softwareRows.map((s) => ({ key: s.key, url: s.url, logoUrl: urlOf(s.logoFileId) })),
+    mainProjects,
+    galleryProjects,
+    experiences:     experienceRows.map((e) => ({
+      period:      e.period,
+      title:       e.title,
+      company:     e.company,
+      location:    e.location,
+      description: e.description,
+    })),
+    profile: profileRow ? {
+      about:     profileRow.about,
+      contact:   profileRow.contact,
+      interests: profileRow.interests,
+      avatarUrl: profileRow.avatarUrl,
+    } : null,
+  })
+})
+
+//MEDIA - static file storage. Files live at storage/files/{stored_filename}
+//and are served under /media/{stored_filename}. Public access since portfolio
+//media is meant to be visible to everyone.
+const mediaDir = join(__dirname, "storage", "files")
+app.use("/media", express.static(mediaDir, {
+  immutable: true,
+  maxAge:    "30d",
+}))
 
 
 //SERVE STATIC FILES IN PRODUCTION

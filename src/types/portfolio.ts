@@ -1,5 +1,5 @@
-//PORTFOLIO domain types - mirror the data shape in src/data/projects.json
-//and src/data/experience.json. Imported by every portfolio section component.
+//PORTFOLIO domain types - shape returned by GET /api/portfolio. Mirrors the
+//DB tables in db/schema.ts but with file ids resolved to /media URLs.
 
 export interface Bilingual {
   en: string
@@ -19,70 +19,68 @@ export interface WireframeLight {
 }
 
 export interface WireframeParameters {
-  wireframeColor?:              string
-  whiteMaterialColor:           string
-  lightsOverwrite:              WireframeLight[]
-  emissiveMaterialsOverwrite:   string[]
+  wireframeColor?:             string
+  whiteMaterialColor:          string
+  lightsOverwrite:             WireframeLight[]
+  emissiveMaterialsOverwrite:  string[]
 }
 
-export interface Project {
-  modelId:                 string
-  imageFolder:             string
-  title:                   Bilingual
-  description:             Bilingual
-  thumbnailsDescriptions:  Bilingual[]
-  wireframeParameters:     WireframeParameters
-  stats:                   ProjectStats
-  software:                string[]
+export interface SoftwareDto {
+  key:     string
+  url:     string
+  logoUrl: string | null
 }
 
-export interface GalleryProject {
-  id?:         string
-  title:       Bilingual
-  link:        string
-  imageFolder: string
+export interface ThumbnailDto {
+  url:          string | null
+  wireframeUrl: string | null
+  description:  Bilingual
+}
+
+export interface MainProjectDto {
+  id:                  number
+  modelId:             string
+  title:               Bilingual
+  description:         Bilingual
+  mainImageUrl:        string | null
+  mainWireframeUrl:    string | null
+  videoUrl:            string | null
+  thumbnails:          ThumbnailDto[]
+  wireframeParameters: WireframeParameters
+  stats:               ProjectStats
+  software:            SoftwareDto[]
+}
+
+export interface GalleryProjectDto {
+  id:       number
+  title:    Bilingual
+  link:     string
+  imageUrl: string | null
   stats: {
     vertices: number
     edges:    number
   }
 }
 
-export interface Software {
-  logo: string
-  url:  string
-}
-
-export interface Experience {
+export interface ExperienceDto {
   period:      Bilingual
   title:       Bilingual
   company:     string
   location:    string
-  description: {
-    en: string[]
-    fr: string[]
-  }
+  description: { en: string[]; fr: string[] }
 }
 
-export interface Contact {
-  phone:     string
-  email:     string
-  instagram: string
+export interface ProfileDto {
+  about:     Bilingual
+  contact:   { phone: string; email: string; instagram: string }
+  interests: { games: string[]; art: string[] }
+  avatarUrl: string
 }
 
-export interface Interests {
-  games: string[]
-  art:   string[]
-}
-
-export interface ProjectsData {
-  software:        Record<string, Software>
-  mainProjects:    Project[]
-  galleryProjects: GalleryProject[]
-}
-
-export interface ExperienceData {
-  experiences: Experience[]
-  contact:     Contact
-  interests:   Interests
-  about:       Bilingual
+export interface PortfolioDto {
+  software:        SoftwareDto[]
+  mainProjects:    MainProjectDto[]
+  galleryProjects: GalleryProjectDto[]
+  experiences:     ExperienceDto[]
+  profile:         ProfileDto | null
 }

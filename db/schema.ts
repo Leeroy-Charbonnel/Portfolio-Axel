@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, boolean, unique, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, serial, text, integer, jsonb, uuid, timestamp, boolean, unique, primaryKey } from "drizzle-orm/pg-core"
 
 //TRANSLATIONS TABLE - source of truth for every translatable string in the app.
 //id is a human-readable key (LBL_LOGOUT, SETTING_ACCENT_DESC, etc.), lang is fr/en,
@@ -33,7 +33,102 @@ export const settings = pgTable("settings", {
   uniqUserKey: unique().on(t.userId, t.key),
 }))
 
-//AUTH TABLES (required by better-auth)
+//PORTFOLIO TABLES ------------------------------------------------------------
+
+//FILE - generic storage table. Each row points to a binary file on disk
+//under storage/files/{stored_filename}. URL served at /media/{stored_filename}.
+//Images and videos both live here; the 'kind' column lets the admin filter.
+export const file = pgTable("file", {
+  id:               uuid("id").primaryKey().defaultRandom(),
+  originalFilename: text("original_filename").notNull(),
+  storedFilename:   text("stored_filename").notNull().unique(),
+  mimeType:         text("mime_type").notNull(),
+  sizeBytes:        integer("size_bytes").notNull(),
+  kind:             text("kind").notNull().default("other"),
+  uploadedBy:       text("uploaded_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt:        timestamp("created_at").notNull().defaultNow(),
+})
+
+//SOFTWARE - logos shown next to a main project (Blender, Substance, etc.)
+export const software = pgTable("software", {
+  id:         serial("id").primaryKey(),
+  key:        text("key").notNull().unique(),
+  logoFileId: uuid("logo_file_id").notNull().references(() => file.id, { onDelete: "restrict" }),
+  url:        text("url").notNull(),
+  sortOrder:  integer("sort_order").notNull().default(0),
+})
+
+//MAIN_PROJECT - the 3 featured projects with Sketchfab embeds + wireframe toggle.
+//Bilingual fields (title, description) stored as jsonb { en, fr } for easy
+//editing from a future admin UI. wireframe_parameters keeps its nested shape
+//rather than expanding into 4 columns - admin form will edit the JSON directly.
+export const mainProject = pgTable("main_project", {
+  id:                   serial("id").primaryKey(),
+  modelId:              text("model_id").notNull().default(""),
+  title:                jsonb("title").$type<{ en: string; fr: string }>().notNull(),
+  description:          jsonb("description").$type<{ en: string; fr: string }>().notNull(),
+  mainImageFileId:      uuid("main_image_file_id").references(() => file.id, { onDelete: "set null" }),
+  mainWireframeFileId:  uuid("main_wireframe_file_id").references(() => file.id, { onDelete: "set null" }),
+  thumbnails:           jsonb("thumbnails").$type<{
+                          fileId:          string
+                          wireframeFileId: string | null
+                          description:     { en: string; fr: string }
+                        }[]>().notNull().default([]),
+  videoFileId:          uuid("video_file_id").references(() => file.id, { onDelete: "set null" }),
+  wireframeParameters:  jsonb("wireframe_parameters").$type<{
+                          wireframeColor?:             string
+                          whiteMaterialColor:          string
+                          lightsOverwrite:             { index: number; intensity?: number; color: string }[]
+                          emissiveMaterialsOverwrite:  string[]
+                        }>().notNull(),
+  stats:                jsonb("stats").$type<{ vertices: number; edges: number; faces?: number }>().notNull(),
+  sortOrder:            integer("sort_order").notNull().default(0),
+  createdAt:            timestamp("created_at").notNull().defaultNow(),
+  updatedAt:            timestamp("updated_at").notNull().defaultNow(),
+})
+
+//MAIN_PROJECT_SOFTWARE - junction. sort_order controls the order in which the
+//logos render under a given project.
+export const mainProjectSoftware = pgTable("main_project_software", {
+  mainProjectId: integer("main_project_id").notNull().references(() => mainProject.id, { onDelete: "cascade" }),
+  softwareId:    integer("software_id").notNull().references(() => software.id, { onDelete: "cascade" }),
+  sortOrder:     integer("sort_order").notNull().default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.mainProjectId, t.softwareId] }),
+}))
+
+//GALLERY_PROJECT - the 8 smaller cards under "Project Gallery"
+export const galleryProject = pgTable("gallery_project", {
+  id:          serial("id").primaryKey(),
+  title:       jsonb("title").$type<{ en: string; fr: string }>().notNull(),
+  link:        text("link").notNull(),
+  imageFileId: uuid("image_file_id").references(() => file.id, { onDelete: "set null" }),
+  stats:       jsonb("stats").$type<{ vertices: number; edges: number }>().notNull(),
+  sortOrder:   integer("sort_order").notNull().default(0),
+})
+
+//EXPERIENCE - work timeline. description holds the bullet list per language.
+export const experience = pgTable("experience", {
+  id:          serial("id").primaryKey(),
+  period:      jsonb("period").$type<{ en: string; fr: string }>().notNull(),
+  title:       jsonb("title").$type<{ en: string; fr: string }>().notNull(),
+  company:     text("company").notNull(),
+  location:    text("location").notNull(),
+  description: jsonb("description").$type<{ en: string[]; fr: string[] }>().notNull(),
+  sortOrder:   integer("sort_order").notNull().default(0),
+})
+
+//PROFILE - single-row table that holds the "About me" copy + contact + interests.
+//A new row is created on seed; the admin updates id=1 going forward.
+export const profile = pgTable("profile", {
+  id:        serial("id").primaryKey(),
+  about:     jsonb("about").$type<{ en: string; fr: string }>().notNull(),
+  contact:   jsonb("contact").$type<{ phone: string; email: string; instagram: string }>().notNull(),
+  interests: jsonb("interests").$type<{ games: string[]; art: string[] }>().notNull(),
+  avatarUrl: text("avatar_url").notNull().default(""),
+})
+
+//AUTH TABLES (required by better-auth) ---------------------------------------
 export const user = pgTable("user", {
   id:            text("id").primaryKey(),
   name:          text("name").notNull(),

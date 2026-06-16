@@ -25,3 +25,6 @@ dist-ssr
 
 .env
 .env.*
+
+# File storage - portfolio media uploaded by admin. Persisted as a Docker volume in prod.
+storage/

@@ -5,7 +5,7 @@ import { useLanguage } from "../../composables/useLanguage"
 import { hexToRgb } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import AnimatedCounter from "./AnimatedCounter.vue"
-import type { Project, Software } from "../../types/portfolio"
+import type { MainProjectDto } from "../../types/portfolio"
 
 //Sketchfab viewer is loaded from a global <script> tag in index.html.
 declare global {
@@ -15,9 +15,8 @@ declare global {
 }
 
 const props = defineProps<{
-  project:   Project
-  softwares: Record<string, Software>
-  index:     number
+  project: MainProjectDto
+  index:   number
 }>()
 
 const { t, lang } = useLanguage()
@@ -41,24 +40,20 @@ let whiteMaterialId:    string | null = null
 let emissiveMaterialId: string | null = null
 const originalLights: Record<number, { intensity: number; color: number[] }> = {}
 
-//WIREFRAME visualization constants from the project's data file
+//WIREFRAME visualization constants from the project's data row
 const wireframeColor             = computed(() => props.project.wireframeParameters?.wireframeColor ?? "00000020")
 const whiteMaterialColor         = computed(() => props.project.wireframeParameters?.whiteMaterialColor ?? "ffffff")
 const emissiveMaterialsOverwrite = computed(() => props.project.wireframeParameters?.emissiveMaterialsOverwrite ?? [])
 const emissiveMaterialColor      = "#85efff"
 
-const mainImagePath      = computed(() => `/images/projects/${props.project.imageFolder}/main.png`)
-const wireframeImagePath = computed(() => `/images/projects/${props.project.imageFolder}/main-wireframe.png`)
-const layoutClass        = computed(() => `main-project--layout-${props.index % 2}`)
+const mainImageUrl     = computed(() => props.project.mainImageUrl)
+//if no dedicated wireframe still exists, fall back to the main image so the
+//<img> always has a source while Sketchfab loads
+const wireframeImageUrl = computed(() => props.project.mainWireframeUrl ?? props.project.mainImageUrl)
+const layoutClass       = computed(() => `main-project--layout-${props.index % 2}`)
 
 const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value))
 const showMainImage = computed(() => !showSketchfab.value || isLoading.value)
-
-const projectSoftwareWithLogos = computed(() =>
-  props.project.software
-    .filter((sw) => props.softwares[sw])
-    .map((sw) => ({ name: sw, ...props.softwares[sw]! }))
-)
 
 let observer: IntersectionObserver | null = null
 
@@ -85,6 +80,7 @@ watch(isInView, (val) => {
 
 function initSketchfab() {
   if (!iframeRef.value || !isInView.value || sketchfabInitialized.value) return
+  if (!props.project.modelId) return
   if (typeof window.Sketchfab !== "function") {
     console.warn("[MainProject] Sketchfab viewer script not loaded yet")
     sketchfabError.value = true
@@ -109,8 +105,8 @@ function initSketchfab() {
         sketchfabError.value = true
         isLoading.value = false
       },
-      autostart: 1,
-      preload:   1,
+      autostart:   1,
+      preload:     1,
       ui_controls: 0,
     })
   } catch (err) {
@@ -237,6 +233,13 @@ const statRows = computed(() => [
   { key: "edges",    labelKey: "projectsStatEdges",    value: props.project.stats.edges ?? 0 },
   { key: "faces",    labelKey: "projectsStatFaces",    value: props.project.stats.faces ?? 0 },
 ])
+
+//thumbnails come pre-resolved with both normal and wireframe URLs. when wireframe
+//is on we prefer the wireframe variant; if it doesn't exist we fall back to the
+//normal one so the slot never empties
+function thumbSrc(t: { url: string | null; wireframeUrl: string | null }): string {
+  return (isWireframe.value ? t.wireframeUrl ?? t.url : t.url) ?? ""
+}
 </script>
 
 <template>
@@ -256,14 +259,15 @@ const statRows = computed(() => [
       <div class="main-project__content">
         <div class="main-project__thumbnails">
           <div
-            v-for="i in 3"
+            v-for="(thumb, i) in project.thumbnails"
             :key="i"
             class="main-project__thumbnail border-sm"
           >
             <img
-              :src="`/images/projects/${project.imageFolder}/thumbnail${i}${isWireframe ? '-w' : ''}.png`"
-              :alt="project.thumbnailsDescriptions[i - 1]?.[lang] ?? ''"
-              :title="project.thumbnailsDescriptions[i - 1]?.[lang] ?? ''"
+              v-if="thumbSrc(thumb)"
+              :src="thumbSrc(thumb)"
+              :alt="thumb.description?.[lang] ?? ''"
+              :title="thumb.description?.[lang] ?? ''"
             />
           </div>
         </div>
@@ -272,8 +276,8 @@ const statRows = computed(() => [
           <div class="main-project__model-section">
             <div class="main-project__model border-sm">
               <img
-                v-if="showMainImage"
-                :src="isWireframe ? wireframeImagePath : mainImagePath"
+                v-if="showMainImage && mainImageUrl"
+                :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
                 :alt="project.title[lang]"
                 class="main-project__main-image"
               />
@@ -322,13 +326,13 @@ const statRows = computed(() => [
 
               <div class="main-project__software-list">
                 <div
-                  v-for="(sw, idx) in projectSoftwareWithLogos"
+                  v-for="(sw, idx) in project.software"
                   :key="idx"
                   class="main-project__software"
                 >
                   <a :href="sw.url" target="_blank" rel="noopener noreferrer">
-                    <img :src="sw.logo" :alt="sw.name" width="24" height="24" />
-                    <span class="main-project__software-name">{{ sw.name }}</span>
+                    <img v-if="sw.logoUrl" :src="sw.logoUrl" :alt="sw.key" width="24" height="24" />
+                    <span class="main-project__software-name">{{ sw.key }}</span>
                   </a>
                 </div>
               </div>
@@ -431,9 +435,7 @@ const statRows = computed(() => [
 
 .main-project__embed--hidden { display: none; }
 
-.main-project__details {
-  height: fit-content;
-}
+.main-project__details { height: fit-content; }
 
 .main-project__description {
   text-align: justify;
