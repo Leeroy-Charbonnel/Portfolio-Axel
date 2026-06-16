@@ -90,8 +90,17 @@ function requireAdmin(
 //Files are never deleted from disk - the admin can wipe rows from the
 //`file` table but the binary stays. This keeps history intact even if a
 //project/gallery row is removed (per project decision).
+//
+//mkdir is wrapped so a permission issue on the Docker volume mount can't
+//crash the whole boot. If it fails, uploads will fail later with a 500 -
+//but at least the server starts and serves the rest of the app.
 const storageDir = join(__dirname, "storage", "files")
-mkdirSync(storageDir, { recursive: true })
+try {
+  mkdirSync(storageDir, { recursive: true })
+} catch (e) {
+  console.error(`[storage] mkdir ${storageDir} failed:`, e)
+  console.error(`[storage] uploads will fail until the mount is fixed`)
+}
 
 const upload = multer({
   storage: multer.diskStorage({
