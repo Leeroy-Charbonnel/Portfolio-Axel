@@ -54,7 +54,7 @@ async function onReplaceAvatar() {
     >
       <h3 class="about__heading">{{ t("experienceAbout") }}</h3>
       <div class="about__content">
-        <div v-if="profile.avatarUrl || editMode" class="about__avatar">
+        <div v-if="profile.avatarUrl || editMode" class="about__avatar no-grain">
           <component
             :is="editMode ? 'div' : 'a'"
             :href="editMode ? undefined : 'https://sketchfab.com/Obambulatesart'"

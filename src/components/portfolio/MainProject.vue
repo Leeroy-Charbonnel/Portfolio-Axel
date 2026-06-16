@@ -324,14 +324,14 @@ async function onDelete() {
           <div
             v-for="(thumb, i) in project.thumbnails"
             :key="i"
-            class="main-project__thumbnail border-sm"
+            class="main-project__thumbnail border-sm no-grain"
           >
             <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
           </div>
         </div>
 
         <div class="main-project__panel">
-          <div class="main-project__model-section">
+          <div class="main-project__model-section no-grain">
             <div class="main-project__model border-sm">
               <img
                 v-if="showMainImage && mainImageUrl"

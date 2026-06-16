@@ -66,7 +66,7 @@ async function onReplaceImage(p: GalleryProjectDto) {
             rel="noopener noreferrer"
             class="gallery-item__inner"
           >
-            <div class="gallery-item__thumbnail-wrap">
+            <div class="gallery-item__thumbnail-wrap no-grain">
               <img
                 v-if="project.imageUrl"
                 :src="project.imageUrl"
