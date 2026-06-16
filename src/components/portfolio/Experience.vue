@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useLanguage } from "../../composables/useLanguage"
+import { usePortfolio } from "../../composables/usePortfolio"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import ExperienceItem from "./ExperienceItem.vue"
 import About from "./About.vue"
+import AddButton from "./AddButton.vue"
 import type { ExperienceDto, ProfileDto } from "../../types/portfolio"
 
 defineProps<{
@@ -11,6 +13,7 @@ defineProps<{
 }>()
 
 const { t } = useLanguage()
+const { createExperience } = usePortfolio()
 </script>
 
 <template>
@@ -24,10 +27,12 @@ const { t } = useLanguage()
         <div class="experience-section__timeline">
           <ExperienceItem
             v-for="(exp, idx) in experiences"
-            :key="idx"
+            :key="exp.id"
             :experience="exp"
             :index="idx"
           />
+
+          <AddButton label="Add experience" @click="createExperience" />
         </div>
 
         <About :profile="profile" />

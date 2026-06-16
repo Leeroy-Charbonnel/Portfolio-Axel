@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { useRoute } from "vue-router"
 import { ToastHost, useAccent, useLang, useTheme } from "vue-shared-ui"
-import SideNav from "./components/portfolio/SideNav.vue"
+import SideNav    from "./components/portfolio/SideNav.vue"
+import AdminGear  from "./components/portfolio/AdminGear.vue"
 
 //ensure accent_color is seeded then applied to --primary (HSL). In public auth
 //mode the DB seed call no-ops gracefully if there is no user session.
@@ -12,20 +14,29 @@ useAccent()
 useTheme()
 
 const { toggleLang, lang } = useLang()
+
+//hide portfolio chrome on auth-related routes (login, settings, etc.) so
+//vue-shared-ui's pages render against the bare background
+const route = useRoute()
+const chromeFreeRoutes = ["/login", "/settings", "/pending", "/banned", "/forgot-password", "/reset-password"]
 </script>
 
 <template>
   <div class="vsui-app portfolio-app">
-    <SideNav />
+    <template v-if="!chromeFreeRoutes.includes(route.path)">
+      <SideNav />
 
-    <button
-      type="button"
-      class="portfolio-app__lang-switch"
-      :aria-label="lang === 'en' ? 'Switch to French' : 'Switch to English'"
-      @click="toggleLang"
-    >
-      {{ lang === 'en' ? 'EN / FR' : 'FR / EN' }}
-    </button>
+      <button
+        type="button"
+        class="portfolio-app__lang-switch"
+        :aria-label="lang === 'en' ? 'Switch to French' : 'Switch to English'"
+        @click="toggleLang"
+      >
+        {{ lang === 'en' ? 'EN / FR' : 'FR / EN' }}
+      </button>
+
+      <AdminGear />
+    </template>
 
     <main class="portfolio-app__main">
       <RouterView />

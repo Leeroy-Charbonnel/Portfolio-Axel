@@ -37,9 +37,19 @@ export interface ThumbnailDto {
   description:  Bilingual
 }
 
+export type MainProjectLayout = "thumbs-left" | "thumbs-right" | "thumbs-bottom" | "viewer-only"
+
+export const MAIN_PROJECT_LAYOUTS: { key: MainProjectLayout; label: string }[] = [
+  { key: "thumbs-left",   label: "Thumbnails left" },
+  { key: "thumbs-right",  label: "Thumbnails right" },
+  { key: "thumbs-bottom", label: "Thumbnails bottom" },
+  { key: "viewer-only",   label: "Viewer only" },
+]
+
 export interface MainProjectDto {
   id:                  number
   modelId:             string
+  layout:              MainProjectLayout
   title:               Bilingual
   description:         Bilingual
   mainImageUrl:        string | null
@@ -63,6 +73,7 @@ export interface GalleryProjectDto {
 }
 
 export interface ExperienceDto {
+  id:          number
   period:      Bilingual
   title:       Bilingual
   company:     string

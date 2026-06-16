@@ -17,3 +17,16 @@ export function formatNumber(num: number): string {
   if (num >= 1000)      return `${(num / 1000).toFixed(2)}k`
   return Math.round(num).toString()
 }
+
+//Open the native file picker and resolve with the selected File (or null if cancelled).
+//Used by every admin "Replace image" button - no <input> element needs to live in the DOM.
+export function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input")
+    input.type   = "file"
+    input.accept = "image/*"
+    input.onchange = () => resolve(input.files?.[0] ?? null)
+    //user-cancel doesn't fire change in all browsers, but the promise will just hang silently which is fine - the UI is unchanged
+    input.click()
+  })
+}

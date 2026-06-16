@@ -148,10 +148,14 @@ through the whole UI.*/
   --border-width-lg: 3px;
   --border-width-xl: 4px;
 
-  --border-radius-sm:   1px;
-  --border-radius-md:   3px;
-  --border-radius-lg:   12px;
-  --border-radius-xl:   15px;
+  /*RADII - portfolio uses square corners everywhere. Keep the named tokens
+  so existing components keep compiling, but resolve them to 0. The single
+  exception is --border-radius-full, used for genuine circles (avatars, the
+  Sketchfab wireframe toggle button).*/
+  --border-radius-sm:   0;
+  --border-radius-md:   0;
+  --border-radius-lg:   0;
+  --border-radius-xl:   0;
   --border-radius-full: 100vh;
 
   --grid-size:     1rem;
@@ -245,13 +249,11 @@ button {
   position: relative;
 }
 
-.border-sm {
-  border: var(--border-radius-sm) solid var(--color-border-primary);
-}
-
-.border-md {
-  border: var(--border-radius-md) solid var(--color-border-primary);
-}
+/*BORDER HELPERS - the variable name carried over from the original portfolio
+where 'border-radius-sm' was misused as a width. Now they correctly use the
+--border-width-* scale.*/
+.border-sm { border: var(--border-width-sm) solid var(--color-border-primary); }
+.border-md { border: var(--border-width-md) solid var(--color-border-primary); }
 
 .section-title {
   font-size: var(--font-size-2xl);

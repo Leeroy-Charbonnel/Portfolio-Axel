@@ -1,12 +1,43 @@
 <script setup lang="ts">
 import { useLanguage } from "../../composables/useLanguage"
-import { formatNumber } from "../../lib/portfolio-utils"
+import { useAdmin } from "../../composables/useAdmin"
+import { usePortfolio } from "../../composables/usePortfolio"
+import { formatNumber, pickImageFile } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
+import EditableText from "./EditableText.vue"
+import RemoveButton from "./RemoveButton.vue"
+import ReplaceImageButton from "./ReplaceImageButton.vue"
+import AddButton from "./AddButton.vue"
 import type { GalleryProjectDto } from "../../types/portfolio"
 
 defineProps<{ projects: GalleryProjectDto[] }>()
 
 const { t, lang } = useLanguage()
+const { editMode } = useAdmin()
+const { uploadFile, updateGalleryProject, deleteGalleryProject, createGalleryProject } = usePortfolio()
+
+async function onTitleSave(p: GalleryProjectDto, newVal: string) {
+  await updateGalleryProject(p.id, { title: { ...p.title, [lang.value]: newVal } })
+}
+
+async function onLinkSave(p: GalleryProjectDto, newVal: string) {
+  await updateGalleryProject(p.id, { link: newVal.trim() })
+}
+
+async function onStatSave(p: GalleryProjectDto, key: "vertices" | "edges", val: string) {
+  const n = parseInt(val.replace(/[^\d-]/g, ""), 10)
+  if (Number.isNaN(n)) return
+  await updateGalleryProject(p.id, { stats: { ...p.stats, [key]: n } })
+}
+
+async function onReplaceImage(p: GalleryProjectDto) {
+  const file = await pickImageFile()
+  if (!file) return
+  try {
+    const { id } = await uploadFile(file)
+    await updateGalleryProject(p.id, { imageFileId: id })
+  } catch (e) { console.error("[Gallery] replace image failed:", e) }
+}
 </script>
 
 <template>
@@ -27,7 +58,14 @@ const { t, lang } = useLanguage()
           :threshold="0.1"
           class="gallery-item"
         >
-          <a :href="project.link" target="_blank" rel="noopener noreferrer">
+          <RemoveButton v-if="editMode" label="Delete gallery item" @click="deleteGalleryProject(project.id)" />
+
+          <component :is="editMode ? 'div' : 'a'"
+            :href="editMode ? undefined : project.link"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="gallery-item__inner"
+          >
             <div class="gallery-item__thumbnail-wrap">
               <img
                 v-if="project.imageUrl"
@@ -35,23 +73,59 @@ const { t, lang } = useLanguage()
                 :alt="project.title[lang]"
                 class="gallery-item__thumbnail"
               />
+              <div v-else class="gallery-item__thumbnail gallery-item__thumbnail--empty">
+                No image
+              </div>
+              <ReplaceImageButton v-if="editMode" @click="onReplaceImage(project)" />
             </div>
 
             <div class="gallery-item__details">
-              <h3 class="gallery-item__title">{{ project.title[lang] }}</h3>
+              <EditableText
+                tag="h3"
+                class="gallery-item__title"
+                :value="project.title[lang]"
+                placeholder="Project name"
+                @save="(v) => onTitleSave(project, v)"
+              />
+
+              <div v-if="editMode" class="gallery-item__link-row">
+                <span class="gallery-item__link-label">Link</span>
+                <EditableText
+                  tag="span"
+                  class="gallery-item__link-value"
+                  :value="project.link"
+                  placeholder="https://sketchfab.com/..."
+                  @save="(v) => onLinkSave(project, v)"
+                />
+              </div>
+
               <div class="gallery-item__stats">
                 <div class="gallery-item__stat">
                   <span class="gallery-item__stat-icon">V</span>
-                  {{ formatNumber(project.stats.vertices) }}
+                  <span v-if="!editMode">{{ formatNumber(project.stats.vertices) }}</span>
+                  <EditableText
+                    v-else
+                    tag="span"
+                    :value="String(project.stats.vertices)"
+                    @save="(v) => onStatSave(project, 'vertices', v)"
+                  />
                 </div>
                 <div class="gallery-item__stat">
                   <span class="gallery-item__stat-icon">E</span>
-                  {{ formatNumber(project.stats.edges) }}
+                  <span v-if="!editMode">{{ formatNumber(project.stats.edges) }}</span>
+                  <EditableText
+                    v-else
+                    tag="span"
+                    :value="String(project.stats.edges)"
+                    @save="(v) => onStatSave(project, 'edges', v)"
+                  />
                 </div>
               </div>
             </div>
-          </a>
+          </component>
         </AnimatedReveal>
+
+        <AddButton label="Add gallery item" @click="createGalleryProject" />
       </div>
     </div>
   </section>
@@ -71,16 +145,21 @@ const { t, lang } = useLanguage()
 }
 
 .gallery-item {
+  position: relative;
   border: var(--border-width-sm) solid hsl(0 0% 100% / 0.1);
   background-color: hsl(0 0% 8% / 0.5);
   overflow: hidden;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  cursor: pointer;
 }
 
 .gallery-item:hover {
   border-color: hsl(0 0% 100% / 0.3);
   box-shadow: 0 10px 30px hsl(0 0% 0% / 0.5);
+}
+
+.gallery-item__inner {
+  display: block;
+  cursor: pointer;
 }
 
 .gallery-item__thumbnail-wrap {
@@ -100,9 +179,18 @@ const { t, lang } = useLanguage()
   transition: transform 0.3s ease;
 }
 
-.gallery-item:hover .gallery-item__thumbnail {
-  transform: scale(1.05);
+.gallery-item__thumbnail--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-background-gray-100);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
 }
+
+.gallery-item:hover .gallery-item__thumbnail { transform: scale(1.05); }
 
 .gallery-item__details { padding: var(--spacing-md); }
 
@@ -111,6 +199,26 @@ const { t, lang } = useLanguage()
   font-weight: var(--font-weight-bold);
   margin-bottom: var(--spacing-xs);
   letter-spacing: var(--letter-spacing-tight);
+}
+
+.gallery-item__link-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: baseline;
+  margin-bottom: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+}
+
+.gallery-item__link-label {
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.gallery-item__link-value {
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  color: var(--color-text-hover);
+  word-break: break-all;
 }
 
 .gallery-item__stats { display: flex; gap: var(--spacing-md); }
@@ -127,20 +235,14 @@ const { t, lang } = useLanguage()
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: var(--spacing-lg);
+  height: var(--spacing-lg);
   background-color: hsl(0 0% 100% / 0.1);
-  border-radius: var(--border-radius-md);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   margin-right: var(--spacing-xxs);
 }
 
-@media (max-width: 1024px) {
-  .gallery-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 768px) {
-  .gallery-grid { grid-template-columns: 1fr; gap: var(--spacing-lg); }
-}
+@media (max-width: 1024px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px)  { .gallery-grid { grid-template-columns: 1fr; gap: var(--spacing-lg); } }
 </style>

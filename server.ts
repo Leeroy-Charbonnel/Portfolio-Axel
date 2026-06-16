@@ -1,8 +1,11 @@
 import express from "express"
 import cors from "cors"
 import helmet from "helmet"
-import { join } from "path"
+import multer from "multer"
+import { join, extname } from "path"
+import { mkdirSync } from "fs"
 import { fileURLToPath } from "url"
+import { randomUUID } from "crypto"
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node"
 import { auth } from "./auth"
 import { db } from "./db/index"
@@ -67,6 +70,237 @@ async function requireAuth(
   ;(req as any).user = session.user as SessionUser
   next()
 }
+
+//ADMIN MIDDLEWARE - chain after requireAuth
+function requireAdmin(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  if ((req as any).user?.role !== "admin") {
+    res.status(403).json({ error: "admin only" })
+    return
+  }
+  next()
+}
+
+
+//FILE UPLOAD --------------------------------------------------------------
+//multer disk storage: every upload lands at storage/files/{uuid}.{ext}.
+//Files are never deleted from disk - the admin can wipe rows from the
+//`file` table but the binary stays. This keeps history intact even if a
+//project/gallery row is removed (per project decision).
+const storageDir = join(__dirname, "storage", "files")
+mkdirSync(storageDir, { recursive: true })
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: storageDir,
+    filename: (_req, file, cb) => {
+      const id  = randomUUID()
+      const ext = extname(file.originalname).toLowerCase()
+      cb(null, `${id}${ext}`)
+    },
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 }, //100 MB per file - large enough for short videos
+})
+
+function inferKind(mimeType: string): "image" | "video" | "other" {
+  if (mimeType.startsWith("image/")) return "image"
+  if (mimeType.startsWith("video/")) return "video"
+  return "other"
+}
+
+//POST /api/files - admin only. Returns the new file row + ready-to-use url
+app.post("/api/files", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: "no file uploaded" })
+    return
+  }
+  //the filename comes from our multer config above as `{uuid}.{ext}` so we
+  //can recover the uuid as the file id
+  const id = req.file.filename.split(".")[0]!
+  const [row] = await db.insert(fileTable).values({
+    id,
+    originalFilename: req.file.originalname,
+    storedFilename:   req.file.filename,
+    mimeType:         req.file.mimetype,
+    sizeBytes:        req.file.size,
+    kind:             inferKind(req.file.mimetype),
+    uploadedBy:       (req as any).user.id,
+  }).returning()
+  res.json({ ...row, url: `/media/${row!.storedFilename}` })
+})
+
+
+//PORTFOLIO MUTATIONS ------------------------------------------------------
+//PUT routes accept a partial body and only update the fields present in it.
+//POST routes create a new row with sensible default placeholders so the
+//admin can fill them in inline. DELETE removes the row only; files stay on
+//disk and in the `file` table (per project decision).
+
+async function nextSortOrder<T extends { sortOrder: any; id: any }>(table: T): Promise<number> {
+  const r = await db.select({ max: sql<number>`coalesce(max(${table.sortOrder}), -1)` }).from(table as any)
+  return ((r[0]?.max ?? -1) as number) + 1
+}
+
+//MAIN PROJECT ---
+app.post("/api/main-project", requireAuth, requireAdmin, async (_req, res) => {
+  const sortOrder = await nextSortOrder(mainProject)
+  const [row] = await db.insert(mainProject).values({
+    modelId:     "",
+    title:       { en: "New project", fr: "Nouveau projet" },
+    description: { en: "Project description", fr: "Description du projet" },
+    thumbnails:  [],
+    wireframeParameters: { whiteMaterialColor: "ffffff", lightsOverwrite: [], emissiveMaterialsOverwrite: [] },
+    stats:       { vertices: 0, edges: 0, faces: 0 },
+    sortOrder,
+  }).returning()
+  res.json(row)
+})
+
+app.put("/api/main-project/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const [row] = await db.update(mainProject)
+    .set({ ...req.body, updatedAt: new Date() })
+    .where(eq(mainProject.id, id))
+    .returning()
+  res.json(row)
+})
+
+app.delete("/api/main-project/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  await db.delete(mainProject).where(eq(mainProject.id, id))
+  res.json({ ok: true })
+})
+
+//GALLERY PROJECT ---
+app.post("/api/gallery-project", requireAuth, requireAdmin, async (_req, res) => {
+  const sortOrder = await nextSortOrder(galleryProject)
+  const [row] = await db.insert(galleryProject).values({
+    title:       { en: "New gallery item", fr: "Nouvel élément" },
+    link:        "",
+    stats:       { vertices: 0, edges: 0 },
+    sortOrder,
+  }).returning()
+  res.json(row)
+})
+
+app.put("/api/gallery-project/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const [row] = await db.update(galleryProject)
+    .set(req.body)
+    .where(eq(galleryProject.id, id))
+    .returning()
+  res.json(row)
+})
+
+app.delete("/api/gallery-project/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  await db.delete(galleryProject).where(eq(galleryProject.id, id))
+  res.json({ ok: true })
+})
+
+//EXPERIENCE ---
+app.post("/api/experience", requireAuth, requireAdmin, async (_req, res) => {
+  const sortOrder = await nextSortOrder(experience)
+  const [row] = await db.insert(experience).values({
+    period:      { en: "YYYY-YYYY", fr: "AAAA-AAAA" },
+    title:       { en: "Role", fr: "Poste" },
+    company:     "Company",
+    location:    "City",
+    description: { en: [], fr: [] },
+    sortOrder,
+  }).returning()
+  res.json(row)
+})
+
+app.put("/api/experience/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const [row] = await db.update(experience)
+    .set(req.body)
+    .where(eq(experience.id, id))
+    .returning()
+  res.json(row)
+})
+
+app.delete("/api/experience/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  await db.delete(experience).where(eq(experience.id, id))
+  res.json({ ok: true })
+})
+
+//SOFTWARE ---
+app.post("/api/software", requireAuth, requireAdmin, async (_req, res) => {
+  const sortOrder = await nextSortOrder(software)
+  //find first file row to use as a logo placeholder; if no files exist yet the
+  //admin must upload one before the row can be inserted (logoFileId is not null)
+  const [firstFile] = await db.select({ id: fileTable.id }).from(fileTable).limit(1)
+  if (!firstFile) { res.status(400).json({ error: "upload at least one logo file before adding software" }); return }
+  const [row] = await db.insert(software).values({
+    key:        `Software ${sortOrder + 1}`,
+    logoFileId: firstFile.id,
+    url:        "https://",
+    sortOrder,
+  }).returning()
+  res.json(row)
+})
+
+app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const [row] = await db.update(software)
+    .set(req.body)
+    .where(eq(software.id, id))
+    .returning()
+  res.json(row)
+})
+
+app.delete("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  await db.delete(software).where(eq(software.id, id))
+  res.json({ ok: true })
+})
+
+//MAIN_PROJECT <-> SOFTWARE junction
+app.put("/api/main-project/:id/software", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const softwareIds = req.body.softwareIds as number[]
+  if (!Array.isArray(softwareIds)) { res.status(400).json({ error: "softwareIds must be an array" }); return }
+  //replace strategy: wipe existing junction rows, re-insert in order
+  await db.delete(mainProjectSoftware).where(eq(mainProjectSoftware.mainProjectId, id))
+  if (softwareIds.length > 0) {
+    await db.insert(mainProjectSoftware).values(
+      softwareIds.map((softwareId, i) => ({ mainProjectId: id, softwareId, sortOrder: i }))
+    )
+  }
+  res.json({ ok: true })
+})
+
+//PROFILE - singleton, only PUT
+app.put("/api/profile", requireAuth, requireAdmin, async (req, res) => {
+  const [existing] = await db.select().from(profile).limit(1)
+  if (!existing) {
+    const [row] = await db.insert(profile).values({
+      about:     { en: "", fr: "" },
+      contact:   { phone: "", email: "", instagram: "" },
+      interests: { games: [], art: [] },
+      avatarUrl: "",
+      ...req.body,
+    }).returning()
+    res.json(row); return
+  }
+  const [row] = await db.update(profile).set(req.body).where(eq(profile.id, existing.id)).returning()
+  res.json(row)
+})
 
 
 //TRANSLATIONS - public read so auth pages (no session) can render in the right language.
@@ -229,6 +463,7 @@ app.get("/api/portfolio", async (_req, res) => {
     return {
       id:                  p.id,
       modelId:             p.modelId,
+      layout:              p.layout,
       title:               p.title,
       description:         p.description,
       mainImageUrl:        urlOf(p.mainImageFileId),
@@ -273,6 +508,7 @@ app.get("/api/portfolio", async (_req, res) => {
     mainProjects,
     galleryProjects,
     experiences:     experienceRows.map((e) => ({
+      id:          e.id,
       period:      e.period,
       title:       e.title,
       company:     e.company,

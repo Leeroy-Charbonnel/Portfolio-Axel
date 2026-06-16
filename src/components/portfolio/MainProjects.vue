@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { useLanguage } from "../../composables/useLanguage"
+import { usePortfolio } from "../../composables/usePortfolio"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import MainProject from "./MainProject.vue"
+import AddButton from "./AddButton.vue"
 import type { MainProjectDto } from "../../types/portfolio"
 
 defineProps<{ projects: MainProjectDto[] }>()
 
 const { t } = useLanguage()
+const { createMainProject } = usePortfolio()
 </script>
 
 <template>
@@ -29,18 +32,20 @@ const { t } = useLanguage()
         :project="project"
         :index="idx"
       />
+
+      <div class="container main-projects-section__add">
+        <AddButton label="Add main project" @click="createMainProject" />
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.main-projects-section {
-  padding-top: var(--spacing-2xl);
-}
+.main-projects-section { padding-top: var(--spacing-2xl); }
 
-.main-projects-section__list {
-  margin-top: var(--spacing-3xl);
-}
+.main-projects-section__list { margin-top: var(--spacing-3xl); }
+
+.main-projects-section__add { margin-bottom: var(--spacing-3xl); }
 
 @media (max-width: 768px) {
   .main-projects-section__list { margin-top: var(--spacing-xl); }

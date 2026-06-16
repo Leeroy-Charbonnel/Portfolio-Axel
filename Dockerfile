@@ -22,4 +22,10 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
+#STORAGE VOLUME - admin uploads (images, videos) land in /app/storage/files/.
+#Mount a persistent Docker volume here from Dokploy so uploaded files survive
+#container rebuilds:
+#  Dokploy -> Service -> Volumes -> Add: name=portfolio-storage, mount=/app/storage
+VOLUME ["/app/storage"]
+
 CMD ["bun", "server.ts"]

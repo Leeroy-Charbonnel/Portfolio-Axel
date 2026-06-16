@@ -67,6 +67,13 @@ export const mainProject = pgTable("main_project", {
   modelId:              text("model_id").notNull().default(""),
   title:                jsonb("title").$type<{ en: string; fr: string }>().notNull(),
   description:          jsonb("description").$type<{ en: string; fr: string }>().notNull(),
+  //LAYOUT controls how the viewer + thumbnails are arranged.
+  //thumbs-left   : 3 vertical thumbnails on the left, viewer on the right
+  //thumbs-right  : 3 vertical thumbnails on the right, viewer on the left
+  //thumbs-bottom : viewer full-width, 3 thumbnails in a row below
+  //viewer-only   : just the viewer, no thumbnail strip
+  //existing rows default to thumbs-left; admins can pick another via the UI.
+  layout:               text("layout").notNull().default("thumbs-left"),
   mainImageFileId:      uuid("main_image_file_id").references(() => file.id, { onDelete: "set null" }),
   mainWireframeFileId:  uuid("main_wireframe_file_id").references(() => file.id, { onDelete: "set null" }),
   thumbnails:           jsonb("thumbnails").$type<{
