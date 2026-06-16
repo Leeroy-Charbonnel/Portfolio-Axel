@@ -95,42 +95,112 @@ function requireAdmin(
 //crash the whole boot. If it fails, uploads will fail later with a 500 -
 //but at least the server starts and serves the rest of the app.
 const storageDir = join(__dirname, "storage", "files")
+const seedDir    = join(__dirname, "seed-files")
+
+//BOOT diagnostics - state captured at server startup so the /_diag endpoint
+//and the stdout logs both surface the same numbers.
+const bootDiag = {
+  startedAt:     new Date().toISOString(),
+  storageDir,
+  seedDir,
+  storageExisted:    existsSync(storageDir),
+  seedExisted:       existsSync(seedDir),
+  mkdirOk:           false,
+  mkdirError:        null as string | null,
+  storageFilesAfterMkdir: 0,
+  seedFileCount:     0,
+  seedCopied:        0,
+  seedSkippedReason: null as string | null,
+  seedErrors:        [] as string[],
+}
+
+console.log(`[boot] ============================`)
+console.log(`[boot] Portfolio-Axel server starting`)
+console.log(`[boot] NODE_ENV   = ${process.env.NODE_ENV}`)
+console.log(`[boot] storageDir = ${storageDir} (exists: ${bootDiag.storageExisted})`)
+console.log(`[boot] seedDir    = ${seedDir} (exists: ${bootDiag.seedExisted})`)
+
 try {
   mkdirSync(storageDir, { recursive: true })
-} catch (e) {
-  console.error(`[storage] mkdir ${storageDir} failed:`, e)
-  console.error(`[storage] uploads will fail until the mount is fixed`)
+  bootDiag.mkdirOk = true
+  console.log(`[boot] storage mkdir OK`)
+} catch (e: any) {
+  bootDiag.mkdirError = String(e?.message ?? e)
+  console.error(`[boot] storage mkdir FAILED: ${bootDiag.mkdirError}`)
+  console.error(`[boot] uploads + seed copy will both fail`)
 }
+
+//count what's currently in storage AFTER the mkdir attempt
+try {
+  bootDiag.storageFilesAfterMkdir = readdirSync(storageDir).length
+} catch { /* dir doesn't exist or unreadable */ }
+console.log(`[boot] storage currently contains ${bootDiag.storageFilesAfterMkdir} file(s)`)
 
 //BOOTSTRAP SEED - if the storage volume is empty on first boot, copy the
 //pre-baked binaries from /app/seed-files (committed to git, baked into the
-//image). This bootstraps fresh prod volumes without manual SCP.
-//Idempotent: once the volume has anything in it, this skips and the files
-//on disk remain untouched.
-const seedDir = join(__dirname, "seed-files")
+//image). Idempotent: once the volume has anything in it, this skips.
 try {
-  if (existsSync(seedDir)) {
-    const existing = (() => {
-      try { return readdirSync(storageDir) } catch { return [] }
-    })()
-    if (existing.length === 0) {
-      const seedFiles = readdirSync(seedDir)
-      console.log(`[seed] storage is empty - copying ${seedFiles.length} pre-baked file(s) into the volume`)
-      let copied = 0
+  if (!existsSync(seedDir)) {
+    bootDiag.seedSkippedReason = "seed dir doesn't exist in image"
+    console.log(`[boot] seed: ${bootDiag.seedSkippedReason}`)
+  } else {
+    const seedFiles = readdirSync(seedDir)
+    bootDiag.seedFileCount = seedFiles.length
+    console.log(`[boot] seed contains ${seedFiles.length} file(s) available`)
+
+    if (bootDiag.storageFilesAfterMkdir > 0) {
+      bootDiag.seedSkippedReason = `storage already has ${bootDiag.storageFilesAfterMkdir} file(s) - skipping seed`
+      console.log(`[boot] seed: ${bootDiag.seedSkippedReason}`)
+    } else {
+      console.log(`[boot] seed: storage is empty, copying ${seedFiles.length} file(s)...`)
       for (const f of seedFiles) {
         try {
           copyFileSync(join(seedDir, f), join(storageDir, f))
-          copied++
-        } catch (e) {
-          console.warn(`[seed] copy failed for ${f}:`, e)
+          bootDiag.seedCopied++
+        } catch (e: any) {
+          const msg = `${f}: ${e?.message ?? e}`
+          bootDiag.seedErrors.push(msg)
+          console.warn(`[boot] seed copy failed for ${msg}`)
         }
       }
-      console.log(`[seed] done, ${copied}/${seedFiles.length} files copied to ${storageDir}`)
+      console.log(`[boot] seed: done, copied ${bootDiag.seedCopied}/${seedFiles.length} file(s)`)
     }
   }
-} catch (e) {
-  console.warn(`[seed] bootstrap skipped due to error:`, e)
+} catch (e: any) {
+  bootDiag.seedSkippedReason = `unexpected error: ${e?.message ?? e}`
+  console.warn(`[boot] seed: ${bootDiag.seedSkippedReason}`)
 }
+
+console.log(`[boot] ============================`)
+
+//PUBLIC diagnostic endpoint - no auth. Visit /api/_diag in the browser to
+//see exactly what the server saw at boot, plus a fresh re-read of the dirs.
+//This is the easiest way to debug volume/permission issues without runtime logs.
+app.get("/api/_diag", (_req, res) => {
+  const storageNow = (() => {
+    try { return readdirSync(storageDir) } catch { return [] }
+  })()
+  const seedNow = (() => {
+    try { return readdirSync(seedDir) } catch { return [] }
+  })()
+  res.json({
+    boot: bootDiag,
+    now: {
+      storageFileCount: storageNow.length,
+      storageFilesPreview: storageNow.slice(0, 5),
+      seedFileCount: seedNow.length,
+      seedFilesPreview: seedNow.slice(0, 5),
+    },
+    env: {
+      NODE_ENV:        process.env.NODE_ENV ?? null,
+      AUTH_MODE:       AUTH_MODE,
+      hasDatabase:     Boolean(process.env.DATABASE_URL),
+      hasAuthSecret:   Boolean(process.env.BETTER_AUTH_SECRET),
+      hasResendKey:    Boolean(process.env.RESEND_API_KEY),
+      hasGoogleClient: Boolean(process.env.GOOGLE_CLIENT_ID),
+    },
+  })
+})
 
 const upload = multer({
   storage: multer.diskStorage({
