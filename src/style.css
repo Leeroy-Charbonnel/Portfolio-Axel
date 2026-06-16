@@ -1,0 +1,289 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*PORTFOLIO color system - dark-only design layered on shadcn-vue HSL.
+useAccent (from vue-shared-ui) writes accent_color directly to --primary,
+so changing the cyan accent retints buttons, focus rings, and any var(--color-primary).
+The light theme block exists but the portfolio forces .dark on <html> at boot.*/
+
+@layer base {
+  :root {
+    /*Light fallback - never displayed in this project (dark is forced).
+    Kept so theme toggle from vue-shared-ui still functions if user opts in.*/
+    --background:             0 0% 98%;
+    --foreground:             0 0% 12%;
+    --card:                   0 0% 100%;
+    --card-foreground:        0 0% 12%;
+    --popover:                0 0% 100%;
+    --popover-foreground:     0 0% 12%;
+    --primary:                185 65% 51%;
+    --primary-foreground:     0 0% 100%;
+    --secondary:              0 0% 96%;
+    --secondary-foreground:   0 0% 12%;
+    --muted:                  0 0% 96%;
+    --muted-foreground:       0 0% 35%;
+    --accent:                 0 0% 96%;
+    --accent-foreground:      0 0% 12%;
+    --destructive:            0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success:                142 71% 45%;
+    --warning:                38 92% 50%;
+    --info:                   217 91% 60%;
+    --border-color:           0 0% 88%;
+    --input:                  0 0% 88%;
+    --ring:                   185 65% 51%;
+    --radius:                 0.5rem;
+  }
+
+  .dark {
+    /*Portfolio dark theme - near-black surface, cyan accent, cool grays.
+    Matches the original portfolio's #000 background and #2dced4 accent.*/
+    --background:             0 0% 0%;
+    --foreground:             0 0% 65%;
+    --card:                   0 0% 4%;
+    --card-foreground:        0 0% 90%;
+    --popover:                0 0% 4%;
+    --popover-foreground:     0 0% 90%;
+    --primary:                184 65% 51%;
+    --primary-foreground:     0 0% 100%;
+    --secondary:              0 0% 7%;
+    --secondary-foreground:   0 0% 90%;
+    --muted:                  0 0% 10%;
+    --muted-foreground:       0 0% 50%;
+    --accent:                 0 0% 10%;
+    --accent-foreground:      0 0% 90%;
+    --destructive:            0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+    --success:                142 65% 55%;
+    --warning:                38 92% 60%;
+    --info:                   217 91% 70%;
+    --border-color:           0 0% 16%;
+    --input:                  0 0% 16%;
+    --ring:                   184 65% 51%;
+  }
+}
+
+/*DERIVED tokens - everything below resolves to the shadcn HSL vars above.
+project components use these named tokens; changing one HSL value flows
+through the whole UI.*/
+:root {
+  /*Generic mapping*/
+  --color-primary:       hsl(var(--primary));
+  --color-primary-fg:    hsl(var(--primary-foreground));
+  --text-main:           hsl(var(--foreground));
+  --text-muted:          hsl(var(--muted-foreground));
+  --bg-main:             hsl(var(--background));
+  --bg-surface:          hsl(var(--card));
+  --border:              hsl(var(--border-color));
+  --line-accent:         linear-gradient(90deg, transparent 0%, hsl(var(--border-color)) 50%, transparent 100%);
+
+  /*Portfolio-specific named tokens (replace the old portfolio --color-* tokens,
+  but derived from shadcn HSL so a single accent change flows everywhere).*/
+  --color-background:           hsl(var(--background));
+  --color-background-secondary: hsl(0 0% 6%);
+  --color-background-tertiary:  hsl(0 0% 8% / 0.7);
+  --color-background-gray-50:   hsl(0 0% 4%);
+  --color-background-gray-100:  hsl(0 0% 10%);
+  --color-background-gray-150:  hsl(0 0% 17%);
+  --color-background-gray-200:  hsl(0 0% 20%);
+  --color-background-gray-250:  hsl(0 0% 22%);
+  --color-background-gray-300:  hsl(0 0% 26%);
+
+  --color-text:              hsl(var(--foreground));
+  --color-text-hover:        hsl(0 0% 100%);
+  --color-text-secondary:    hsl(0 0% 100% / 0.7);
+  --color-text-tertiary:     hsl(0 0% 100% / 0.5);
+
+  --color-accent-neutral:    hsl(0 0% 100%);
+  --color-accent:            hsl(var(--primary));
+  --color-accent-hover:      hsl(0 0% 94%);
+
+  --color-border-primary:    hsl(0 0% 87%);
+  --color-border-muted:      hsl(0 0% 65%);
+  --color-border-accent:     hsl(0 0% 100%);
+  --color-gray-dark:         hsl(0 0% 10%);
+  --color-gray-medium:       hsl(0 0% 20%);
+  --color-gray-light:        hsl(0 0% 40%);
+
+  --semi-transparent-dark:   hsl(0 0% 0% / 0.24);
+
+  /*Typography*/
+  --font-weight-regular: 400;
+  --font-weight-medium:  500;
+  --font-weight-bold:    700;
+
+  --font-size-xs:   0.8rem;
+  --font-size-sm:   0.9rem;
+  --font-size-base: 1rem;
+  --font-size-md:   1.2rem;
+  --font-size-lg:   1.5rem;
+  --font-size-xl:   2rem;
+  --font-size-2xl:  2.5rem;
+  --font-size-3xl:  3rem;
+  --font-size-4xl:  4rem;
+  --font-size-5xl:  5rem;
+
+  --letter-spacing-tight:  0.05em;
+  --letter-spacing-normal: 0.1em;
+  --letter-spacing-wide:   0.2em;
+
+  /*Spacing*/
+  --spacing-xxs: 0.25rem;
+  --spacing-xs:  0.4rem;
+  --spacing-sm:  0.75rem;
+  --spacing-md:  1rem;
+  --spacing-lg:  1.5rem;
+  --spacing-xl:  2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+  --spacing-4xl: 5rem;
+  --spacing-5xl: 8rem;
+  --spacing-6xl: 10rem;
+
+  /*Borders + radius*/
+  --border-width:    1px;
+  --border-width-sm: 1px;
+  --border-width-md: 2px;
+  --border-width-lg: 3px;
+  --border-width-xl: 4px;
+
+  --border-radius-sm:   1px;
+  --border-radius-md:   3px;
+  --border-radius-lg:   12px;
+  --border-radius-xl:   15px;
+  --border-radius-full: 100vh;
+
+  --grid-size:     1rem;
+  --grain-size:    150px;
+  --grain-opacity: 0.8;
+  --filter-blur:   6px;
+  --tooltip-delay: 0.7s;
+
+  /*vue-shared-ui surface tokens - mapped to shadcn so its components inherit the theme*/
+  --vsui-nav-bg:                 hsl(var(--background));
+  --vsui-nav-border:             hsl(var(--border-color));
+  --vsui-nav-fg:                 hsl(var(--foreground));
+  --vsui-nav-gear-hover-bg:      hsl(var(--muted));
+  --vsui-dropdown-bg:            hsl(var(--popover));
+  --vsui-dropdown-border:        hsl(var(--border-color));
+  --vsui-dropdown-fg:            hsl(var(--popover-foreground));
+  --vsui-dropdown-item-hover-bg: hsl(var(--muted));
+  --vsui-input-bg:               hsl(var(--muted) / 0.4);
+  --vsui-input-border:           hsl(var(--border-color));
+  --vsui-input-focus-bg:         hsl(var(--muted) / 0.6);
+  --vsui-input-focus-border:     hsl(var(--ring));
+  --vsui-btn-bg:                 hsl(var(--primary));
+  --vsui-btn-fg:                 hsl(var(--primary-foreground));
+  --vsui-divider:                hsl(var(--border-color));
+  --vsui-text-muted:             hsl(var(--muted-foreground));
+  --vsui-line-accent:            var(--line-accent);
+  --vsui-google-btn-border:      hsl(var(--border-color));
+  --vsui-google-btn-hover-bg:    hsl(var(--muted));
+  --vsui-danger-fg:              hsl(var(--destructive));
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+}
+
+html, body {
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gray-light) var(--color-background);
+}
+
+body {
+  font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  background: hsl(var(--background));
+  color: var(--color-text);
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+
+/*LAYOUT - .vsui-app comes from vue-shared-ui/styles*/
+.vsui-app {
+  position: relative;
+  z-index: 1;
+}
+
+.vsui-app__main {
+  padding: 0;
+}
+
+/*PORTFOLIO global helpers (used across the section components).*/
+.container {
+  width: 80%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--spacing-md);
+  padding-right: var(--spacing-md);
+}
+
+.main {
+  position: relative;
+}
+
+.border-sm {
+  border: var(--border-radius-sm) solid var(--color-border-primary);
+}
+
+.border-md {
+  border: var(--border-radius-md) solid var(--color-border-primary);
+}
+
+.section-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--spacing-lg);
+  text-transform: uppercase;
+  text-align: center;
+  position: relative;
+  display: inline-block;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  width: 50%;
+  height: var(--border-width-sm);
+  background-color: var(--color-text);
+  bottom: calc(-1 * var(--spacing-xs));
+  left: 25%;
+}
+
+/*Full-bleed grain overlay layer (applied at the App.vue root).*/
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  background-image: url('/textures/grain.png');
+  background-size: var(--grain-size);
+  z-index: 1000;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: var(--grain-opacity);
+}

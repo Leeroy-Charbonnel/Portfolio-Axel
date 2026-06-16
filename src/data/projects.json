@@ -1,0 +1,277 @@
+{
+    "software": {
+        "Blender": {
+            "logo": "/images/logos/blender-logo.png",
+            "url": "https://www.blender.org/"
+        },
+        "Substance": {
+            "logo": "/images/logos/substance-logo.png",
+            "url": "https://www.substance3d.com/"
+        },
+        "Photoshop": {
+            "logo": "/images/logos/photoshop-logo.png",
+            "url": "https://www.adobe.com/products/photoshop.html"
+        },
+        "Illustrator": {
+            "logo": "/images/logos/illustrator-logo.png",
+            "url": "https://www.adobe.com/products/illustrator.html"
+        }
+    },
+    "mainProjects": [
+        {
+            "modelId": "441d21b8a12a4971ab67eaac5cef0888",
+            "imageFolder": "project-1",
+            "title": {
+                "en": "Table/Chair Office",
+                "fr": "Tables/Chaises de bureau"
+            },
+            "description": {
+                "en": "Magnificent 3D model of a table, slightly borrowed from my work, with 8 high-quality chairs, raised outdoors. The table is a table-type table, which among other things serves as a table.",
+                "fr": "Modèle 3D de table magnifique, légèrement volé de mon travail, 8 chaises de qualité supérieure, élevées en plein air. La table est une table de type table, qui permet entre autre de servir de table"
+            },
+            "thumbnailsDescriptions": [
+                {
+                    "en": "Thumbnail 1",
+                    "fr": "Miniature 1"
+                },
+                {
+                    "en": "Thumbnail 2",
+                    "fr": "Miniature 2"
+                },
+                {
+                    "en": "Thumbnail 3",
+                    "fr": "Miniature 3"
+                }
+            ],
+            "wireframeParameters": {
+                "wireframeColor": "00000020",
+                "whiteMaterialColor": "151515",
+                "lightsOverwrite": [
+                    {
+                        "index": 0,
+                        "intensity": 2.0,
+                        "color": "00ddff"
+                    }
+                ],
+                "emissiveMaterialsOverwrite": [
+                    "6ee4a74a-df95-4a94-ac64-34308e85fcdf"
+                ]
+            },
+            "stats": {
+                "vertices": 46091,
+                "edges": 92096,
+                "faces": 46060
+            },
+            "software": [
+                "Blender",
+                "Substance",
+                "Photoshop"
+            ]
+        },
+        {
+            "modelId": "a7bccdc2d8d24ef6814bfed7a3ed3922",
+            "imageFolder": "project-2",
+            "title": {
+                "en": "Cylinder seat / Table / Bamboo lamp",
+                "fr": "Siège cylindrique / Table / Lampe en bambou"
+            },
+            "description": {
+                "en": "Cylinder-type seats around a solid wood table (that's not true, it's clearly IKEA plywood with vinyl on top), accompanied by its bamboo lamp (not at all from IKEA either, please don't sue me).",
+                "fr": "Siège de type cylindre, autour d'une table en bois massif (c'est faux, c'est clairement du contreplaqué ikea avec un vinyl dessus), accompagné de sa lampe en bambou (pas du tout de ikea non plus d'ailleurs, m'attaquez pas en justice svp)"
+            },
+            "thumbnailsDescriptions": [
+                {
+                    "en": "Thumbnail 1",
+                    "fr": "Miniature 1"
+                },
+                {
+                    "en": "Thumbnail 2",
+                    "fr": "Miniature 2"
+                },
+                {
+                    "en": "Thumbnail 3",
+                    "fr": "Miniature 3"
+                }
+            ],
+            "wireframeParameters": {
+                "wireframeColor": "00000020",
+                "whiteMaterialColor": "303030",
+                "lightsOverwrite": [
+                    {
+                        "index": 0,
+                        "color": "ffffff"
+                    },
+                    {
+                        "index": 1,
+                        "color": "ffffff"
+                    },
+                    {
+                        "index": 2,
+                        "intensity": 1.0,
+                        "color": "00ddff"
+                    }
+                ],
+                "emissiveMaterialsOverwrite": [
+                    "a57c5585-8173-4f73-a4b7-b3b412314a2e"
+                ]
+            },
+            "stats": {
+                "vertices": 25600,
+                "edges": 51200,
+                "faces": 25550
+            },
+            "software": [
+                "Photoshop",
+                "Blender",
+                "Illustrator"
+            ]
+        },
+        {
+            "modelId": "07dc155556b9403bb4853c9ba2a44a84",
+            "imageFolder": "project-3",
+            "title": {
+                "en": "High Table / High chairs",
+                "fr": "Table haute / Chaises hautes"
+            },
+            "description": {
+                "en": "Yet more furniture, once again borrowed from my 3D model of my workplace cafeteria. Please still don't sue me, I would appreciate not going to prison, thanks.",
+                "fr": "Encore et toujours des meubles, toujours et encore yoinké de mon modèle 3D de cafète de mon boulot, ne m'attaquez toujours pas en justice, ça me ferait plaisir de pas aller en prison, merci"
+            },
+            "thumbnailsDescriptions": [
+                {
+                    "en": "Thumbnail 1",
+                    "fr": "Miniature 1"
+                },
+                {
+                    "en": "Thumbnail 2",
+                    "fr": "Miniature 2"
+                },
+                {
+                    "en": "Thumbnail 3",
+                    "fr": "Miniature 3"
+                }
+            ],
+            "wireframeParameters": {
+                "wireframeColor": "00000020",
+                "whiteMaterialColor": "707070",
+                "lightsOverwrite": [
+                    {
+                        "index": 0,
+                        "intensity": 0.4,
+                        "color": "00ddff"
+                    }
+                ],
+                "emissiveMaterialsOverwrite": [
+                    "2aeabc9d-a865-4528-a628-7164611f6ff9"
+                ]
+            },
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400,
+                "faces": 85650
+            },
+            "software": [
+                "Blender",
+                "Substance"
+            ]
+        }
+    ],
+    "galleryProjects": [
+        {
+            "title": {
+                "en": "Table/Chair Office",
+                "fr": "Tables/Chaises de bureau"
+            },
+            "link": "https://sketchfab.com/3d-models/table-chair-office-441d21b8a12a4971ab67eaac5cef0888",
+            "imageFolder": "project-1",
+            "stats": {
+                "vertices": 46091,
+                "edges": 92096
+            }
+        },
+        {
+            "title": {
+                "en": "Cylinder seat / Table / Bamboo lamp",
+                "fr": "Siège cylindrique / Table / Lampe en bambou"
+            },
+            "link": "https://sketchfab.com/3d-models/cylinder-seat-table-bamboo-lamp-a7bccdc2d8d24ef6814bfed7a3ed3922",
+            "imageFolder": "project-2",
+            "stats": {
+                "vertices": 25600,
+                "edges": 51200
+            }
+        },
+        {
+            "title": {
+                "en": "High Table / High chairs",
+                "fr": "Table haute / Chaises hautes"
+            },
+            "link": "https://sketchfab.com/3d-models/high-table-high-chairs-07dc155556b9403bb4853c9ba2a44a84",
+            "imageFolder": "project-3",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
+            }
+        },
+        {
+            "title": {
+                "en": "Low poly dystopian man",
+                "fr": "Homme dystopique - low poly"
+            },
+            "link": "https://sketchfab.com/3d-models/low-poly-dystopian-man-3633c8c2b3844b33a9d10e4b0793b032",
+            "imageFolder": "project-4",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
+            }
+        },
+        {
+            "title": {
+                "en": "Low poly retro futuristic dog",
+                "fr": "Chien rétro-futuriste - low poly"
+            },
+            "link": "https://sketchfab.com/3d-models/low-poly-retro-futuristic-dog-c1e00825937b4b01a7d194336566eb9b",
+            "imageFolder": "project-5",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
+            }
+        },
+        {
+            "title": {
+                "en": "Dystopian Car",
+                "fr": "Voiture dystopique - low poly"
+            },
+            "link": "https://sketchfab.com/3d-models/dystopian-car-c0bde64524c0426ea6cd74cee2dc9707",
+            "imageFolder": "project-6",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
+            }
+        },
+        {
+            "title": {
+                "en": "Cute Plesio",
+                "fr": "Plésiosaure mignon"
+            },
+            "link": "https://sketchfab.com/3d-models/cute-plesio-340770d2e7f245798fcf93e232378f4a",
+            "imageFolder": "project-7",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
+            }
+        },
+        {
+            "title": {
+                "en": "Cute Spino",
+                "fr": "Spinosaure mignon"
+            },
+            "link": "https://sketchfab.com/3d-models/cute-spino-701f055847224f7c928787733254ae2c",
+            "imageFolder": "project-8",
+            "stats": {
+                "vertices": 85700,
+                "edges": 171400
+            }
+        }
+    ]
+}

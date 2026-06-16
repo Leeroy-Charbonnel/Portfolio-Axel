@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(node:*)",
+      "Bash(rm package-lock.json)",
+      "Bash(bun install)",
+      "Bash(bun add better-auth helmet)",
+      "Bash(bun add lucide-vue-next)",
+      "Bash(git:*)"
+    ]
+  }
+}
