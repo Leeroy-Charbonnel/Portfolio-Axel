@@ -146,15 +146,15 @@ async function onReplaceImage(p: GalleryProjectDto) {
 
 .gallery-item {
   position: relative;
-  border: var(--border-width-sm) solid hsl(0 0% 100% / 0.1);
-  background-color: hsl(0 0% 8% / 0.5);
+  border: var(--border-width-sm) solid hsl(var(--foreground) / 0.1);
+  background-color: hsl(var(--card) / 0.5);
   overflow: hidden;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .gallery-item:hover {
-  border-color: hsl(0 0% 100% / 0.3);
-  box-shadow: 0 10px 30px hsl(0 0% 0% / 0.5);
+  border-color: hsl(var(--foreground) / 0.3);
+  box-shadow: 0 var(--spacing-sm) var(--spacing-2xl) hsl(var(--background) / 0.5);
 }
 
 .gallery-item__inner {
@@ -237,7 +237,7 @@ async function onReplaceImage(p: GalleryProjectDto) {
   justify-content: center;
   width: var(--spacing-lg);
   height: var(--spacing-lg);
-  background-color: hsl(0 0% 100% / 0.1);
+  background-color: hsl(var(--foreground) / 0.1);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   margin-right: var(--spacing-xxs);

@@ -698,7 +698,7 @@ parent flex direction.*/
   cursor: pointer;
   transition: background-color 0.2s ease;
   z-index: 10;
-  color: hsl(0 0% 0%);
+  color: hsl(var(--background));
 }
 
 .main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }

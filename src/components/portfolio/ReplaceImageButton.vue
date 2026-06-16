@@ -31,7 +31,7 @@ const { editMode } = useAdmin()
   align-items: center;
   justify-content: center;
   gap: var(--spacing-xs);
-  background-color: hsl(0 0% 0% / 0);
+  background-color: hsl(var(--background) / 0);
   color: var(--color-text-hover);
   font-size: var(--font-size-xs);
   letter-spacing: var(--letter-spacing-wide);
@@ -43,7 +43,7 @@ const { editMode } = useAdmin()
 }
 
 .replace-image-button:hover {
-  background-color: hsl(0 0% 0% / 0.65);
+  background-color: hsl(var(--background) / 0.65);
   opacity: 1;
 }
 </style>

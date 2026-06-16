@@ -184,11 +184,11 @@ async function onDescriptionSave(newVal: string) {
 .experience-item__description::before {
   content: "";
   position: absolute;
-  top: 0.7rem;
+  top: var(--spacing-sm);
   left: 0;
   width: var(--spacing-sm);
   height: var(--border-width-md);
-  background-color: hsl(0 0% 100% / 0.5);
+  background-color: hsl(var(--foreground) / 0.5);
 }
 
 .experience-item__description-edit {

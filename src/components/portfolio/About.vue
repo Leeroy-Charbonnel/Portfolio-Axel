@@ -174,8 +174,8 @@ async function onReplaceAvatar() {
 
 <style scoped>
 .about {
-  background-color: hsl(0 0% 8% / 0.7);
-  border: var(--border-width-sm) solid hsl(0 0% 100% / 0.1);
+  background-color: hsl(var(--card) / 0.7);
+  border: var(--border-width-sm) solid hsl(var(--foreground) / 0.1);
   padding: var(--spacing-xl);
   margin-top: var(--spacing-2xl);
 }

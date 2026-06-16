@@ -78,7 +78,7 @@ const nameParts = computed(() => {
   pointer-events: none;
   background-size: 100% 100%;
   background-position: 0 0;
-  background-image: radial-gradient(circle, hsl(0 0% 100% / 0.2) 0%, hsl(0 0% 0% / 0) 25%);
+  background-image: radial-gradient(circle, hsl(var(--foreground) / 0.2) 0%, hsl(var(--background) / 0) 25%);
   width: var(--gradient-size);
   height: var(--gradient-size);
 }
@@ -155,8 +155,8 @@ const nameParts = computed(() => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(hsl(0 0% 100% / 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(0 0% 100% / 0.1) 1px, transparent 1px);
+    linear-gradient(hsl(var(--foreground) / 0.1) var(--border-width-sm), transparent var(--border-width-sm)),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.1) var(--border-width-sm), transparent var(--border-width-sm));
   background-size: 50px 50px;
   pointer-events: none;
 }
