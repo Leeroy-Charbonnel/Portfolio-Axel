@@ -114,13 +114,16 @@ export const galleryProject = pgTable("gallery_project", {
   sortOrder:   integer("sort_order").notNull().default(0),
 })
 
-//EXPERIENCE - work timeline. description holds the bullet list per language.
+//EXPERIENCE - work timeline.
+//- summary: optional paragraph description per language (intro to the role)
+//- description: bullet-list of highlights per language (edited entry by entry)
 export const experience = pgTable("experience", {
   id:          serial("id").primaryKey(),
   period:      jsonb("period").$type<{ en: string; fr: string }>().notNull(),
   title:       jsonb("title").$type<{ en: string; fr: string }>().notNull(),
   company:     text("company").notNull(),
   location:    text("location").notNull(),
+  summary:     jsonb("summary").$type<{ en: string; fr: string }>().notNull().default({ en: "", fr: "" }),
   description: jsonb("description").$type<{ en: string[]; fr: string[] }>().notNull(),
   sortOrder:   integer("sort_order").notNull().default(0),
 })

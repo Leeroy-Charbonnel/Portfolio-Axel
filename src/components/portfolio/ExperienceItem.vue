@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
+import { Plus, X } from "lucide-vue-next"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { usePortfolio } from "../../composables/usePortfolio"
@@ -14,11 +15,9 @@ const { lang } = useLanguage()
 const { editMode } = useAdmin()
 const { updateExperience, deleteExperience } = usePortfolio()
 
-//view mode parses the period string ("12.2022-04.2023") into two halves;
-//edit mode shows a single editable field with the full string so the admin
-//doesn't have to mentally split on the dash
 const periodParts = computed(() => props.experience.period[lang.value].split("-"))
 
+//ROLE/PERIOD/COMPANY/LOCATION ---
 async function onPeriodSave(newVal: string) {
   await updateExperience(props.experience.id, {
     period: { ...props.experience.period, [lang.value]: newVal },
@@ -34,14 +33,34 @@ async function onTitleSave(newVal: string) {
 async function onCompanySave(newVal: string)  { await updateExperience(props.experience.id, { company: newVal }) }
 async function onLocationSave(newVal: string) { await updateExperience(props.experience.id, { location: newVal }) }
 
-//description list is stored as { en: string[]; fr: string[] }. In edit mode we
-//render it as a multi-line textarea where each non-empty line becomes one bullet.
-const descriptionJoined = computed(() => props.experience.description[lang.value].join("\n"))
-
-async function onDescriptionSave(newVal: string) {
-  const lines = newVal.split("\n").map((s) => s.trim()).filter(Boolean)
+//SUMMARY (paragraph) ---
+async function onSummarySave(newVal: string) {
   await updateExperience(props.experience.id, {
-    description: { ...props.experience.description, [lang.value]: lines },
+    summary: { ...props.experience.summary, [lang.value]: newVal },
+  })
+}
+
+//BULLETS - each entry edited individually with its own remove button, plus
+//an explicit "add bullet" trigger. No more newline-splitting hack.
+async function onBulletSave(idx: number, newVal: string) {
+  const bullets = [...(props.experience.description[lang.value] ?? [])]
+  bullets[idx] = newVal
+  await updateExperience(props.experience.id, {
+    description: { ...props.experience.description, [lang.value]: bullets },
+  })
+}
+
+async function addBullet() {
+  const bullets = [...(props.experience.description[lang.value] ?? []), ""]
+  await updateExperience(props.experience.id, {
+    description: { ...props.experience.description, [lang.value]: bullets },
+  })
+}
+
+async function removeBullet(idx: number) {
+  const bullets = (props.experience.description[lang.value] ?? []).filter((_, i) => i !== idx)
+  await updateExperience(props.experience.id, {
+    description: { ...props.experience.description, [lang.value]: bullets },
   })
 }
 </script>
@@ -59,6 +78,8 @@ async function onDescriptionSave(newVal: string) {
   >
     <RemoveButton v-if="editMode" label="Delete experience" @click="deleteExperience(experience.id)" />
 
+    <!--PERIOD column: fixed width so view-mode (two-line dates) and edit-mode
+    (single editable line) stay vertically aligned with the content column.-->
     <div class="experience-item__period">
       <template v-if="!editMode">
         <div>{{ periodParts[0] }}</div>
@@ -83,12 +104,7 @@ async function onDescriptionSave(newVal: string) {
       />
 
       <div class="experience-item__company">
-        <EditableText
-          tag="span"
-          :value="experience.company"
-          placeholder="Company"
-          @save="onCompanySave"
-        />
+        <EditableText tag="span" :value="experience.company" placeholder="Company" @save="onCompanySave" />
         <span class="experience-item__location-wrap">
           (<EditableText
             tag="span"
@@ -100,26 +116,49 @@ async function onDescriptionSave(newVal: string) {
         </span>
       </div>
 
-      <ul v-if="!editMode" class="experience-item__description-list">
-        <li
-          v-for="(line, idx) in experience.description[lang]"
-          :key="idx"
-          class="experience-item__description"
-        >{{ line }}</li>
-      </ul>
-
-      <!--Edit mode: one line per bullet, save splits on newlines. The textarea
-      borrows the same typography as the rendered list so the admin sees roughly
-      the same line layout.-->
+      <!--SUMMARY paragraph - optional, sits between header and bullet list-->
       <EditableText
-        v-else
-        tag="div"
-        class="experience-item__description-edit"
+        v-if="editMode || experience.summary[lang]"
+        tag="p"
+        class="experience-item__summary"
         :multiline="true"
-        :value="descriptionJoined"
-        placeholder="One line per bullet..."
-        @save="onDescriptionSave"
+        :value="experience.summary[lang]"
+        placeholder="Optional summary paragraph..."
+        @save="onSummarySave"
       />
+
+      <!--BULLET LIST - real <ul> with one editable item per bullet plus +/x controls-->
+      <ul v-if="(experience.description[lang]?.length ?? 0) > 0 || editMode" class="experience-item__bullets">
+        <li
+          v-for="(bullet, idx) in experience.description[lang]"
+          :key="idx"
+          class="experience-item__bullet"
+        >
+          <EditableText
+            tag="span"
+            class="experience-item__bullet-text"
+            :value="bullet"
+            placeholder="Highlight..."
+            @save="(v) => onBulletSave(idx, v)"
+          />
+          <button
+            v-if="editMode"
+            type="button"
+            class="experience-item__bullet-remove"
+            aria-label="Remove bullet"
+            @click="removeBullet(idx)"
+          >
+            <X :size="12" />
+          </button>
+        </li>
+
+        <li v-if="editMode" class="experience-item__bullet experience-item__bullet--add">
+          <button type="button" class="experience-item__bullet-add" @click="addBullet">
+            <Plus :size="14" />
+            <span>Add bullet</span>
+          </button>
+        </li>
+      </ul>
     </div>
   </AnimatedReveal>
 </template>
@@ -127,92 +166,142 @@ async function onDescriptionSave(newVal: string) {
 <style scoped>
 .experience-item {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--spacing-5xl) 1fr;
+  gap: var(--spacing-md);
   margin-bottom: var(--spacing-2xl);
   padding-right: var(--spacing-2xl);
+  align-items: start;
 }
 
 .experience-item__period {
   font-weight: var(--font-weight-bold);
-  padding-right: var(--spacing-md);
   text-align: right;
-  flex-shrink: 0;
-  min-width: var(--spacing-4xl);
+  padding-right: var(--spacing-md);
+  /*lock width to match the grid track so view/edit modes line up identically*/
+  min-width: 0;
 }
 
 .experience-item__content {
-  flex: 1;
-  padding-left: var(--spacing-xl);
   position: relative;
-}
-
-.experience-item__content::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: var(--border-width-sm);
-  height: 100%;
-  background: linear-gradient(to bottom, var(--color-background-gray-300), transparent);
+  padding-left: var(--spacing-xl);
+  border-left: var(--border-width-sm) solid var(--color-gray-medium);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
 }
 
 .experience-item__title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-normal);
-  margin-bottom: var(--spacing-sm);
 }
 
 .experience-item__company {
   font-size: var(--font-size-md);
   color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-md);
 }
 
 .experience-item__location-wrap { margin-left: var(--spacing-xxs); }
 .experience-item__location      { color: var(--color-text-tertiary); }
 
-.experience-item__description-list { list-style: none; padding: 0; }
+.experience-item__summary {
+  line-height: 1.6;
+  color: var(--color-text);
+}
 
-.experience-item__description {
-  margin-bottom: var(--spacing-xs);
+/*BULLET LIST - real ul, each li is a row with the bullet text + a remove button.
+The leading dash is a pseudo-element so it scales naturally with font size and
+doesn't take a separate column when in edit mode.*/
+.experience-item__bullets {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.experience-item__bullet {
   position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
   padding-left: var(--spacing-lg);
   line-height: 1.6;
 }
 
-.experience-item__description::before {
+.experience-item__bullet::before {
   content: "";
   position: absolute;
-  top: var(--spacing-sm);
+  top: 0.7em;
   left: 0;
   width: var(--spacing-sm);
   height: var(--border-width-md);
   background-color: hsl(var(--foreground) / 0.5);
 }
 
-.experience-item__description-edit {
-  white-space: pre-wrap;
-  line-height: 1.6;
-  padding: var(--spacing-sm);
-  background-color: hsl(var(--background) / 0.5);
-  border-left: var(--border-width-md) solid var(--color-gray-medium);
+.experience-item__bullet--add::before { display: none; }
+
+.experience-item__bullet-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.experience-item__bullet-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width:  var(--spacing-lg);
+  height: var(--spacing-lg);
+  color: var(--color-text-tertiary);
+  background-color: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.experience-item__bullet-remove:hover {
+  color: var(--color-text-hover);
+  background-color: hsl(var(--destructive) / 0.6);
+}
+
+.experience-item__bullet-add {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: transparent;
+  border: var(--border-width-sm) dashed var(--color-gray-medium);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.experience-item__bullet-add:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 @media (max-width: 768px) {
-  .experience-item { flex-direction: column; padding-right: var(--spacing-xl); }
+  .experience-item {
+    grid-template-columns: 1fr;
+    padding-right: var(--spacing-xl);
+  }
   .experience-item__period {
-    width: 100%;
     text-align: left;
     padding-right: 0;
-    padding-left: var(--spacing-lg);
-    margin-bottom: var(--spacing-md);
     display: flex;
+    gap: var(--spacing-xs);
   }
-  .experience-item__period > div:first-child::after {
-    content: "-";
-    margin: 0 var(--spacing-xs);
+  .experience-item__period > div:first-child + div::before {
+    content: "—";
+    margin-right: var(--spacing-xs);
   }
-  .experience-item__content { padding-left: var(--spacing-lg); }
+  .experience-item__content {
+    padding-left: var(--spacing-md);
+  }
 }
 </style>

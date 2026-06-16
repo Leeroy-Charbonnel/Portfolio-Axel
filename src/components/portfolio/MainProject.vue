@@ -335,12 +335,28 @@ async function replaceThumbnailWireframe(idx: number) {
     :threshold="0.1"
     class="main-project"
   >
-    <div ref="containerRef" :class="['container', 'main-project__container', layoutClass]">
+    <article ref="containerRef" :class="['container', 'main-project__article', layoutClass]">
       <RemoveButton v-if="editMode" label="Delete project" @click="onDelete" />
 
-      <div class="main-project__header">
-        <h3 class="main-project__number">{{ String(index + 1).padStart(2, "0") }}</h3>
+      <!--Layout picker - absolute top-right of the article so overflow on the
+      thumbnail strip never clips it. Admin only.-->
+      <div v-if="editMode" class="main-project__layout-picker" role="group" aria-label="Layout">
+        <button
+          v-for="opt in MAIN_PROJECT_LAYOUTS"
+          :key="opt.key"
+          type="button"
+          class="main-project__layout-option"
+          :class="{ 'main-project__layout-option--active': project.layout === opt.key }"
+          :aria-label="opt.label"
+          :title="opt.label"
+          @click="onLayoutChange(opt.key)"
+        >
+          <component :is="LAYOUT_ICONS[opt.key]" :size="16" />
+        </button>
+      </div>
 
+      <header class="main-project__header">
+        <h3 class="main-project__number">{{ String(index + 1).padStart(2, "0") }}</h3>
         <EditableText
           tag="h3"
           class="main-project__title"
@@ -348,30 +364,49 @@ async function replaceThumbnailWireframe(idx: number) {
           placeholder="Project title"
           @save="onTitleSave"
         />
+      </header>
 
-        <!--Layout picker - admin only. 4 icons, one per arrangement option-->
-        <div v-if="editMode" class="main-project__layout-picker" role="group" aria-label="Layout">
+      <!--BODY - viewer + (optional) thumbnail strip. CSS grid arranges them per layout-->
+      <div class="main-project__body">
+        <div class="main-project__viewer border-sm">
+          <img
+            v-if="showMainImage && mainImageUrl"
+            :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
+            :alt="project.title[lang]"
+            class="main-project__viewer-image"
+          />
+          <div v-else-if="showMainImage && !mainImageUrl" class="main-project__viewer-empty">
+            No image
+          </div>
+
+          <iframe
+            v-if="project.modelId && !editMode"
+            ref="iframeRef"
+            :title="`Sketchfab Model - ${project.title[lang]}`"
+            class="main-project__viewer-embed"
+            :class="{ 'main-project__viewer-embed--hidden': !showSketchfab || isLoading }"
+          ></iframe>
+
+          <ReplaceImageButton v-if="editMode" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
+
           <button
-            v-for="opt in MAIN_PROJECT_LAYOUTS"
-            :key="opt.key"
+            v-if="!editMode"
             type="button"
-            class="main-project__layout-option"
-            :class="{ 'main-project__layout-option--active': project.layout === opt.key }"
-            :aria-label="opt.label"
-            :title="opt.label"
-            @click="onLayoutChange(opt.key)"
+            class="main-project__wireframe-btn"
+            :class="{ 'main-project__wireframe-btn--active': isWireframe }"
+            :disabled="!sketchfabLoaded"
+            aria-label="Toggle wireframe"
+            @click="toggleWireframe"
           >
-            <component :is="LAYOUT_ICONS[opt.key]" :size="16" />
+            <Grid :size="16" />
           </button>
         </div>
-      </div>
 
-      <div class="main-project__content">
         <div v-if="showThumbnails" class="main-project__thumbnails">
           <div
             v-for="(thumb, i) in project.thumbnails"
             :key="i"
-            class="main-project__thumbnail border-sm no-grain"
+            class="main-project__thumbnail border-sm"
           >
             <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
             <div v-else class="main-project__thumbnail-empty">No image</div>
@@ -389,202 +424,133 @@ async function replaceThumbnailWireframe(idx: number) {
             <Plus :size="20" />
           </button>
         </div>
+      </div>
 
-        <div class="main-project__panel">
-          <div class="main-project__model-section no-grain">
-            <div class="main-project__model border-sm">
-              <img
-                v-if="showMainImage && mainImageUrl"
-                :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
-                :alt="project.title[lang]"
-                class="main-project__main-image"
+      <!--DETAILS - description, optional Sketchfab id, stats + software meta row-->
+      <div class="main-project__details">
+        <EditableText
+          tag="p"
+          class="main-project__description"
+          :value="project.description[lang]"
+          :multiline="true"
+          placeholder="Project description..."
+          @save="onDescriptionSave"
+        />
+
+        <div v-if="editMode" class="main-project__model-id">
+          <span class="main-project__model-id-label">Sketchfab model ID</span>
+          <EditableText
+            tag="span"
+            class="main-project__model-id-value"
+            :value="project.modelId"
+            placeholder="(empty = no embed)"
+            @save="onModelIdSave"
+          />
+        </div>
+
+        <div class="main-project__meta">
+          <div class="main-project__stats">
+            <AnimatedReveal
+              v-for="(item, idx) in statRows"
+              :key="item.key"
+              direction="bottom"
+              :distance="20"
+              :duration="0.5"
+              :delay="idx * 0.1 + 0.3"
+              :initial-opacity="0"
+              :final-opacity="1"
+              class="main-project__stat"
+            >
+              <div class="main-project__stat-label">{{ t(item.labelKey) }}</div>
+              <AnimatedCounter v-if="!editMode" :from="0" :to="item.value" :duration="2" />
+              <EditableText
+                v-else
+                tag="span"
+                class="main-project__stat-value"
+                :value="String(item.value)"
+                @save="(v) => onStatSave(item.key, v)"
               />
-              <div v-else-if="showMainImage && !mainImageUrl" class="main-project__main-image main-project__main-image--empty">
-                No image
-              </div>
-
-              <iframe
-                v-if="project.modelId && !editMode"
-                ref="iframeRef"
-                :title="`Sketchfab Model - ${project.title[lang]}`"
-                class="main-project__embed"
-                :class="{ 'main-project__embed--hidden': !showSketchfab || isLoading }"
-              ></iframe>
-
-              <ReplaceImageButton v-if="editMode" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
-
-              <button
-                v-if="!editMode"
-                type="button"
-                class="main-project__wireframe-btn"
-                :class="{ 'main-project__wireframe-btn--active': isWireframe, 'border-sm': !isWireframe }"
-                :disabled="!sketchfabLoaded"
-                aria-label="Toggle wireframe"
-                @click="toggleWireframe"
-              >
-                <Grid :size="16" />
-              </button>
-            </div>
+            </AnimatedReveal>
           </div>
 
-          <div class="main-project__details">
-            <EditableText
-              tag="p"
-              class="main-project__description"
-              :value="project.description[lang]"
-              :multiline="true"
-              placeholder="Project description..."
-              @save="onDescriptionSave"
-            />
-
-            <!--Sketchfab model id - admin-only field, hidden in view mode-->
-            <div v-if="editMode" class="main-project__model-id">
-              <span class="main-project__model-id-label">Sketchfab model ID</span>
-              <EditableText
-                tag="span"
-                class="main-project__model-id-value"
-                :value="project.modelId"
-                placeholder="(empty = no embed)"
-                @save="onModelIdSave"
-              />
-            </div>
-
-            <div class="main-project__stats-and-software">
-              <div class="main-project__stats">
-                <AnimatedReveal
-                  v-for="(item, idx) in statRows"
-                  :key="item.key"
-                  direction="bottom"
-                  :distance="20"
-                  :duration="0.5"
-                  :delay="idx * 0.1 + 0.3"
-                  :initial-opacity="0"
-                  :final-opacity="1"
-                  class="main-project__stat"
-                >
-                  <div class="main-project__stat-label">{{ t(item.labelKey) }}</div>
-                  <AnimatedCounter v-if="!editMode" :from="0" :to="item.value" :duration="2" />
-                  <EditableText
-                    v-else
-                    tag="span"
-                    class="main-project__stat-value"
-                    :value="String(item.value)"
-                    @save="(v) => onStatSave(item.key, v)"
-                  />
-                </AnimatedReveal>
-              </div>
-
-              <div class="main-project__software-list">
-                <div
-                  v-for="(sw, idx) in project.software"
-                  :key="idx"
-                  class="main-project__software"
-                >
-                  <a :href="sw.url" target="_blank" rel="noopener noreferrer">
-                    <img v-if="sw.logoUrl" :src="sw.logoUrl" :alt="sw.key" width="24" height="24" />
-                    <span class="main-project__software-name">{{ sw.key }}</span>
-                  </a>
-                </div>
-              </div>
-            </div>
+          <div class="main-project__software-list">
+            <a
+              v-for="(sw, idx) in project.software"
+              :key="idx"
+              :href="sw.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="main-project__software"
+            >
+              <img v-if="sw.logoUrl" :src="sw.logoUrl" :alt="sw.key" width="20" height="20" />
+              <span class="main-project__software-name">{{ sw.key }}</span>
+            </a>
           </div>
         </div>
       </div>
-    </div>
+    </article>
   </AnimatedReveal>
 </template>
 
 <style scoped>
+/*MAIN PROJECT
+================================================================================
+Each project is an <article> with three vertical zones:
+  - header     : project number + title (full width)
+  - body       : viewer (always) + thumbnails strip (unless viewer-only)
+  - details    : description, optional model-id, stats + software meta row
+
+Width is constrained by the .container helper (max 1200px). Height is natural -
+no fixed 90vh anymore - so projects grow with content. The layout picker floats
+absolute at the article's top-right, OUTSIDE the body's flex/grid layout, so it
+never clips against overflow or pushes the title.
+*/
+
 .main-project {
-  --thumbnail-gap:   var(--spacing-xxs);
-  --thumbnail-count: 3;
-  --project-height:         90vh;
-  --project-header-height:  10vh;
-  --project-content-height: 80vh;
-
+  --thumbnail-aspect: 1;
+  position: relative;
   width: 100%;
-  margin-bottom: var(--spacing-3xl);
-  height: var(--project-height);
-  overflow: hidden;
-  padding-bottom: var(--spacing-lg);
-  background: linear-gradient(to right, transparent, var(--color-background-secondary));
-  position: relative;
+  margin-bottom: var(--spacing-5xl);
+  padding: var(--spacing-xl) 0;
+  background: linear-gradient(to right, transparent 30%, var(--color-background-secondary) 100%);
 }
 
-.main-project__container {
-  height: var(--project-height);
+.main-project__article {
   position: relative;
-}
-
-.main-project__header {
   display: flex;
-  align-items: center;
-  height: var(--project-header-height);
-  font-size: var(--font-size-lg);
-  background: transparent;
-  gap: var(--spacing-xs);
-}
-
-.main-project__number {
-  font-weight: var(--font-weight-bold);
-  color: transparent;
-  -webkit-text-stroke: var(--border-width-sm) var(--color-text);
-}
-
-.main-project__content {
-  display: grid;
-  height: var(--project-content-height);
-  position: relative;
+  flex-direction: column;
   gap: var(--spacing-xl);
 }
 
-/*LAYOUT VARIANTS - each rearranges the same content (thumbnails + viewer-panel)
-without changing the DOM. Thumbnails container takes its dimensions from the
-parent flex direction.*/
-.main-project--layout-thumbs-left  .main-project__content { display: flex; flex-direction: row; }
-.main-project--layout-thumbs-right .main-project__content { display: flex; flex-direction: row-reverse; }
-
-.main-project--layout-thumbs-bottom .main-project__content {
+/*HEADER ----------------------------------------------------------------------*/
+.main-project__header {
   display: flex;
-  flex-direction: column-reverse;
-}
-.main-project--layout-thumbs-bottom .main-project__thumbnails {
-  flex-direction: row;
-  height: calc(var(--project-content-height) * 0.22);
-  width: 100%;
-}
-.main-project--layout-thumbs-bottom .main-project__thumbnail {
-  height: 100%;
-  width: calc(33% - var(--thumbnail-gap));
+  align-items: baseline;
+  gap: var(--spacing-sm);
 }
 
-.main-project--layout-viewer-only .main-project__content {
-  display: flex;
-  flex-direction: column;
+.main-project__number {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: transparent;
+  -webkit-text-stroke: var(--border-width-sm) var(--color-text);
+  flex-shrink: 0;
 }
 
-.main-project__thumbnails {
-  display: flex;
-  gap: var(--thumbnail-gap);
-  justify-content: space-between;
-  flex-direction: column;
-  height: var(--project-content-height);
-  position: relative;
+.main-project__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-normal);
 }
 
-.main-project__thumbnail {
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 1;
-  height: calc(33% - (var(--thumbnail-gap) * (var(--thumbnail-count) - 2)));
-}
-
-/*LAYOUT PICKER - shown only in edit mode, sits inside the header next to the title*/
+/*LAYOUT PICKER - absolute top-right of article, never clipped --------------*/
 .main-project__layout-picker {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  margin-left: auto;
   padding: var(--spacing-xxs);
   background-color: var(--color-background-secondary);
   border: var(--border-width-sm) solid var(--color-gray-medium);
@@ -594,8 +560,8 @@ parent flex direction.*/
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width:  var(--spacing-2xl);
-  height: var(--spacing-2xl);
+  width:  var(--spacing-xl);
+  height: var(--spacing-xl);
   color: var(--color-text-tertiary);
   background-color: transparent;
   cursor: pointer;
@@ -610,6 +576,116 @@ parent flex direction.*/
 .main-project__layout-option--active {
   color: var(--color-accent);
   background-color: hsl(var(--primary) / 0.12);
+}
+
+/*BODY - viewer + (optional) thumbnails. Grid template depends on layout ----*/
+.main-project__body {
+  display: grid;
+  gap: var(--spacing-md);
+  min-height: 50vh;
+}
+
+.main-project--layout-thumbs-left .main-project__body {
+  grid-template-columns: minmax(150px, 18%) 1fr;
+}
+.main-project--layout-thumbs-left .main-project__thumbnails { order: 1; }
+.main-project--layout-thumbs-left .main-project__viewer    { order: 2; }
+
+.main-project--layout-thumbs-right .main-project__body {
+  grid-template-columns: 1fr minmax(150px, 18%);
+}
+.main-project--layout-thumbs-right .main-project__viewer    { order: 1; }
+.main-project--layout-thumbs-right .main-project__thumbnails { order: 2; }
+
+.main-project--layout-thumbs-bottom .main-project__body {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+}
+.main-project--layout-thumbs-bottom .main-project__viewer    { order: 1; }
+.main-project--layout-thumbs-bottom .main-project__thumbnails {
+  order: 2;
+  flex-direction: row;
+  height: calc(var(--spacing-6xl) + var(--spacing-2xl));
+}
+.main-project--layout-thumbs-bottom .main-project__thumbnail {
+  width: auto;
+  flex: 1;
+}
+
+.main-project--layout-viewer-only .main-project__body {
+  grid-template-columns: 1fr;
+}
+
+/*VIEWER (Sketchfab embed / main image / wireframe toggle) ------------------*/
+.main-project__viewer {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--color-background-gray-100);
+}
+
+.main-project--layout-viewer-only .main-project__viewer {
+  aspect-ratio: 16 / 9;
+}
+
+.main-project__viewer-image,
+.main-project__viewer-embed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: none;
+}
+
+.main-project__viewer-embed--hidden { display: none; }
+
+.main-project__viewer-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+/*Sketchfab wireframe toggle - the lone explicit circle in the design.*/
+.main-project__wireframe-btn {
+  position: absolute;
+  bottom: var(--spacing-md);
+  right:  var(--spacing-md);
+  width:  var(--spacing-2xl);
+  height: var(--spacing-2xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-text-secondary);
+  border-radius: var(--border-radius-full);
+  color: hsl(var(--background));
+  cursor: pointer;
+  z-index: 10;
+  transition: background-color 0.2s ease;
+}
+
+.main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.main-project__wireframe-btn--active  { background-color: var(--color-accent); }
+
+/*THUMBNAILS strip ----------------------------------------------------------*/
+.main-project__thumbnails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.main-project__thumbnail {
+  position: relative;
+  aspect-ratio: var(--thumbnail-aspect);
+  width: 100%;
+  overflow: hidden;
 }
 
 .main-project__thumbnail img {
@@ -633,15 +709,13 @@ parent flex direction.*/
   letter-spacing: var(--letter-spacing-wide);
 }
 
-/*Small "+" tile - mirrors the thumbnail aspect ratio so it sits in the strip
-without breaking the layout. Visible only in edit mode (parent v-if).*/
 .main-project__thumbnail-add {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 1;
-  height: calc(33% - (var(--thumbnail-gap) * (var(--thumbnail-count) - 2)));
+  aspect-ratio: var(--thumbnail-aspect);
+  width: 100%;
   background-color: transparent;
   border: var(--border-width-md) dashed var(--color-gray-medium);
   color: var(--color-text-secondary);
@@ -655,53 +729,22 @@ without breaking the layout. Visible only in edit mode (parent v-if).*/
   background-color: hsl(var(--primary) / 0.05);
 }
 
-.main-project__panel { display: flex; flex-direction: column; }
-
-.main-project__model-section {
+/*DETAILS - description + meta row -----------------------------------------*/
+.main-project__details {
   display: flex;
-  width: 100%;
-  flex-grow: 1;
+  flex-direction: column;
+  gap: var(--spacing-md);
 }
-
-.main-project__model {
-  height: 100%;
-  width: 100%;
-  position: relative;
-}
-
-.main-project__main-image,
-.main-project__embed {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border: none;
-}
-
-.main-project__main-image--empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--color-background-gray-100);
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-sm);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
-}
-
-.main-project__embed--hidden { display: none; }
-
-.main-project__details { height: fit-content; }
 
 .main-project__description {
+  line-height: 1.7;
   text-align: justify;
-  margin: var(--spacing-xl) 0;
 }
 
 .main-project__model-id {
   display: flex;
   gap: var(--spacing-sm);
   align-items: baseline;
-  margin-bottom: var(--spacing-md);
   padding: var(--spacing-xs) var(--spacing-sm);
   background-color: hsl(var(--background) / 0.4);
   border-left: var(--border-width-md) solid var(--color-accent);
@@ -719,29 +762,33 @@ without breaking the layout. Visible only in edit mode (parent v-if).*/
   color: var(--color-text-hover);
 }
 
-.main-project__stats-and-software {
+.main-project__meta {
   display: flex;
   justify-content: space-between;
-  align-content: center;
+  align-items: center;
+  gap: var(--spacing-xl);
+  flex-wrap: wrap;
+  padding-top: var(--spacing-md);
+  border-top: var(--border-width-sm) solid var(--color-gray-medium);
 }
 
+/*STATS ---------------------------------------------------------------------*/
 .main-project__stats {
   display: flex;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-lg);
   flex-wrap: wrap;
 }
 
 .main-project__stat {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  min-width: 100px;
-  flex-grow: 1;
+  align-items: flex-start;
+  min-width: 5rem;
 }
 
 .main-project__stat-label {
-  font-size: var(--font-size-base);
-  color: var(--color-background-gray-300);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-normal);
 }
@@ -753,89 +800,69 @@ without breaking the layout. Visible only in edit mode (parent v-if).*/
   color: var(--color-text-hover);
 }
 
+/*SOFTWARE LIST -------------------------------------------------------------*/
 .main-project__software-list {
   display: flex;
   gap: var(--spacing-xs);
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .main-project__software {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex-grow: 1;
-}
-
-.main-project__software a {
-  display: flex;
   gap: var(--spacing-xs);
-  background: linear-gradient(to bottom right, var(--color-background-gray-100), var(--color-background-gray-150));
-  padding: var(--spacing-xs);
-  height: fit-content;
-  flex-grow: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--color-background-gray-100);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-normal);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.main-project__software img { filter: brightness(0.8); }
-.main-project__software a:hover img { filter: brightness(1); }
-.main-project__software a:hover * { color: var(--color-text-hover); }
-
-.main-project__wireframe-btn {
-  position: absolute;
-  bottom: var(--spacing-md);
-  right:  var(--spacing-md);
-  border-radius: 50%;
-  background: var(--color-text-secondary);
-  width:  var(--spacing-2xl);
-  height: var(--spacing-2xl);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  z-index: 10;
-  color: hsl(var(--background));
+.main-project__software:hover {
+  background-color: var(--color-background-gray-150);
+  color: var(--color-text-hover);
 }
 
-.main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.main-project__wireframe-btn--active   { background-color: var(--color-accent); }
+.main-project__software img { filter: brightness(0.8); transition: filter 0.2s ease; }
+.main-project__software:hover img { filter: brightness(1); }
 
-@media (max-width: 768px) {
-  .main-project__header { font-size: var(--font-size-base); }
-  .main-project__title {
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
+/*RESPONSIVE - collapse all layouts to single column on tablet/mobile -------*/
+@media (max-width: 900px) {
+  .main-project__body,
+  .main-project--layout-thumbs-left  .main-project__body,
+  .main-project--layout-thumbs-right .main-project__body,
+  .main-project--layout-thumbs-bottom .main-project__body,
+  .main-project--layout-viewer-only  .main-project__body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    min-height: 0;
   }
-  /*all layouts collapse to single column on mobile*/
-  .main-project--layout-thumbs-left  .main-project__content,
-  .main-project--layout-thumbs-right .main-project__content,
-  .main-project--layout-thumbs-bottom .main-project__content,
-  .main-project--layout-viewer-only  .main-project__content { flex-direction: column; }
-  .main-project__panel { height: inherit; }
-  .main-project__thumbnails { flex-direction: row; height: fit-content; }
-  .main-project__thumbnail {
-    aspect-ratio: 1;
-    height: fit-content;
-    width: calc(33% - (var(--thumbnail-gap) * (var(--thumbnail-count) - 2)));
+  .main-project__thumbnails {
+    flex-direction: row;
+    height: auto;
   }
-  .main-project__software-list {
-    align-content: center;
-    justify-content: center;
-    height: fit-content;
-    width: 100%;
+  .main-project__thumbnail,
+  .main-project__thumbnail-add {
+    flex: 1;
   }
-  .main-project__software a { justify-content: center; width: 100%; }
-  .main-project__stats {
-    width: 100%;
-    align-content: center;
-    justify-content: space-around;
-    margin-bottom: var(--spacing-md);
-    flex-wrap: nowrap;
+  .main-project__layout-picker {
+    position: static;
+    margin-left: auto;
+    align-self: flex-end;
   }
-  .main-project__stats-and-software { flex-direction: column; align-items: center; }
+  .main-project__header {
+    flex-wrap: wrap;
+  }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 600px) {
+  .main-project__meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .main-project__software-name { display: none; }
 }
 </style>

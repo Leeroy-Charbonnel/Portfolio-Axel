@@ -80,6 +80,7 @@ export interface ExperienceDto {
   title:       Bilingual
   company:     string
   location:    string
+  summary:     Bilingual
   description: { en: string[]; fr: string[] }
 }
 

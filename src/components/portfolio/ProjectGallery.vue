@@ -88,17 +88,6 @@ async function onReplaceImage(p: GalleryProjectDto) {
                 @save="(v) => onTitleSave(project, v)"
               />
 
-              <div v-if="editMode" class="gallery-item__link-row">
-                <span class="gallery-item__link-label">Link</span>
-                <EditableText
-                  tag="span"
-                  class="gallery-item__link-value"
-                  :value="project.link"
-                  placeholder="https://sketchfab.com/..."
-                  @save="(v) => onLinkSave(project, v)"
-                />
-              </div>
-
               <div class="gallery-item__stats">
                 <div class="gallery-item__stat">
                   <span class="gallery-item__stat-icon">V</span>
@@ -120,6 +109,19 @@ async function onReplaceImage(p: GalleryProjectDto) {
                     @save="(v) => onStatSave(project, 'edges', v)"
                   />
                 </div>
+              </div>
+
+              <!--LINK editor last - moved here so the field that's only relevant
+              in edit mode doesn't push the stats out of their visual home-->
+              <div v-if="editMode" class="gallery-item__link-row">
+                <span class="gallery-item__link-label">Link</span>
+                <EditableText
+                  tag="span"
+                  class="gallery-item__link-value"
+                  :value="project.link"
+                  placeholder="https://sketchfab.com/..."
+                  @save="(v) => onLinkSave(project, v)"
+                />
               </div>
             </div>
           </component>
@@ -205,7 +207,9 @@ async function onReplaceImage(p: GalleryProjectDto) {
   display: flex;
   gap: var(--spacing-sm);
   align-items: baseline;
-  margin-bottom: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: var(--border-width-sm) dashed var(--color-gray-medium);
   font-size: var(--font-size-xs);
 }
 

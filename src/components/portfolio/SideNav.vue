@@ -91,38 +91,32 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/*NAV HOVER zone - position is animated, not padding. Default state keeps a
+small gap from the edge (--spacing-sm), hover slides it further out to
+--spacing-xl for a smooth detach effect.*/
 .side-nav-hover {
   position: fixed;
   top: 50%;
-  left: 0;
+  left: var(--spacing-sm);
   z-index: 10;
   transform: translateY(-50%);
   width: fit-content;
   height: fit-content;
-  padding: var(--spacing-4xl);
-  padding-left: 0;
-  transition: padding 0.3s ease;
+  padding: var(--spacing-4xl) var(--spacing-md) var(--spacing-4xl) 0;
+  transition: left 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .side-nav-hover--expanded {
-  padding-left: var(--spacing-lg);
+  left: var(--spacing-xl);
 }
 
 .side-nav {
   border: var(--border-width-sm) solid var(--color-gray-medium);
   background-color: var(--semi-transparent-dark);
   backdrop-filter: blur(var(--filter-blur));
-  border-top-right-radius:    var(--border-radius-lg);
-  border-bottom-right-radius: var(--border-radius-lg);
   display: flex;
   flex-direction: column;
   justify-content: center;
-  transition: border-radius 0.3s ease;
-}
-
-.side-nav-hover--expanded .side-nav {
-  border-top-left-radius:    var(--border-radius-lg);
-  border-bottom-left-radius: var(--border-radius-lg);
 }
 
 .side-nav__list {

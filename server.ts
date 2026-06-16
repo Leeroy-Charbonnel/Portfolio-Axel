@@ -213,6 +213,7 @@ app.post("/api/experience", requireAuth, requireAdmin, async (_req, res) => {
     title:       { en: "Role", fr: "Poste" },
     company:     "Company",
     location:    "City",
+    summary:     { en: "", fr: "" },
     description: { en: [], fr: [] },
     sortOrder,
   }).returning()
@@ -517,6 +518,7 @@ app.get("/api/portfolio", async (_req, res) => {
       title:       e.title,
       company:     e.company,
       location:    e.location,
+      summary:     e.summary,
       description: e.description,
     })),
     profile: profileRow ? {
