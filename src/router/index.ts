@@ -1,12 +1,12 @@
 import { createRouter, createWebHistory } from "vue-router"
-import HomePage from "../pages/HomePage.vue"
+import HomePage     from "../pages/HomePage.vue"
+import SettingsPage from "../pages/SettingsPage.vue"
 import {
   LoginPage,
   PendingPage,
   BannedPage,
   ForgotPasswordPage,
   ResetPasswordPage,
-  SettingsPage,
   authClient,
   type SessionUser,
 } from "vue-shared-ui"

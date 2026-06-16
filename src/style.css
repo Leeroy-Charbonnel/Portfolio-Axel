@@ -232,6 +232,11 @@ button {
 }
 
 .vsui-app__main {
+  /*sit above .grain-overlay (z-index:1). Content with opaque backgrounds
+  (viewer, thumbnails, project right-half gradient) covers the grain;
+  transparent areas let the grain texture show through subtly.*/
+  position: relative;
+  z-index: 2;
   padding: 0;
 }
 
@@ -278,16 +283,17 @@ where 'border-radius-sm' was misused as a width. Now they correctly use the
   left: 25%;
 }
 
-/*Full-bleed grain overlay - film-grain look. Sits on top of EVERYTHING at a
-very low opacity, no blend mode, so it adds a uniform analog texture without
-darkening images or weirding out the Sketchfab embed. Scrolls with the page
-since the parent .portfolio-app expands to the full document height.*/
+/*Full-bleed grain overlay - sits BEHIND everything (z-index:1). Content
+(main, nav, gear, etc.) is lifted above with z-index >= 2, so the grain
+shows only where content is transparent. No mix-blend-mode: predictable
+compositing, no darkening of images. Scrolls with the page since the
+parent .portfolio-app expands to the full document height.*/
 .grain-overlay {
   position: absolute;
   inset: 0;
   background-image: url('/textures/grain.png');
   background-size: var(--grain-size);
-  z-index: 1000;
+  z-index: 1;
   pointer-events: none;
   opacity: var(--grain-opacity);
 }

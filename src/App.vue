@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router"
-import { ToastHost, useAccent, useLang, useTheme } from "vue-shared-ui"
+import { ToastHost, useAccent, useLang } from "vue-shared-ui"
 import SideNav    from "./components/portfolio/SideNav.vue"
 import AdminGear  from "./components/portfolio/AdminGear.vue"
 
@@ -8,10 +8,9 @@ import AdminGear  from "./components/portfolio/AdminGear.vue"
 //mode the DB seed call no-ops gracefully if there is no user session.
 useAccent()
 
-//hydrate the theme composable so the .dark class follows the DB value when a
-//user toggles light/dark via the settings page. dark is the composable's
-//default so the first paint stays dark even without a DB hit.
-useTheme()
+//Theme is dark-only for this portfolio: html.dark is hardcoded in index.html
+//and no toggle is exposed. We deliberately don't call useTheme() to avoid
+//auto-seeding a `theme` setting row that would show up in /settings.
 
 const { toggleLang, lang } = useLang()
 

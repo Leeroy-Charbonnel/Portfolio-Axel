@@ -53,11 +53,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <!--animate-on-mount disabled: SideNav is position:fixed and the
+  IntersectionObserver doesn't fire reliably for fixed elements, so the
+  nav was stuck in its initial -100px translated state (off-screen).
+  Skipping the entrance animation makes the nav appear instantly; the
+  hover slide on .side-nav-hover--expanded still works.-->
   <AnimatedReveal
     direction="left"
     :distance="100"
     :duration="0.3"
-    :animate-on-mount="true"
+    :animate-on-mount="false"
     class="side-nav-hover"
     :class="{ 'side-nav-hover--expanded': expanded }"
   >
@@ -91,23 +96,24 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/*NAV HOVER zone - position is animated, not padding. Default state keeps a
-small gap from the edge (--spacing-sm), hover slides it further out to
---spacing-xl for a smooth detach effect.*/
+/*NAV HOVER zone - flush against the left edge by default. Hovering slides
+the nav smoothly out from the edge. The wide right-padding is the hover
+trigger area: you can move the cursor slightly past the icons and still
+keep the expanded state.*/
 .side-nav-hover {
   position: fixed;
   top: 50%;
-  left: var(--spacing-sm);
+  left: 0;
   z-index: 10;
   transform: translateY(-50%);
   width: fit-content;
   height: fit-content;
-  padding: var(--spacing-4xl) var(--spacing-md) var(--spacing-4xl) 0;
+  padding: var(--spacing-4xl) var(--spacing-2xl) var(--spacing-4xl) 0;
   transition: left 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .side-nav-hover--expanded {
-  left: var(--spacing-xl);
+  left: var(--spacing-md);
 }
 
 .side-nav {
