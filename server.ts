@@ -3,7 +3,7 @@ import cors from "cors"
 import helmet from "helmet"
 import multer from "multer"
 import { join, extname } from "path"
-import { mkdirSync, unlinkSync } from "fs"
+import { mkdirSync, unlinkSync, readdirSync, copyFileSync, existsSync } from "fs"
 import { fileURLToPath } from "url"
 import { randomUUID } from "crypto"
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node"
@@ -100,6 +100,36 @@ try {
 } catch (e) {
   console.error(`[storage] mkdir ${storageDir} failed:`, e)
   console.error(`[storage] uploads will fail until the mount is fixed`)
+}
+
+//BOOTSTRAP SEED - if the storage volume is empty on first boot, copy the
+//pre-baked binaries from /app/seed-files (committed to git, baked into the
+//image). This bootstraps fresh prod volumes without manual SCP.
+//Idempotent: once the volume has anything in it, this skips and the files
+//on disk remain untouched.
+const seedDir = join(__dirname, "seed-files")
+try {
+  if (existsSync(seedDir)) {
+    const existing = (() => {
+      try { return readdirSync(storageDir) } catch { return [] }
+    })()
+    if (existing.length === 0) {
+      const seedFiles = readdirSync(seedDir)
+      console.log(`[seed] storage is empty - copying ${seedFiles.length} pre-baked file(s) into the volume`)
+      let copied = 0
+      for (const f of seedFiles) {
+        try {
+          copyFileSync(join(seedDir, f), join(storageDir, f))
+          copied++
+        } catch (e) {
+          console.warn(`[seed] copy failed for ${f}:`, e)
+        }
+      }
+      console.log(`[seed] done, ${copied}/${seedFiles.length} files copied to ${storageDir}`)
+    }
+  }
+} catch (e) {
+  console.warn(`[seed] bootstrap skipped due to error:`, e)
 }
 
 const upload = multer({
