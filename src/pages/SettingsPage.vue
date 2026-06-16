@@ -3,6 +3,8 @@ import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { ArrowLeft } from "lucide-vue-next"
 import { useAccent, useSettings } from "vue-shared-ui"
+import { useAdmin } from "../composables/useAdmin"
+import FileManager from "../components/portfolio/FileManager.vue"
 
 //Custom Settings page - portfolio shows ONLY the accent color picker.
 //vue-shared-ui's SettingsPage would also surface theme + language rows
@@ -12,6 +14,7 @@ import { useAccent, useSettings } from "vue-shared-ui"
 useAccent()
 const router = useRouter()
 const { getString, update, loaded } = useSettings()
+const { isAdmin } = useAdmin()
 
 const accent = ref(getString("accent_color", "#0891b2"))
 
@@ -64,6 +67,12 @@ function goBack() {
           <span class="settings-page__color-hex">{{ accent }}</span>
         </div>
       </label>
+    </section>
+
+    <!--File manager - admin only. Lists every binary in storage/files/ with a
+    usage count, lets the admin delete unused files individually or in bulk.-->
+    <section v-if="isAdmin" class="settings-page__group">
+      <FileManager />
     </section>
   </div>
 </template>

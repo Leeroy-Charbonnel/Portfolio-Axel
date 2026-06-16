@@ -3,7 +3,7 @@ import cors from "cors"
 import helmet from "helmet"
 import multer from "multer"
 import { join, extname } from "path"
-import { mkdirSync } from "fs"
+import { mkdirSync, unlinkSync } from "fs"
 import { fileURLToPath } from "url"
 import { randomUUID } from "crypto"
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node"
@@ -119,6 +119,113 @@ function inferKind(mimeType: string): "image" | "video" | "other" {
   if (mimeType.startsWith("video/")) return "video"
   return "other"
 }
+
+//GET /api/files - admin only. Returns every row in the file table with a
+//reference count: how many portfolio rows currently point at this file id.
+//References include direct fk columns AND thumbnail jsonb scans on main_project.
+//Used by the file manager UI in /settings.
+app.get("/api/files", requireAuth, requireAdmin, async (_req, res) => {
+  const result = await db.execute(sql`
+    SELECT
+      f.id,
+      f.original_filename,
+      f.stored_filename,
+      f.mime_type,
+      f.size_bytes,
+      f.kind,
+      f.created_at,
+      (
+        COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_image_file_id     = f.id), 0) +
+        COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_wireframe_file_id = f.id), 0) +
+        COALESCE((SELECT COUNT(*) FROM main_project    WHERE video_file_id          = f.id), 0) +
+        COALESCE((SELECT COUNT(*) FROM gallery_project WHERE image_file_id          = f.id), 0) +
+        COALESCE((SELECT COUNT(*) FROM software        WHERE logo_file_id           = f.id), 0) +
+        COALESCE((
+          SELECT COUNT(*)
+          FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
+          WHERE thumb->>'fileId' = f.id::text OR thumb->>'wireframeFileId' = f.id::text
+        ), 0)
+      )::int AS reference_count
+    FROM file f
+    ORDER BY f.created_at DESC
+  `)
+  const rows = (result as any).rows ?? result
+  res.json(rows.map((row: any) => ({
+    id:               row.id,
+    originalFilename: row.original_filename,
+    storedFilename:   row.stored_filename,
+    mimeType:         row.mime_type,
+    sizeBytes:        row.size_bytes,
+    kind:             row.kind,
+    createdAt:        row.created_at,
+    referenceCount:   Number(row.reference_count),
+    url:              `/media/${row.stored_filename}`,
+  })))
+})
+
+//DELETE /api/files/:id - admin only. Removes the row AND the binary on disk.
+//Refuses (409) if the file is still referenced anywhere. The UI surfaces the
+//ref count so the admin always knows before clicking.
+app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = String(req.params.id ?? "")
+  const [row] = await db.select().from(fileTable).where(eq(fileTable.id, id))
+  if (!row) { res.status(404).json({ error: "not found" }); return }
+
+  //reference count for this file
+  const refResult = await db.execute(sql`
+    SELECT (
+      COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_image_file_id     = ${id}::uuid), 0) +
+      COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_wireframe_file_id = ${id}::uuid), 0) +
+      COALESCE((SELECT COUNT(*) FROM main_project    WHERE video_file_id          = ${id}::uuid), 0) +
+      COALESCE((SELECT COUNT(*) FROM gallery_project WHERE image_file_id          = ${id}::uuid), 0) +
+      COALESCE((SELECT COUNT(*) FROM software        WHERE logo_file_id           = ${id}::uuid), 0) +
+      COALESCE((
+        SELECT COUNT(*)
+        FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
+        WHERE thumb->>'fileId' = ${id} OR thumb->>'wireframeFileId' = ${id}
+      ), 0)
+    )::int AS c
+  `)
+  const refCount = Number(((refResult as any).rows ?? refResult)[0]?.c ?? 0)
+  if (refCount > 0) {
+    res.status(409).json({ error: "file is still referenced", referenceCount: refCount })
+    return
+  }
+
+  //best-effort unlink first (DB still wins as source of truth even if unlink fails)
+  try {
+    unlinkSync(join(storageDir, row.storedFilename))
+  } catch (e) {
+    console.warn(`[files] disk unlink failed for ${row.storedFilename}:`, e)
+  }
+  await db.delete(fileTable).where(eq(fileTable.id, id))
+  res.json({ ok: true })
+})
+
+//DELETE /api/files/orphans - admin only. Bulk-delete every row whose ref
+//count is 0. Returns the number actually removed.
+app.delete("/api/files/orphans", requireAuth, requireAdmin, async (_req, res) => {
+  const result = await db.execute(sql`
+    SELECT f.id, f.stored_filename FROM file f WHERE
+      NOT EXISTS (SELECT 1 FROM main_project    WHERE main_image_file_id     = f.id) AND
+      NOT EXISTS (SELECT 1 FROM main_project    WHERE main_wireframe_file_id = f.id) AND
+      NOT EXISTS (SELECT 1 FROM main_project    WHERE video_file_id          = f.id) AND
+      NOT EXISTS (SELECT 1 FROM gallery_project WHERE image_file_id          = f.id) AND
+      NOT EXISTS (SELECT 1 FROM software        WHERE logo_file_id           = f.id) AND
+      NOT EXISTS (
+        SELECT 1 FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
+        WHERE thumb->>'fileId' = f.id::text OR thumb->>'wireframeFileId' = f.id::text
+      )
+  `)
+  const orphans = ((result as any).rows ?? result) as { id: string; stored_filename: string }[]
+  let deleted = 0
+  for (const o of orphans) {
+    try { unlinkSync(join(storageDir, o.stored_filename)) } catch { /* already gone */ }
+    await db.delete(fileTable).where(eq(fileTable.id, o.id))
+    deleted++
+  }
+  res.json({ deletedCount: deleted })
+})
 
 //POST /api/files - admin only. Returns the new file row + ready-to-use url
 app.post("/api/files", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
