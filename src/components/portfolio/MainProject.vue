@@ -493,54 +493,69 @@ async function replaceThumbnailWireframe(idx: number) {
 </template>
 
 <style scoped>
-/*MAIN PROJECT
+/*MAIN PROJECT - editorial / showcase layout
 ================================================================================
-Each project is an <article> with three vertical zones:
-  - header     : project number + title (full width)
-  - body       : viewer (always) + thumbnails strip (unless viewer-only)
-  - details    : description, optional model-id, stats + software meta row
+Inspired by independent 3D artist portfolios (Vitaly Bulgarov, Maxime Lebled
+and the editorial-style ArtStation premium pages). Visual language:
 
-Width is constrained by the .container helper (max 1200px). Height is natural -
-no fixed 90vh anymore - so projects grow with content. The layout picker floats
-absolute at the article's top-right, OUTSIDE the body's flex/grid layout, so it
-never clips against overflow or pushes the title.
+  - HUGE project number, watermark-style (transparent + thin outline). Acts as
+    a graphic device, not a label.
+  - Bold sans-serif title sits alongside the number with strong size contrast.
+  - The viewer dominates the visual space. Aspect ratios vary per layout for
+    rhythm: 16/9 cinematic in viewer-only, more compact 4/3 in the side
+    variants where the thumbnail column shares the row.
+  - Description constrained to ~62ch for editorial readability.
+  - Stats: small uppercase labels with prominent bold values.
+  - Software: minimal monospace-ish chips.
+  - Plenty of vertical breathing room - projects don't fight for attention.
+
+Structure stays: header / body (viewer + thumbnails) / details (description +
+meta). Layout picker floats absolute top-right of the article. Body grid is
+driven by the layout class on .main-project.
 */
 
 .main-project {
   --thumbnail-aspect: 1;
+  --viewer-aspect:   16 / 10;
+  --content-max:     62ch;
   position: relative;
   width: 100%;
-  margin-bottom: var(--spacing-5xl);
-  padding: var(--spacing-xl) 0;
-  background: linear-gradient(to right, transparent 30%, var(--color-background-secondary) 100%);
+  margin-bottom: var(--spacing-6xl);
+  padding: var(--spacing-3xl) 0;
 }
 
 .main-project__article {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xl);
+  gap: var(--spacing-2xl);
 }
 
-/*HEADER ----------------------------------------------------------------------*/
+/*HEADER - watermark number + bold title -----------------------------------*/
 .main-project__header {
   display: flex;
-  align-items: baseline;
-  gap: var(--spacing-sm);
+  align-items: flex-end;
+  gap: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: var(--border-width-sm) solid var(--color-gray-medium);
 }
 
 .main-project__number {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-bold);
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 900;
+  line-height: 1;
   color: transparent;
-  -webkit-text-stroke: var(--border-width-sm) var(--color-text);
+  -webkit-text-stroke: var(--border-width-md) var(--color-gray-medium);
+  letter-spacing: -0.02em;
   flex-shrink: 0;
 }
 
 .main-project__title {
-  font-size: var(--font-size-lg);
+  font-size: clamp(1.5rem, 3vw, var(--font-size-2xl));
   font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-normal);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: 1.1;
+  padding-bottom: 0.4em;
 }
 
 /*LAYOUT PICKER - absolute top-right of article, never clipped --------------*/
@@ -578,55 +593,62 @@ never clips against overflow or pushes the title.
   background-color: hsl(var(--primary) / 0.12);
 }
 
-/*BODY - viewer + (optional) thumbnails. Grid template depends on layout ----*/
+/*BODY - viewer + (optional) thumbnails. Grid template + aspect-ratio
+override depending on the layout for visual rhythm.*/
 .main-project__body {
   display: grid;
-  gap: var(--spacing-md);
-  min-height: 50vh;
+  gap: var(--spacing-lg);
 }
 
+/*thumbs-left: thin thumbnail column, viewer dominant. Compact 4/3 viewer.*/
 .main-project--layout-thumbs-left .main-project__body {
-  grid-template-columns: minmax(150px, 18%) 1fr;
+  grid-template-columns: minmax(140px, 16%) 1fr;
 }
 .main-project--layout-thumbs-left .main-project__thumbnails { order: 1; }
-.main-project--layout-thumbs-left .main-project__viewer    { order: 2; }
+.main-project--layout-thumbs-left .main-project__viewer     { order: 2; }
+.main-project--layout-thumbs-left .main-project__viewer { --viewer-aspect: 4 / 3; }
 
+/*thumbs-right: mirror of thumbs-left.*/
 .main-project--layout-thumbs-right .main-project__body {
-  grid-template-columns: 1fr minmax(150px, 18%);
+  grid-template-columns: 1fr minmax(140px, 16%);
 }
-.main-project--layout-thumbs-right .main-project__viewer    { order: 1; }
+.main-project--layout-thumbs-right .main-project__viewer     { order: 1; }
 .main-project--layout-thumbs-right .main-project__thumbnails { order: 2; }
+.main-project--layout-thumbs-right .main-project__viewer { --viewer-aspect: 4 / 3; }
 
+/*thumbs-bottom: cinematic 21/9 viewer with horizontal thumbnail strip below.*/
 .main-project--layout-thumbs-bottom .main-project__body {
   grid-template-columns: 1fr;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto auto;
 }
 .main-project--layout-thumbs-bottom .main-project__viewer    { order: 1; }
 .main-project--layout-thumbs-bottom .main-project__thumbnails {
   order: 2;
   flex-direction: row;
-  height: calc(var(--spacing-6xl) + var(--spacing-2xl));
+  flex-wrap: wrap;
 }
-.main-project--layout-thumbs-bottom .main-project__thumbnail {
-  width: auto;
-  flex: 1;
+.main-project--layout-thumbs-bottom .main-project__thumbnail,
+.main-project--layout-thumbs-bottom .main-project__thumbnail-add {
+  flex: 1 1 calc(25% - var(--spacing-xs));
+  max-width: calc(25% - var(--spacing-xs));
 }
+.main-project--layout-thumbs-bottom .main-project__viewer { --viewer-aspect: 21 / 9; }
 
+/*viewer-only: full cinema mode. 16/9 ultra-wide-ish, no thumbs.*/
 .main-project--layout-viewer-only .main-project__body {
   grid-template-columns: 1fr;
 }
+.main-project--layout-viewer-only .main-project__viewer { --viewer-aspect: 16 / 9; }
 
 /*VIEWER (Sketchfab embed / main image / wireframe toggle) ------------------*/
 .main-project__viewer {
   position: relative;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: var(--viewer-aspect);
   width: 100%;
   overflow: hidden;
-  background-color: var(--color-background-gray-100);
-}
-
-.main-project--layout-viewer-only .main-project__viewer {
-  aspect-ratio: 16 / 9;
+  background-color: var(--color-background-gray-50);
+  outline: var(--border-width-sm) solid var(--color-gray-medium);
+  outline-offset: calc(-1 * var(--border-width-sm));
 }
 
 .main-project__viewer-image,
@@ -729,19 +751,24 @@ never clips against overflow or pushes the title.
   background-color: hsl(var(--primary) / 0.05);
 }
 
-/*DETAILS - description + meta row -----------------------------------------*/
+/*DETAILS - editorial 2-column block: narrow description + meta sidebar ----*/
 .main-project__details {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+  display: grid;
+  grid-template-columns: minmax(0, var(--content-max)) 1fr;
+  gap: var(--spacing-3xl);
+  align-items: start;
+  padding-top: var(--spacing-md);
 }
 
 .main-project__description {
-  line-height: 1.7;
-  text-align: justify;
+  line-height: 1.75;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  grid-column: 1;
 }
 
 .main-project__model-id {
+  grid-column: 1 / -1;
   display: flex;
   gap: var(--spacing-sm);
   align-items: baseline;
@@ -762,75 +789,93 @@ never clips against overflow or pushes the title.
   color: var(--color-text-hover);
 }
 
+/*META - stats stacked vertically, software list below. Sits in the right
+column next to the description.*/
 .main-project__meta {
+  grid-column: 2;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   gap: var(--spacing-xl);
-  flex-wrap: wrap;
-  padding-top: var(--spacing-md);
-  border-top: var(--border-width-sm) solid var(--color-gray-medium);
 }
 
 /*STATS ---------------------------------------------------------------------*/
 .main-project__stats {
   display: flex;
-  gap: var(--spacing-lg);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--spacing-md);
 }
 
 .main-project__stat {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  min-width: 5rem;
+  gap: var(--spacing-xxs);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: var(--border-width-sm) solid var(--color-gray-dark);
 }
+
+.main-project__stat:last-of-type { border-bottom: none; }
 
 .main-project__stat-label {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-normal);
+  letter-spacing: var(--letter-spacing-wide);
 }
 
 .main-project__stat :deep(span),
 .main-project__stat-value {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-hover);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
-/*SOFTWARE LIST -------------------------------------------------------------*/
+/*SOFTWARE LIST - minimal monospace chips with logos -----------------------*/
 .main-project__software-list {
   display: flex;
+  flex-direction: column;
   gap: var(--spacing-xs);
-  flex-wrap: wrap;
-  align-items: center;
+}
+
+.main-project__software-list::before {
+  content: "Tools";
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--spacing-xs);
 }
 
 .main-project__software {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
-  background-color: var(--color-background-gray-100);
+  background-color: transparent;
+  border: var(--border-width-sm) solid var(--color-gray-medium);
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-normal);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
 .main-project__software:hover {
-  background-color: var(--color-background-gray-150);
+  border-color: var(--color-accent);
   color: var(--color-text-hover);
 }
 
 .main-project__software img { filter: brightness(0.8); transition: filter 0.2s ease; }
 .main-project__software:hover img { filter: brightness(1); }
 
-/*RESPONSIVE - collapse all layouts to single column on tablet/mobile -------*/
+/*RESPONSIVE - collapse layouts gracefully ----------------------------------*/
 @media (max-width: 900px) {
+  .main-project { padding: var(--spacing-xl) 0; margin-bottom: var(--spacing-5xl); }
+
+  /*all layouts collapse to single column - viewer + thumbs stacked vertically*/
   .main-project__body,
   .main-project--layout-thumbs-left  .main-project__body,
   .main-project--layout-thumbs-right .main-project__body,
@@ -838,16 +883,28 @@ never clips against overflow or pushes the title.
   .main-project--layout-viewer-only  .main-project__body {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
-    min-height: 0;
   }
+
+  /*viewer goes wide on mobile regardless of layout*/
+  .main-project__viewer { --viewer-aspect: 16 / 10; }
+
   .main-project__thumbnails {
     flex-direction: row;
-    height: auto;
+    flex-wrap: wrap;
   }
   .main-project__thumbnail,
   .main-project__thumbnail-add {
-    flex: 1;
+    flex: 1 1 calc(33.333% - var(--spacing-xs));
+    max-width: calc(33.333% - var(--spacing-xs));
   }
+
+  /*details collapse to one column*/
+  .main-project__details {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-xl);
+  }
+  .main-project__meta { grid-column: 1; }
+
   .main-project__layout-picker {
     position: static;
     margin-left: auto;
@@ -855,14 +912,11 @@ never clips against overflow or pushes the title.
   }
   .main-project__header {
     flex-wrap: wrap;
+    align-items: baseline;
   }
 }
 
 @media (max-width: 600px) {
-  .main-project__meta {
-    flex-direction: column;
-    align-items: flex-start;
-  }
   .main-project__software-name { display: none; }
 }
 </style>
