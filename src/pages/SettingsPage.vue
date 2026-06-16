@@ -3,7 +3,6 @@ import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { ArrowLeft } from "lucide-vue-next"
 import { useAccent, useSettings } from "vue-shared-ui"
-import { useAdmin } from "../composables/useAdmin"
 import FileManager from "../components/portfolio/FileManager.vue"
 
 //Custom Settings page - portfolio shows ONLY the accent color picker.
@@ -14,7 +13,6 @@ import FileManager from "../components/portfolio/FileManager.vue"
 useAccent()
 const router = useRouter()
 const { getString, update, loaded } = useSettings()
-const { isAdmin } = useAdmin()
 
 const accent = ref(getString("accent_color", "#0891b2"))
 
@@ -69,9 +67,10 @@ function goBack() {
       </label>
     </section>
 
-    <!--File manager - admin only. Lists every binary in storage/files/ with a
-    usage count, lets the admin delete unused files individually or in bulk.-->
-    <section v-if="isAdmin" class="settings-page__group">
+    <!--File manager - always rendered. The component handles its own state:
+    if you aren't logged in as admin, the API returns 401 and the FileManager
+    shows an inline error instead of disappearing silently.-->
+    <section class="settings-page__group">
       <FileManager />
     </section>
   </div>
