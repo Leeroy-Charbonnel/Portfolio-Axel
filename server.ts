@@ -173,33 +173,86 @@ try {
 
 console.log(`[boot] ============================`)
 
-//PUBLIC diagnostic endpoint - no auth. Visit /api/_diag in the browser to
-//see exactly what the server saw at boot, plus a fresh re-read of the dirs.
-//This is the easiest way to debug volume/permission issues without runtime logs.
-app.get("/api/_diag", (_req, res) => {
+//PUBLIC diagnostic page - no auth. Visit /diag in the browser to see at a
+//glance whether the container is running the latest code (build marker),
+//whether the storage volume bootstrapped correctly, etc. Plain HTML so it
+//renders even with browser caching turned off.
+//
+//Bumped build marker on every commit so you can SEE the version with one
+//URL. If the marker doesn't match the latest commit hash on GitHub, the
+//container is stale.
+const BUILD_MARKER = "diag-v3-2976663-plus"
+
+app.get(["/diag", "/api/_diag"], (_req, res) => {
   const storageNow = (() => {
     try { return readdirSync(storageDir) } catch { return [] }
   })()
-  const seedNow = (() => {
-    try { return readdirSync(seedDir) } catch { return [] }
-  })()
-  res.json({
-    boot: bootDiag,
-    now: {
-      storageFileCount: storageNow.length,
-      storageFilesPreview: storageNow.slice(0, 5),
-      seedFileCount: seedNow.length,
-      seedFilesPreview: seedNow.slice(0, 5),
-    },
-    env: {
-      NODE_ENV:        process.env.NODE_ENV ?? null,
-      AUTH_MODE:       AUTH_MODE,
-      hasDatabase:     Boolean(process.env.DATABASE_URL),
-      hasAuthSecret:   Boolean(process.env.BETTER_AUTH_SECRET),
-      hasResendKey:    Boolean(process.env.RESEND_API_KEY),
-      hasGoogleClient: Boolean(process.env.GOOGLE_CLIENT_ID),
-    },
-  })
+
+  const ok    = (txt: string) => `<span style="color:#4ade80">${txt}</span>`
+  const bad   = (txt: string) => `<span style="color:#f87171">${txt}</span>`
+  const muted = (txt: string) => `<span style="color:#9ca3af">${txt}</span>`
+  const yesno = (b: boolean) => b ? ok("yes") : bad("no")
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8")
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate")
+  res.send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Portfolio-Axel diag</title>
+  <style>
+    body { background:#0a0a0a; color:#e5e5e5; font-family:ui-monospace,Consolas,monospace; padding:2rem; line-height:1.6; }
+    h1 { font-size:1.6rem; margin:0 0 .5rem; color:#fff; letter-spacing:.05em; text-transform:uppercase; }
+    h2 { font-size:.95rem; margin:1.5rem 0 .25rem; color:#9ca3af; letter-spacing:.1em; text-transform:uppercase; border-bottom:1px solid #333; padding-bottom:.25rem; }
+    .marker { font-size:1.1rem; background:#1f2937; padding:.5rem 1rem; border-left:3px solid #4ade80; display:inline-block; margin-bottom:1rem; }
+    .grid { display:grid; grid-template-columns:max-content 1fr; gap:.25rem 1.5rem; }
+    .grid > .key { color:#9ca3af; }
+    .grid > .val { color:#e5e5e5; font-weight:bold; }
+    pre { background:#1f2937; padding:.75rem; border:1px solid #333; overflow:auto; font-size:.85rem; margin:.5rem 0; }
+    .small { color:#6b7280; font-size:.85rem; }
+  </style>
+</head>
+<body>
+  <h1>Portfolio-Axel diagnostics</h1>
+
+  <div class="marker">build marker: ${BUILD_MARKER}</div>
+  <p class="small">If you don't see this marker (or the green color), your container is on an OLD image - the new build hasn't taken effect.</p>
+
+  <h2>Storage volume</h2>
+  <div class="grid">
+    <span class="key">Mount path (container)</span>     <span class="val">${storageDir}</span>
+    <span class="key">Existed at boot</span>             <span class="val">${yesno(bootDiag.storageExisted)}</span>
+    <span class="key">mkdir at boot</span>               <span class="val">${bootDiag.mkdirOk ? ok("ok") : bad(bootDiag.mkdirError ?? "failed")}</span>
+    <span class="key">Files after mkdir</span>           <span class="val">${bootDiag.storageFilesAfterMkdir}</span>
+    <span class="key">Files RIGHT NOW</span>             <span class="val">${storageNow.length}</span>
+  </div>
+
+  <h2>Seed bootstrap (from baked image)</h2>
+  <div class="grid">
+    <span class="key">Seed dir (in image)</span>        <span class="val">${seedDir}</span>
+    <span class="key">Seed exists in image</span>        <span class="val">${yesno(bootDiag.seedExisted)}</span>
+    <span class="key">Seed file count</span>             <span class="val">${bootDiag.seedFileCount}</span>
+    <span class="key">Copied at boot</span>              <span class="val">${bootDiag.seedCopied > 0 ? ok(String(bootDiag.seedCopied)) : muted(String(bootDiag.seedCopied))}</span>
+    <span class="key">Skipped reason</span>              <span class="val">${bootDiag.seedSkippedReason ?? muted("(none)")}</span>
+  </div>
+  ${bootDiag.seedErrors.length > 0 ? `<pre>${bootDiag.seedErrors.join("\n")}</pre>` : ""}
+
+  <h2>Environment</h2>
+  <div class="grid">
+    <span class="key">NODE_ENV</span>             <span class="val">${process.env.NODE_ENV ?? muted("(unset)")}</span>
+    <span class="key">VITE_AUTH_MODE</span>       <span class="val">${AUTH_MODE}</span>
+    <span class="key">DATABASE_URL set</span>     <span class="val">${yesno(Boolean(process.env.DATABASE_URL))}</span>
+    <span class="key">BETTER_AUTH_SECRET set</span> <span class="val">${yesno(Boolean(process.env.BETTER_AUTH_SECRET))}</span>
+    <span class="key">RESEND_API_KEY set</span>   <span class="val">${yesno(Boolean(process.env.RESEND_API_KEY))}</span>
+    <span class="key">GOOGLE_CLIENT_ID set</span> <span class="val">${yesno(Boolean(process.env.GOOGLE_CLIENT_ID))}</span>
+  </div>
+
+  <h2>Boot started at</h2>
+  <p>${bootDiag.startedAt}</p>
+
+  ${storageNow.length > 0 ? `<h2>First 5 files currently in storage</h2><pre>${storageNow.slice(0, 5).join("\n")}</pre>` : ""}
+</body>
+</html>`)
 })
 
 const upload = multer({
