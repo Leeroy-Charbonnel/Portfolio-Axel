@@ -26,5 +26,7 @@ dist-ssr
 .env
 .env.*
 
-# File storage - portfolio media uploaded by admin. Persisted as a Docker volume in prod.
+# File storage - portfolio media uploaded by admin. Persisted as a Docker
+# named volume in prod (Dokploy: Mount Type = Volume Mount, NOT Bind Mount).
 storage/
+seed-files/
