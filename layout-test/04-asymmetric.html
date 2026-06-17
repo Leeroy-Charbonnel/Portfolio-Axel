@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>04 — Asymmetric · Axel Offret</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    overflow-x: hidden;
+    position: relative;
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.25;
+    mix-blend-mode: overlay;
+    z-index: 200;
+  }
+  :root { --accent: #ff1e3c; }
+
+  /*HERO - giant name with one letter accent*/
+  .hero {
+    height: 100vh;
+    padding: 5rem 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-bottom: 4px solid #fff;
+  }
+  .hero-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+  }
+  .hero-top .accent { color: var(--accent); font-weight: 900; }
+  .hero-name {
+    font-size: clamp(5rem, 18vw, 18rem);
+    font-weight: 900;
+    line-height: 0.8;
+    letter-spacing: -0.06em;
+    margin-bottom: 2rem;
+  }
+  .hero-name .accent { color: var(--accent); }
+  .hero-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    border-top: 1px solid #444;
+    padding-top: 1rem;
+  }
+  .hero-meta > div:nth-child(2) { transform: rotate(-2deg); padding-left: 3rem; }
+  .hero-meta > div:nth-child(3) { text-align: right; font-style: italic; }
+  .hero-meta-label { font-size: 0.6rem; letter-spacing: 0.3em; color: #666; text-transform: uppercase; margin-bottom: 0.3rem; }
+  .hero-meta-val { font-size: 0.95rem; }
+
+  /*SECTION TITLE — diagonal*/
+  .section-tag {
+    background: var(--accent);
+    color: #000;
+    font-weight: 900;
+    padding: 0.4rem 1rem;
+    display: inline-block;
+    transform: rotate(-2deg);
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin: 5rem 3rem 1rem;
+  }
+  .section-title {
+    padding: 0 3rem;
+    font-size: clamp(3rem, 8vw, 7rem);
+    line-height: 0.9;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+    margin-bottom: 4rem;
+  }
+  .section-title .strike { text-decoration: line-through; color: #444; }
+
+  /*PROJECT — totally off-balance*/
+  .project {
+    position: relative;
+    padding: 3rem;
+    border-top: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    margin-bottom: 3rem;
+    min-height: 90vh;
+  }
+  .p-bignum {
+    position: absolute;
+    top: -1rem;
+    right: 2rem;
+    font-size: clamp(15rem, 32vw, 32rem);
+    line-height: 0.7;
+    color: transparent;
+    -webkit-text-stroke: 2px #222;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+  .p-top {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 2rem;
+    align-items: flex-end;
+    margin-bottom: 2rem;
+  }
+  .p-title {
+    font-size: clamp(2.5rem, 5vw, 4.5rem);
+    line-height: 0.95;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    max-width: 60%;
+  }
+  .p-title .underline { background: var(--accent); padding: 0 0.3rem; color: #000; }
+  .p-tag {
+    background: #fff;
+    color: #000;
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    font-weight: 900;
+    padding: 0.4rem 0.7rem;
+    transform: rotate(3deg);
+  }
+
+  .p-body {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 3rem;
+    margin-bottom: 2rem;
+  }
+  .p-side {
+    border: 2px solid #fff;
+    padding: 1.5rem;
+    background: #000;
+  }
+  .p-desc {
+    font-size: 1.05rem;
+    line-height: 1.5;
+    color: #ddd;
+    margin-bottom: 1.5rem;
+  }
+  .p-stats-flat {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+  .p-stat-flat { font-size: 1.6rem; font-weight: 900; }
+  .p-stat-flat span { font-size: 0.55rem; letter-spacing: 0.3em; color: var(--accent); display: block; text-transform: uppercase; margin-bottom: 0.15rem; }
+  .p-sw-flat {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .p-sw-flat > div {
+    width: 2.2rem;
+    height: 2.2rem;
+    border: 2px solid #fff;
+    background: #fff;
+    padding: 0.2rem;
+  }
+  .p-sw-flat img { width: 100%; height: 100%; object-fit: contain; }
+
+  .p-viewer {
+    aspect-ratio: 4/3;
+    border: 4px solid #fff;
+    overflow: hidden;
+    background: #000;
+    transform: rotate(0deg);
+  }
+  .p-viewer iframe { width: 100%; height: 100%; border: 0; }
+
+  .p-thumbs {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .p-thumbs > div {
+    aspect-ratio: 4/3;
+    border: 2px solid #fff;
+    overflow: hidden;
+  }
+  .p-thumbs > div:nth-child(2) { transform: rotate(2deg); }
+  .p-thumbs > div:nth-child(3) { transform: rotate(-1deg); }
+  .p-thumbs img { width: 100%; height: 100%; object-fit: cover; }
+
+  /*GALLERY — chaotic grid*/
+  .gallery {
+    padding: 3rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+  .g-item { text-decoration: none; color: inherit; position: relative; }
+  .g-item:nth-child(2n) { transform: translateY(2rem); }
+  .g-item:nth-child(3n) { transform: rotate(1deg) translateY(-1rem); }
+  .g-img { border: 3px solid #fff; aspect-ratio: 4/3; overflow: hidden; }
+  .g-img img { width: 100%; height: 100%; object-fit: cover; }
+  .g-label {
+    background: #fff;
+    color: #000;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.7rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    display: inline-block;
+    margin-top: -0.5rem;
+    position: relative;
+    z-index: 2;
+    transform: rotate(-1deg);
+  }
+
+  /*EXP — bullet-board style*/
+  .exp { padding: 3rem; }
+  .exp-card {
+    border: 3px solid #fff;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    background: #000;
+    display: grid;
+    grid-template-columns: 10rem 1fr;
+    gap: 2rem;
+  }
+  .exp-card:nth-child(odd) { transform: rotate(-0.3deg); }
+  .exp-card:nth-child(even) { transform: rotate(0.3deg); margin-left: 3rem; }
+  .exp-year { font-size: 2rem; font-weight: 900; line-height: 1; }
+  .exp-year-sub { font-size: 0.6rem; letter-spacing: 0.3em; color: var(--accent); margin-top: 0.5rem; }
+  .exp-role { font-size: 1.6rem; font-weight: 900; text-transform: uppercase; line-height: 1; margin-bottom: 0.3rem; }
+  .exp-co { font-size: 0.85rem; color: #888; margin-bottom: 1rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .exp-bullets { list-style: none; }
+  .exp-bullets li { font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.3rem; padding-left: 1.2rem; position: relative; color: #ccc; }
+  .exp-bullets li::before { content: "▶"; position: absolute; left: 0; color: var(--accent); font-size: 0.6rem; top: 0.3rem; }
+
+  /*ABOUT*/
+  .about {
+    padding: 5rem 3rem;
+    border-top: 4px solid var(--accent);
+    background: #0a0a0a;
+  }
+  .about-bio {
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    line-height: 1.3;
+    font-weight: 700;
+    max-width: 50rem;
+    margin-bottom: 3rem;
+  }
+  .about-bio .acc { color: var(--accent); font-style: italic; }
+  .about-contact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .about-contact > div {
+    border: 2px solid #fff;
+    padding: 1rem 1.5rem;
+    flex: 1;
+    min-width: 12rem;
+  }
+  .about-contact > div:nth-child(2) { transform: rotate(-1deg); background: var(--accent); color: #000; border-color: var(--accent); }
+  .about-contact dt {
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 0.3rem;
+  }
+  .about-contact dd { font-size: 1.1rem; font-weight: 700; }
+
+  footer {
+    padding: 2rem 3rem;
+    border-top: 4px solid #fff;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+  }
+  footer .accent { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-top">
+    <span>PORTFOLIO <span class="accent">/ 2026</span></span>
+    <span>HELSINKI · FINLAND</span>
+    <span>N°<span class="accent">01</span></span>
+  </div>
+
+  <div class="hero-name">AXEL<br>OFFR<span class="accent">E</span>T</div>
+
+  <div class="hero-meta">
+    <div>
+      <div class="hero-meta-label">Role</div>
+      <div class="hero-meta-val">3D Artist · Technical Artist</div>
+    </div>
+    <div>
+      <div class="hero-meta-label">Stack</div>
+      <div class="hero-meta-val">Blender · Unreal · Unity · Substance</div>
+    </div>
+    <div>
+      <div class="hero-meta-label">Available</div>
+      <div class="hero-meta-val">YES · 2026</div>
+    </div>
+  </div>
+</section>
+
+<div class="section-tag">— Main Work —</div>
+<h2 class="section-title">PROJ<span class="strike">EKT</span>ECTS</h2>
+
+<article class="project">
+  <div class="p-bignum">01</div>
+  <div class="p-top">
+    <h3 class="p-title">Tables /<br><span class="underline">Chaises</span><br>Bureau</h3>
+    <div class="p-tag">HARD SURFACE</div>
+  </div>
+  <div class="p-body">
+    <div class="p-side">
+      <p class="p-desc">Setup mobilier complet pour open space. Modélisation hard-surface optimisée pour rendu temps réel et inspection détaillée via Sketchfab.</p>
+      <div class="p-stats-flat">
+        <div class="p-stat-flat"><span>Verts</span>46K</div>
+        <div class="p-stat-flat"><span>Edges</span>92K</div>
+        <div class="p-stat-flat"><span>Faces</span>46K</div>
+      </div>
+      <div class="p-sw-flat">
+        <div><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+        <div><img src="https://axel.somerandomcreator.com/media/d0d7885a-e28d-4a79-952b-e9e55efc5099.png"></div>
+        <div><img src="https://axel.somerandomcreator.com/media/dfaab84f-b66c-4d8d-add7-821aa970b57f.png"></div>
+      </div>
+    </div>
+    <div class="p-viewer">
+      <iframe src="https://sketchfab.com/models/441d21b8a12a4971ab67eaac5cef0888/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+  </div>
+  <div class="p-thumbs">
+    <div><img src="https://axel.somerandomcreator.com/media/7e9ddb78-ba2b-4227-826c-e7310018a3fb.png"></div>
+    <div><img src="https://axel.somerandomcreator.com/media/4bf6f82e-4d01-4414-9414-fdbcebb83b0c.png"></div>
+    <div><img src="https://axel.somerandomcreator.com/media/4d0ca325-60b2-461e-a479-666ad36dbf94.png"></div>
+  </div>
+</article>
+
+<article class="project">
+  <div class="p-bignum">02</div>
+  <div class="p-top">
+    <h3 class="p-title">Siège /<br>Table /<br><span class="underline">Bambou</span></h3>
+    <div class="p-tag">ORGANIC</div>
+  </div>
+  <div class="p-body">
+    <div class="p-side">
+      <p class="p-desc">Composition mobilier organique avec lampe en bambou et sièges cylindriques. Étude d'éclairage tamisé et matériaux naturels.</p>
+      <div class="p-stats-flat">
+        <div class="p-stat-flat"><span>Verts</span>25K</div>
+        <div class="p-stat-flat"><span>Edges</span>51K</div>
+        <div class="p-stat-flat"><span>Faces</span>25K</div>
+      </div>
+      <div class="p-sw-flat">
+        <div><img src="https://axel.somerandomcreator.com/media/dfaab84f-b66c-4d8d-add7-821aa970b57f.png"></div>
+        <div><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+        <div><img src="https://axel.somerandomcreator.com/media/99a22a7c-00a8-4214-a278-8ec1206a2d2b.png"></div>
+      </div>
+    </div>
+    <div class="p-viewer">
+      <iframe src="https://sketchfab.com/models/a7bccdc2d8d24ef6814bfed7a3ed3922/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+  </div>
+  <div class="p-thumbs">
+    <div><img src="https://axel.somerandomcreator.com/media/68d88152-e7ec-4d7c-9d03-f38ed7c37c12.png"></div>
+    <div><img src="https://axel.somerandomcreator.com/media/47020228-2df0-4ac7-a7ee-7e0a396b6b5d.png"></div>
+    <div><img src="https://axel.somerandomcreator.com/media/588613c0-a3f9-4504-ad61-9bd500e2eb69.png"></div>
+  </div>
+</article>
+
+<article class="project">
+  <div class="p-bignum">03</div>
+  <div class="p-top">
+    <h3 class="p-title"><span class="underline">Hautes</span><br>Table /<br>Chaises</h3>
+    <div class="p-tag">DENSITY</div>
+  </div>
+  <div class="p-body">
+    <div class="p-side">
+      <p class="p-desc">Scène cafétéria haute densité. 85K vertices arrangés en harmonie pour un lobby ou un coin de pause moderne.</p>
+      <div class="p-stats-flat">
+        <div class="p-stat-flat"><span>Verts</span>85K</div>
+        <div class="p-stat-flat"><span>Edges</span>171K</div>
+        <div class="p-stat-flat"><span>Faces</span>85K</div>
+      </div>
+      <div class="p-sw-flat">
+        <div><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+        <div><img src="https://axel.somerandomcreator.com/media/d0d7885a-e28d-4a79-952b-e9e55efc5099.png"></div>
+      </div>
+    </div>
+    <div class="p-viewer">
+      <iframe src="https://sketchfab.com/models/07dc155556b9403bb4853c9ba2a44a84/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+  </div>
+  <div class="p-thumbs">
+    <div><img src="https://axel.somerandomcreator.com/media/4113b082-f87b-41f5-9fe1-d18023897aee.png"></div>
+    <div><img src="https://axel.somerandomcreator.com/media/37933062-0ac9-4808-a0ea-5aef02db90ed.png"></div>
+    <div><img src="https://axel.somerandomcreator.com/media/6098a92a-d31a-47f4-ae34-d8eebec95c4e.png"></div>
+  </div>
+</article>
+
+<div class="section-tag">— Other Stuff —</div>
+<h2 class="section-title">G<span class="strike">A</span>LLERY</h2>
+
+<div class="gallery">
+  <a class="g-item" href="#" target="_blank">
+    <div class="g-img"><img src="https://axel.somerandomcreator.com/media/6606e8c9-7c1b-4786-b624-a21aa862ea6c.png"></div>
+    <div class="g-label">01 · DYSTOPIAN MAN</div>
+  </a>
+  <a class="g-item" href="#" target="_blank">
+    <div class="g-img"><img src="https://axel.somerandomcreator.com/media/1fc1f99a-1ae4-48f9-8ac2-70adf3c86723.png"></div>
+    <div class="g-label">02 · RETRO DOG</div>
+  </a>
+  <a class="g-item" href="#" target="_blank">
+    <div class="g-img"><img src="https://axel.somerandomcreator.com/media/f96557e3-4466-4270-9866-ac3c504f0774.png"></div>
+    <div class="g-label">03 · DYSTOPIAN CAR</div>
+  </a>
+  <a class="g-item" href="#" target="_blank">
+    <div class="g-img"><img src="https://axel.somerandomcreator.com/media/242a4d56-8ee5-4f3c-b814-bce7c75550aa.png"></div>
+    <div class="g-label">04 · PLESIO</div>
+  </a>
+  <a class="g-item" href="#" target="_blank">
+    <div class="g-img"><img src="https://axel.somerandomcreator.com/media/35d7aaf5-4781-48a4-a8d4-39bb3ac1dca2.png"></div>
+    <div class="g-label">05 · SPINO</div>
+  </a>
+  <a class="g-item" href="#" target="_blank">
+    <div class="g-img"><img src="https://axel.somerandomcreator.com/media/c5274885-e4bd-4479-b79b-c4ab78ad25e4.png"></div>
+    <div class="g-label">06 · OFFICE</div>
+  </a>
+</div>
+
+<div class="section-tag">— Timeline —</div>
+<h2 class="section-title">EXP<span class="strike">ER</span>IENCE</h2>
+
+<div class="exp">
+  <div class="exp-card">
+    <div>
+      <div class="exp-year">2023+</div>
+      <div class="exp-year-sub">ACT.</div>
+    </div>
+    <div>
+      <h3 class="exp-role">Tech Artist 3D</h3>
+      <p class="exp-co">Ailivesim · Helsinki</p>
+      <ul class="exp-bullets">
+        <li>Unreal Engine — Blueprints, Material Editor, Niagara, Sequencer</li>
+        <li>Optimisation assets temps réel (LOD, atlasing, occlusion)</li>
+        <li>Pipelines de production, gestion d'assets 3D</li>
+        <li>Lumen, Nanite, Ray Tracing pour rendu avancé</li>
+      </ul>
+    </div>
+  </div>
+  <div class="exp-card">
+    <div>
+      <div class="exp-year">22→23</div>
+      <div class="exp-year-sub">5 MOIS</div>
+    </div>
+    <div>
+      <h3 class="exp-role">Multimedia Generalist</h3>
+      <p class="exp-co">Polyverse Life · Denizli</p>
+      <ul class="exp-bullets">
+        <li>Modélisation low/high poly jeux vidéo, archi, animation</li>
+        <li>Création d'environnements et scènes 3D</li>
+        <li>Animation 3D shape keys, drivers, rigs custom</li>
+        <li>Maîtrise Cycles et Eevee</li>
+      </ul>
+    </div>
+  </div>
+  <div class="exp-card">
+    <div>
+      <div class="exp-year">2022</div>
+      <div class="exp-year-sub">12 MOIS</div>
+    </div>
+    <div>
+      <h3 class="exp-role">3D Artist</h3>
+      <p class="exp-co">Funika Games · Denizli</p>
+      <ul class="exp-bullets">
+        <li>Unity — Editor, Prefabs, Timeline, Shader Graph, VFX Graph</li>
+        <li>Modélisation low/high poly pour jeux vidéo</li>
+        <li>Animation et rigging dans Unity (Animator, IK, Mocap)</li>
+        <li>Retopologie et baking (normal maps, AO, roughness)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<section class="about">
+  <p class="about-bio">Salut! Je suis un Artiste avec de l'expérience dans le <span class="acc">design graphique</span> et la modélisation 3D. Forte passion pour la création de modèles 3D, et je m'efforce toujours d'<span class="acc">améliorer mes skills</span> dans ce domaine.</p>
+  <div class="about-contact">
+    <div><dt>Phone</dt><dd>+33 6 51 63 50 08</dd></div>
+    <div><dt>Mail</dt><dd>AXEL.OFFRET@GMAIL.COM</dd></div>
+    <div><dt>Insta</dt><dd>@AXEL.OFFRET</dd></div>
+  </div>
+</section>
+
+<footer>
+  <span>AXEL OFFRET</span>
+  <span class="accent">— 2026 —</span>
+  <span>ALL RIGHTS</span>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>05 — Cinematic · Axel Offret</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    overflow-x: hidden;
+    position: relative;
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.15;
+    mix-blend-mode: overlay;
+    z-index: 200;
+  }
+
+  /*FIXED HEADER chrome - minimal*/
+  .chrome {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+  }
+  .chrome-left { font-weight: 700; }
+  .chrome-nav { display: flex; gap: 2rem; }
+  .chrome-nav a { color: #fff; text-decoration: none; opacity: 0.6; transition: opacity 0.2s; }
+  .chrome-nav a:hover { opacity: 1; }
+  .chrome-right .lang { padding: 0.4rem 0.6rem; border: 1px solid #fff; }
+
+  /*HERO - full screen image overlay*/
+  .hero {
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+  }
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    background-image: url("https://axel.somerandomcreator.com/media/1e93bfb9-e391-4a7a-98c1-7b941166d457.png");
+    background-size: cover;
+    background-position: center;
+    filter: brightness(0.55);
+    transform: scale(1.04);
+  }
+  .hero-vignette {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.9) 100%);
+  }
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 4rem 3rem;
+    width: 100%;
+  }
+  .hero-eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.5em;
+    margin-bottom: 1rem;
+    opacity: 0.7;
+  }
+  .hero-title {
+    font-size: clamp(4rem, 10vw, 9rem);
+    line-height: 0.95;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    margin-bottom: 1.5rem;
+  }
+  .hero-meta {
+    display: flex;
+    gap: 3rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+  .hero-meta > span:first-child::after { content: " · "; opacity: 0.5; }
+
+  /*PROJECT - full-bleed hero + minimal info below*/
+  .project { position: relative; }
+  .project-hero {
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+  }
+  .project-hero iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .project-hero-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 3rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .project-num {
+    font-size: 6rem;
+    line-height: 0.9;
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 1.5px #fff;
+    letter-spacing: -0.04em;
+  }
+  .project-title-wrap { text-align: right; }
+  .project-cat {
+    font-size: 0.7rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    opacity: 0.7;
+  }
+  .project-title {
+    font-size: clamp(2.5rem, 5vw, 4.5rem);
+    line-height: 0.95;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+
+  .project-info {
+    padding: 5rem 3rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5rem;
+    max-width: 100rem;
+    margin: 0 auto;
+    border-bottom: 1px solid #222;
+  }
+  .project-desc {
+    font-size: 1.2rem;
+    line-height: 1.6;
+    color: #ccc;
+    max-width: 38rem;
+  }
+  .project-side { display: flex; flex-direction: column; gap: 2rem; align-items: flex-end; }
+  .project-stats {
+    display: grid;
+    grid-template-columns: repeat(3, max-content);
+    gap: 2rem;
+    text-align: right;
+  }
+  .stat-label { font-size: 0.6rem; letter-spacing: 0.3em; opacity: 0.5; text-transform: uppercase; margin-bottom: 0.4rem; }
+  .stat-value { font-size: 1.8rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .project-software { display: flex; gap: 0.5rem; }
+  .project-software > div {
+    width: 2.5rem; height: 2.5rem;
+    background: #fff;
+    padding: 0.3rem;
+    border-radius: 0;
+  }
+  .project-software img { width: 100%; height: 100%; object-fit: contain; }
+
+  .project-thumbs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border-bottom: 1px solid #222;
+  }
+  .project-thumbs > div {
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    border-left: 1px solid #222;
+  }
+  .project-thumbs > div:first-child { border-left: 0; }
+  .project-thumbs img { width: 100%; height: 100%; object-fit: cover; }
+
+  /*GALLERY - 4-col image grid*/
+  .gallery-section { padding: 6rem 0; }
+  .gallery-header { padding: 0 3rem; margin-bottom: 4rem; }
+  .gallery-tag { font-size: 0.7rem; letter-spacing: 0.4em; opacity: 0.5; text-transform: uppercase; margin-bottom: 1rem; }
+  .gallery-title { font-size: clamp(3rem, 7vw, 6rem); line-height: 0.95; font-weight: 900; letter-spacing: -0.03em; }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+  }
+  .g-item {
+    aspect-ratio: 1;
+    overflow: hidden;
+    position: relative;
+    text-decoration: none;
+    color: inherit;
+  }
+  .g-item img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    filter: brightness(0.85);
+    transition: filter 0.3s, transform 0.3s;
+  }
+  .g-item:hover img { filter: brightness(1); transform: scale(1.03); }
+  .g-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.5rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
+  }
+  .g-num { font-size: 0.65rem; letter-spacing: 0.4em; opacity: 0.7; margin-bottom: 0.3rem; }
+  .g-title { font-size: 0.95rem; font-weight: 700; letter-spacing: 0.05em; }
+
+  /*EXPERIENCE - cinematic timeline*/
+  .exp-section {
+    padding: 6rem 3rem;
+    border-top: 1px solid #222;
+  }
+  .exp-header { text-align: center; margin-bottom: 5rem; }
+  .exp-header .tag { font-size: 0.7rem; letter-spacing: 0.4em; opacity: 0.5; text-transform: uppercase; margin-bottom: 1rem; }
+  .exp-header .title { font-size: clamp(3rem, 6vw, 5rem); font-weight: 900; line-height: 0.95; letter-spacing: -0.02em; }
+
+  .exp-list { max-width: 65rem; margin: 0 auto; }
+  .exp-item {
+    display: grid;
+    grid-template-columns: 12rem 1fr;
+    gap: 4rem;
+    padding: 3rem 0;
+    border-top: 1px solid #222;
+    align-items: start;
+  }
+  .exp-period {
+    font-size: 1rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+  }
+  .exp-period-meta { font-size: 0.65rem; letter-spacing: 0.3em; opacity: 0.5; text-transform: uppercase; margin-top: 0.3rem; }
+  .exp-role { font-size: 2rem; font-weight: 900; line-height: 1; letter-spacing: -0.01em; margin-bottom: 0.4rem; }
+  .exp-co { font-size: 0.85rem; opacity: 0.6; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1.5rem; }
+  .exp-bullets { list-style: none; }
+  .exp-bullets li { font-size: 0.95rem; line-height: 1.6; color: #bbb; padding-left: 1.5rem; position: relative; margin-bottom: 0.5rem; }
+  .exp-bullets li::before { content: "→"; position: absolute; left: 0; opacity: 0.5; }
+
+  /*ABOUT - full bleed image hero*/
+  .about-section {
+    padding: 8rem 3rem;
+    text-align: center;
+    border-top: 1px solid #222;
+  }
+  .about-tag { font-size: 0.7rem; letter-spacing: 0.4em; opacity: 0.5; text-transform: uppercase; margin-bottom: 1rem; }
+  .about-title { font-size: clamp(3rem, 7vw, 6rem); font-weight: 900; letter-spacing: -0.03em; margin-bottom: 3rem; }
+  .about-bio {
+    font-size: 1.4rem;
+    line-height: 1.6;
+    max-width: 40rem;
+    margin: 0 auto 4rem;
+    color: #d8d8d8;
+  }
+  .about-contact {
+    display: flex;
+    justify-content: center;
+    gap: 4rem;
+    flex-wrap: wrap;
+    border-top: 1px solid #222;
+    padding-top: 3rem;
+  }
+  .about-contact > div { text-align: center; }
+  .about-contact dt { font-size: 0.65rem; letter-spacing: 0.3em; opacity: 0.5; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .about-contact dd { font-size: 1rem; font-weight: 700; letter-spacing: 0.05em; }
+
+  footer {
+    padding: 3rem;
+    text-align: center;
+    border-top: 1px solid #222;
+    font-size: 0.7rem;
+    letter-spacing: 0.4em;
+    opacity: 0.4;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<header class="chrome">
+  <div class="chrome-left">A. OFFRET — 2026</div>
+  <nav class="chrome-nav">
+    <a href="#projects">Projects</a>
+    <a href="#gallery">Gallery</a>
+    <a href="#experience">Experience</a>
+    <a href="#about">About</a>
+  </nav>
+  <div class="chrome-right"><span class="lang">EN/FR</span></div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-vignette"></div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">PORTFOLIO · WINTER 2026</div>
+    <h1 class="hero-title">AXEL<br>OFFRET</h1>
+    <div class="hero-meta">
+      <span>3D Artist</span>
+      <span>Sculpteur Numérique · Helsinki</span>
+    </div>
+  </div>
+</section>
+
+<!-- PROJECTS -->
+<section id="projects">
+  <article class="project">
+    <div class="project-hero">
+      <iframe src="https://sketchfab.com/models/441d21b8a12a4971ab67eaac5cef0888/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+      <div class="project-hero-overlay">
+        <div class="project-num">01</div>
+        <div class="project-title-wrap">
+          <div class="project-cat">— Hard Surface</div>
+          <div class="project-title">Tables / Chaises<br>de Bureau</div>
+        </div>
+      </div>
+    </div>
+    <div class="project-info">
+      <p class="project-desc">Setup mobilier complet pour open space. Modélisation hard-surface optimisée pour rendu temps réel et inspection détaillée via embed Sketchfab. 8 chaises haute qualité, table en finition noyer.</p>
+      <div class="project-side">
+        <div class="project-software">
+          <div><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+          <div><img src="https://axel.somerandomcreator.com/media/d0d7885a-e28d-4a79-952b-e9e55efc5099.png"></div>
+          <div><img src="https://axel.somerandomcreator.com/media/dfaab84f-b66c-4d8d-add7-821aa970b57f.png"></div>
+        </div>
+        <div class="project-stats">
+          <div><div class="stat-label">Verts</div><div class="stat-value">46.09K</div></div>
+          <div><div class="stat-label">Edges</div><div class="stat-value">92.10K</div></div>
+          <div><div class="stat-label">Faces</div><div class="stat-value">46.06K</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="project-thumbs">
+      <div><img src="https://axel.somerandomcreator.com/media/7e9ddb78-ba2b-4227-826c-e7310018a3fb.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/4bf6f82e-4d01-4414-9414-fdbcebb83b0c.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/4d0ca325-60b2-461e-a479-666ad36dbf94.png"></div>
+    </div>
+  </article>
+
+  <article class="project">
+    <div class="project-hero">
+      <iframe src="https://sketchfab.com/models/a7bccdc2d8d24ef6814bfed7a3ed3922/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+      <div class="project-hero-overlay">
+        <div class="project-num">02</div>
+        <div class="project-title-wrap">
+          <div class="project-cat">— Organic</div>
+          <div class="project-title">Siège / Table /<br>Lampe Bambou</div>
+        </div>
+      </div>
+    </div>
+    <div class="project-info">
+      <p class="project-desc">Composition mobilier organique avec lampe en bambou et sièges cylindriques. Étude d'éclairage tamisé et matériaux naturels, particulièrement la complexité géométrique du tressage en bambou pendant.</p>
+      <div class="project-side">
+        <div class="project-software">
+          <div><img src="https://axel.somerandomcreator.com/media/dfaab84f-b66c-4d8d-add7-821aa970b57f.png"></div>
+          <div><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+          <div><img src="https://axel.somerandomcreator.com/media/99a22a7c-00a8-4214-a278-8ec1206a2d2b.png"></div>
+        </div>
+        <div class="project-stats">
+          <div><div class="stat-label">Verts</div><div class="stat-value">25.60K</div></div>
+          <div><div class="stat-label">Edges</div><div class="stat-value">51.20K</div></div>
+          <div><div class="stat-label">Faces</div><div class="stat-value">25.55K</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="project-thumbs">
+      <div><img src="https://axel.somerandomcreator.com/media/68d88152-e7ec-4d7c-9d03-f38ed7c37c12.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/47020228-2df0-4ac7-a7ee-7e0a396b6b5d.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/588613c0-a3f9-4504-ad61-9bd500e2eb69.png"></div>
+    </div>
+  </article>
+
+  <article class="project">
+    <div class="project-hero">
+      <iframe src="https://sketchfab.com/models/07dc155556b9403bb4853c9ba2a44a84/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+      <div class="project-hero-overlay">
+        <div class="project-num">03</div>
+        <div class="project-title-wrap">
+          <div class="project-cat">— Density</div>
+          <div class="project-title">Table & Chaises<br>Hautes</div>
+        </div>
+      </div>
+    </div>
+    <div class="project-info">
+      <p class="project-desc">Scène cafétéria/lobby haute densité. 85K vertices, géométrie hard-surface complexe optimisée pour rendu temps réel. Variations subtiles entre les chaises hautes pour casser la répétition visuelle.</p>
+      <div class="project-side">
+        <div class="project-software">
+          <div><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+          <div><img src="https://axel.somerandomcreator.com/media/d0d7885a-e28d-4a79-952b-e9e55efc5099.png"></div>
+        </div>
+        <div class="project-stats">
+          <div><div class="stat-label">Verts</div><div class="stat-value">85.70K</div></div>
+          <div><div class="stat-label">Edges</div><div class="stat-value">171.40K</div></div>
+          <div><div class="stat-label">Faces</div><div class="stat-value">85.65K</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="project-thumbs">
+      <div><img src="https://axel.somerandomcreator.com/media/4113b082-f87b-41f5-9fe1-d18023897aee.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/37933062-0ac9-4808-a0ea-5aef02db90ed.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/6098a92a-d31a-47f4-ae34-d8eebec95c4e.png"></div>
+    </div>
+  </article>
+</section>
+
+<!-- GALLERY -->
+<section class="gallery-section" id="gallery">
+  <div class="gallery-header">
+    <div class="gallery-tag">— Other Work · 08 Items</div>
+    <h2 class="gallery-title">Galerie</h2>
+  </div>
+  <div class="gallery">
+    <a class="g-item" href="#" target="_blank">
+      <img src="https://axel.somerandomcreator.com/media/c5274885-e4bd-4479-b79b-c4ab78ad25e4.png">
+      <div class="g-overlay"><div class="g-num">N°01</div><div class="g-title">Tables Bureau</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <img src="https://axel.somerandomcreator.com/media/96495fa5-6820-441d-ac4b-66ef595e3247.png">
+      <div class="g-overlay"><div class="g-num">N°02</div><div class="g-title">Siège Bambou</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <img src="https://axel.somerandomcreator.com/media/c40e8c21-05be-49d7-9239-156097ed148c.png">
+      <div class="g-overlay"><div class="g-num">N°03</div><div class="g-title">Chaises Hautes</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <img src="https://axel.somerandomcreator.com/media/6606e8c9-7c1b-4786-b624-a21aa862ea6c.png">
+      <div class="g-overlay"><div class="g-num">N°04</div><div class="g-title">Homme Dystopique</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <img src="https://axel.somerandomcreator.com/media/1fc1f99a-1ae4-48f9-8ac2-70adf3c86723.png">
+      <div class="g-overlay"><div class="g-num">N°05</div><div class="g-title">Chien Rétro</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <img src="https://axel.somerandomcreator.com/media/f96557e3-4466-4270-9866-ac3c504f0774.png">
+      <div class="g-overlay"><div class="g-num">N°06</div><div class="g-title">Voiture Dystopique</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <img src="https://axel.somerandomcreator.com/media/242a4d56-8ee5-4f3c-b814-bce7c75550aa.png">
+      <div class="g-overlay"><div class="g-num">N°07</div><div class="g-title">Plésiosaure</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <img src="https://axel.somerandomcreator.com/media/35d7aaf5-4781-48a4-a8d4-39bb3ac1dca2.png">
+      <div class="g-overlay"><div class="g-num">N°08</div><div class="g-title">Spinosaure</div></div>
+    </a>
+  </div>
+</section>
+
+<!-- EXPERIENCE -->
+<section class="exp-section" id="experience">
+  <div class="exp-header">
+    <div class="tag">— Timeline · 03 Roles</div>
+    <div class="title">Expérience</div>
+  </div>
+  <div class="exp-list">
+    <div class="exp-item">
+      <div>
+        <div class="exp-period">2023 — ACT.</div>
+        <div class="exp-period-meta">Helsinki</div>
+      </div>
+      <div>
+        <h3 class="exp-role">Technical Artist 3D</h3>
+        <p class="exp-co">Ailivesim</p>
+        <ul class="exp-bullets">
+          <li>Unreal Engine — Blueprints, Material Editor, Sequencer, Niagara</li>
+          <li>Optimisation assets temps réel — LOD, atlasing, occlusion culling</li>
+          <li>Intégration et gestion d'assets 3D, pipelines de production</li>
+          <li>Lumen, Nanite, Ray Tracing pour rendu avancé</li>
+        </ul>
+      </div>
+    </div>
+    <div class="exp-item">
+      <div>
+        <div class="exp-period">12.22 — 04.23</div>
+        <div class="exp-period-meta">Denizli</div>
+      </div>
+      <div>
+        <h3 class="exp-role">Multimedia Generalist</h3>
+        <p class="exp-co">Polyverse Life</p>
+        <ul class="exp-bullets">
+          <li>Modélisation low/high poly pour jeux vidéo, archi, animation</li>
+          <li>Création d'environnements et scènes 3D</li>
+          <li>Animation personnages/objets/caméras (shape keys, drivers, rigs)</li>
+          <li>Maîtrise Cycles et Eevee</li>
+        </ul>
+      </div>
+    </div>
+    <div class="exp-item">
+      <div>
+        <div class="exp-period">2022</div>
+        <div class="exp-period-meta">Denizli</div>
+      </div>
+      <div>
+        <h3 class="exp-role">3D Artist</h3>
+        <p class="exp-co">Funika Games</p>
+        <ul class="exp-bullets">
+          <li>Unity — Editor, Prefabs, Timeline, Shader Graph, VFX Graph</li>
+          <li>Modélisation low/high poly pour jeux vidéo</li>
+          <li>Animation et rigging dans Unity (Animator, IK, Mocap)</li>
+          <li>Retopologie et baking (normal maps, AO, roughness)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="about-section" id="about">
+  <div class="about-tag">— Bio · Contact</div>
+  <h2 class="about-title">À Propos</h2>
+  <p class="about-bio">Salut! Je suis un Artiste avec de l'expérience dans le domaine du design graphique et de la modélisation 3D. J'ai une forte passion pour la création de modèles 3D, et je m'efforce toujours d'améliorer mes compétences dans ce domaine.</p>
+  <div class="about-contact">
+    <div><dt>Phone</dt><dd>+33 6 51 63 50 08</dd></div>
+    <div><dt>Mail</dt><dd>AXEL.OFFRET@GMAIL.COM</dd></div>
+    <div><dt>Instagram</dt><dd>AXEL.OFFRET</dd></div>
+    <div><dt>Location</dt><dd>HELSINKI · FI</dd></div>
+  </div>
+</section>
+
+<footer>AXEL OFFRET — PORTFOLIO 2026 — ALL RIGHTS RESERVED</footer>
+
+</body>
+</html>

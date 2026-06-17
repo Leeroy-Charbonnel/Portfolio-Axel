@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>03 — Magazine · Axel Offret</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    background: #0d0a08;
+    color: #ddd5c8;
+    font-family: "Inter", sans-serif;
+    min-height: 100vh;
+    position: relative;
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.18;
+    mix-blend-mode: overlay;
+    z-index: 200;
+  }
+  .wrap { max-width: 70rem; margin: 0 auto; padding: 4rem 3rem 6rem; position: relative; z-index: 1; }
+
+  /*HEADER masthead*/
+  .masthead {
+    border-top: 4px double #888;
+    border-bottom: 1px solid #444;
+    padding: 1.5rem 0;
+    text-align: center;
+    margin-bottom: 5rem;
+    font-family: "Cormorant Garamond", serif;
+  }
+  .masthead-title {
+    font-size: 0.85rem;
+    letter-spacing: 0.5em;
+    color: #999;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .masthead-issue {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    color: #777;
+    text-transform: uppercase;
+    font-style: italic;
+  }
+
+  /*HERO*/
+  .hero { text-align: center; margin-bottom: 6rem; }
+  .hero-eyebrow {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #999;
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+  }
+  .hero-title {
+    font-family: "Cormorant Garamond", serif;
+    font-size: clamp(4rem, 10vw, 8rem);
+    line-height: 1;
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 1rem;
+  }
+  .hero-dash {
+    width: 4rem;
+    height: 1px;
+    background: #888;
+    margin: 2rem auto;
+  }
+  .hero-sub {
+    font-size: 0.85rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: #b0a896;
+  }
+
+  /*FEATURE / PROJECT*/
+  .feature { margin-bottom: 6rem; padding-top: 3rem; border-top: 1px solid #333; }
+  .feature-cat {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #c9a875;
+    font-size: 1rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+  .feature-num {
+    text-align: center;
+    font-family: "Cormorant Garamond", serif;
+    font-size: 4rem;
+    color: transparent;
+    -webkit-text-stroke: 1px #888;
+    letter-spacing: -0.04em;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+  .feature-title {
+    text-align: center;
+    font-family: "Cormorant Garamond", serif;
+    font-size: 3rem;
+    line-height: 1.05;
+    color: #fff;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    max-width: 32rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .feature-deck {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    text-align: center;
+    color: #b0a896;
+    font-size: 1.2rem;
+    line-height: 1.5;
+    max-width: 36rem;
+    margin: 0 auto 3rem;
+  }
+
+  .feature-viewer { aspect-ratio: 16/10; border: 1px solid #2a2620; overflow: hidden; margin-bottom: 0.5rem; }
+  .feature-viewer iframe { width: 100%; height: 100%; border: 0; }
+  .feature-cap {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    text-align: center;
+    color: #888;
+    font-size: 0.85rem;
+    margin-bottom: 3rem;
+  }
+
+  /*2-COLUMN BODY*/
+  .feature-body {
+    column-count: 2;
+    column-gap: 3rem;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #c8c0b0;
+    margin-bottom: 3rem;
+    column-rule: 1px solid #2a2620;
+  }
+  .feature-body::first-letter {
+    font-family: "Cormorant Garamond", serif;
+    font-weight: 700;
+    font-size: 4rem;
+    float: left;
+    line-height: 0.85;
+    margin: 0.2rem 0.5rem 0 0;
+    color: #c9a875;
+  }
+
+  /*PULL QUOTE*/
+  .pull-quote {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    font-size: 1.8rem;
+    line-height: 1.4;
+    color: #fff;
+    text-align: center;
+    padding: 2rem;
+    border-top: 1px solid #444;
+    border-bottom: 1px solid #444;
+    margin: 3rem 0;
+    max-width: 36rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /*STATS / META row*/
+  .feature-meta {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    border-top: 1px solid #2a2620;
+    padding-top: 2rem;
+    margin-top: 3rem;
+  }
+  .meta-item { text-align: center; }
+  .meta-label {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #888;
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+  }
+  .meta-value {
+    font-family: "Cormorant Garamond", serif;
+    color: #fff;
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+
+  .feature-thumbs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 3rem;
+  }
+  .feature-thumbs > div { aspect-ratio: 4/3; border: 1px solid #2a2620; overflow: hidden; }
+  .feature-thumbs img { width: 100%; height: 100%; object-fit: cover; }
+
+  /*SECTION TITLE*/
+  .section-title {
+    text-align: center;
+    margin: 6rem 0 3rem;
+  }
+  .section-title-tag {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #c9a875;
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+  .section-title h2 {
+    font-family: "Cormorant Garamond", serif;
+    font-size: 4rem;
+    line-height: 1;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  /*GALLERY - editorial grid*/
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 3rem;
+  }
+  .g-item {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+  }
+  .g-img {
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.5rem;
+  }
+  .g-img img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85); transition: filter 0.3s; }
+  .g-item:hover .g-img img { filter: saturate(1); }
+  .g-num {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #c9a875;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .g-title {
+    font-family: "Cormorant Garamond", serif;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    color: #fff;
+    margin-bottom: 0.4rem;
+  }
+  .g-meta {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #888;
+    font-size: 0.85rem;
+  }
+
+  /*EXP*/
+  .exp { max-width: 50rem; margin: 0 auto; }
+  .exp-item {
+    padding: 2.5rem 0;
+    border-bottom: 1px solid #2a2620;
+    text-align: center;
+  }
+  .exp-year {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #c9a875;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+  .exp-role {
+    font-family: "Cormorant Garamond", serif;
+    font-size: 2rem;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+  .exp-co {
+    font-style: italic;
+    color: #888;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+  .exp-body {
+    column-count: 2;
+    column-gap: 2rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #b8b0a0;
+    text-align: left;
+  }
+
+  /*ABOUT*/
+  .about { max-width: 48rem; margin: 0 auto; text-align: center; }
+  .about-bio {
+    font-family: "Cormorant Garamond", serif;
+    font-size: 1.4rem;
+    line-height: 1.6;
+    color: #d8d0c0;
+    margin-bottom: 3rem;
+    font-style: italic;
+  }
+  .about-contact dl {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #333;
+    padding: 2rem 0;
+    margin-bottom: 3rem;
+  }
+  .about-contact dt {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #888;
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+  }
+  .about-contact dd { color: #fff; font-size: 0.95rem; letter-spacing: 0.05em; }
+
+  footer {
+    text-align: center;
+    border-top: 4px double #888;
+    margin-top: 6rem;
+    padding-top: 2rem;
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    color: #888;
+    font-size: 0.95rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="masthead-title">A · O — Portfolio</div>
+    <div class="masthead-issue">Édition N°01 — Hiver 2026</div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-eyebrow">Présenté par —</div>
+    <h1 class="hero-title">Axel Offret</h1>
+    <div class="hero-dash"></div>
+    <div class="hero-sub">3D Artist · Sculpteur Numérique</div>
+  </section>
+
+  <article class="feature">
+    <div class="feature-cat">— Pièce Numéro Un —</div>
+    <div class="feature-num">01</div>
+    <h2 class="feature-title">Tables & Chaises de Bureau</h2>
+    <p class="feature-deck">Une étude minutieuse du mobilier d'open space, où chaque sommet a été placé avec l'attention d'un horloger. 46 091 vertices au service d'une idée simple : la table qui sert de table.</p>
+
+    <div class="feature-viewer">
+      <iframe src="https://sketchfab.com/models/441d21b8a12a4971ab67eaac5cef0888/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+    <p class="feature-cap">Vue principale — explorez en cliquant et glissant le modèle</p>
+
+    <div class="feature-body">
+      Magnificent 3D model of a table, slightly borrowed from my work, with 8 high-quality chairs, raised outdoors. The table is a table-type table, which among other things serves as a table. Le travail commence par la silhouette, gros plans abstraits qui définissent les volumes, puis affinage progressif jusqu'à la topologie finale. L'éclairage cherche la simplicité — un seul soleil orienté, des rebonds doux. Le matériau du plateau alterne entre noyer huilé et stratifié, selon le contexte de présentation.
+    </div>
+
+    <div class="pull-quote">« La table est une table de type table, qui permet entre autre de servir de table. »</div>
+
+    <div class="feature-meta">
+      <div class="meta-item"><div class="meta-label">Vertices</div><div class="meta-value">46,091</div></div>
+      <div class="meta-item"><div class="meta-label">Edges</div><div class="meta-value">92,096</div></div>
+      <div class="meta-item"><div class="meta-label">Faces</div><div class="meta-value">46,060</div></div>
+      <div class="meta-item"><div class="meta-label">Année</div><div class="meta-value">2025</div></div>
+    </div>
+
+    <div class="feature-thumbs">
+      <div><img src="https://axel.somerandomcreator.com/media/7e9ddb78-ba2b-4227-826c-e7310018a3fb.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/4bf6f82e-4d01-4414-9414-fdbcebb83b0c.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/4d0ca325-60b2-461e-a479-666ad36dbf94.png"></div>
+    </div>
+  </article>
+
+  <article class="feature">
+    <div class="feature-cat">— Pièce Numéro Deux —</div>
+    <div class="feature-num">02</div>
+    <h2 class="feature-title">Siège, Table, et Lampe en Bambou</h2>
+    <p class="feature-deck">Composition douce où l'organique rencontre le géométrique. Une lampe pendante éclaire trois sièges cylindriques, autour d'une table en bois massif (ou contreplaqué, ne le dites à personne).</p>
+
+    <div class="feature-viewer">
+      <iframe src="https://sketchfab.com/models/a7bccdc2d8d24ef6814bfed7a3ed3922/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+    <p class="feature-cap">Composition complète — lampe, table, sièges cylindriques</p>
+
+    <div class="feature-body">
+      Siège de type cylindre, autour d'une table en bois massif (c'est faux, c'est clairement du contreplaqué ikea avec un vinyl dessus), accompagné de sa lampe en bambou (pas du tout de ikea non plus d'ailleurs). Étude de matériaux organiques, particulièrement le travail du bambou tressé et les textures de bois huilé. La complexité géométrique se concentre dans la lampe pendante, dont chaque brin de bambou suit une courbe douce sans répétition.
+    </div>
+
+    <div class="feature-meta">
+      <div class="meta-item"><div class="meta-label">Vertices</div><div class="meta-value">25,600</div></div>
+      <div class="meta-item"><div class="meta-label">Edges</div><div class="meta-value">51,200</div></div>
+      <div class="meta-item"><div class="meta-label">Faces</div><div class="meta-value">25,550</div></div>
+      <div class="meta-item"><div class="meta-label">Année</div><div class="meta-value">2025</div></div>
+    </div>
+
+    <div class="feature-thumbs">
+      <div><img src="https://axel.somerandomcreator.com/media/68d88152-e7ec-4d7c-9d03-f38ed7c37c12.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/47020228-2df0-4ac7-a7ee-7e0a396b6b5d.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/588613c0-a3f9-4504-ad61-9bd500e2eb69.png"></div>
+    </div>
+  </article>
+
+  <article class="feature">
+    <div class="feature-cat">— Pièce Numéro Trois —</div>
+    <div class="feature-num">03</div>
+    <h2 class="feature-title">Table Haute & Chaises Hautes</h2>
+    <p class="feature-deck">Scène cafétéria haute densité. 85 700 vertices arrangés en harmonie pour un lobby ou un coin de pause moderne.</p>
+
+    <div class="feature-viewer">
+      <iframe src="https://sketchfab.com/models/07dc155556b9403bb4853c9ba2a44a84/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+    <p class="feature-cap">Setup complet — table haute centrale entourée de chaises hautes</p>
+
+    <div class="feature-body">
+      Encore et toujours des meubles, toujours et encore yoinké de mon modèle 3D de cafète de mon boulot, ne m'attaquez toujours pas en justice, ça me ferait plaisir de pas aller en prison, merci. Le challenge ici tient dans la densité — 85K vertices pour une scène complète tout en restant temps-réel friendly. Chaque chaise haute possède son micro-jeu de proportions pour casser la répétition.
+    </div>
+
+    <div class="feature-meta">
+      <div class="meta-item"><div class="meta-label">Vertices</div><div class="meta-value">85,700</div></div>
+      <div class="meta-item"><div class="meta-label">Edges</div><div class="meta-value">171,400</div></div>
+      <div class="meta-item"><div class="meta-label">Faces</div><div class="meta-value">85,650</div></div>
+      <div class="meta-item"><div class="meta-label">Année</div><div class="meta-value">2025</div></div>
+    </div>
+
+    <div class="feature-thumbs">
+      <div><img src="https://axel.somerandomcreator.com/media/4113b082-f87b-41f5-9fe1-d18023897aee.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/37933062-0ac9-4808-a0ea-5aef02db90ed.png"></div>
+      <div><img src="https://axel.somerandomcreator.com/media/6098a92a-d31a-47f4-ae34-d8eebec95c4e.png"></div>
+    </div>
+  </article>
+
+  <section class="section-title">
+    <div class="section-title-tag">— Galerie —</div>
+    <h2>Autres Travaux</h2>
+  </section>
+
+  <div class="gallery">
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-img"><img src="https://axel.somerandomcreator.com/media/6606e8c9-7c1b-4786-b624-a21aa862ea6c.png"></div>
+      <div class="g-num">N°01</div>
+      <div class="g-title">Homme Dystopique</div>
+      <div class="g-meta">Low-poly · 2024</div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-img"><img src="https://axel.somerandomcreator.com/media/1fc1f99a-1ae4-48f9-8ac2-70adf3c86723.png"></div>
+      <div class="g-num">N°02</div>
+      <div class="g-title">Chien Rétro-Futuriste</div>
+      <div class="g-meta">Low-poly · 2024</div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-img"><img src="https://axel.somerandomcreator.com/media/f96557e3-4466-4270-9866-ac3c504f0774.png"></div>
+      <div class="g-num">N°03</div>
+      <div class="g-title">Voiture Dystopique</div>
+      <div class="g-meta">Low-poly · 2024</div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-img"><img src="https://axel.somerandomcreator.com/media/242a4d56-8ee5-4f3c-b814-bce7c75550aa.png"></div>
+      <div class="g-num">N°04</div>
+      <div class="g-title">Plésiosaure Mignon</div>
+      <div class="g-meta">Cute · 2023</div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-img"><img src="https://axel.somerandomcreator.com/media/35d7aaf5-4781-48a4-a8d4-39bb3ac1dca2.png"></div>
+      <div class="g-num">N°05</div>
+      <div class="g-title">Spinosaure Mignon</div>
+      <div class="g-meta">Cute · 2023</div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-img"><img src="https://axel.somerandomcreator.com/media/c5274885-e4bd-4479-b79b-c4ab78ad25e4.png"></div>
+      <div class="g-num">N°06</div>
+      <div class="g-title">Bureaux — Vue Alternative</div>
+      <div class="g-meta">Hard-surface · 2025</div>
+    </a>
+  </div>
+
+  <section class="section-title">
+    <div class="section-title-tag">— Parcours —</div>
+    <h2>Expérience</h2>
+  </section>
+
+  <div class="exp">
+    <div class="exp-item">
+      <div class="exp-year">2023 — Présent</div>
+      <h3 class="exp-role">Technical Artist 3D</h3>
+      <p class="exp-co">Ailivesim · Helsinki</p>
+      <div class="exp-body">Maîtrise d'Unreal Engine (Blueprints, Material Editor, Sequencer, Niagara). Optimisation des assets pour le temps réel — LOD, texture atlasing, occlusion culling. Intégration et gestion d'assets 3D dans Unreal Engine. Connaissance des pipelines de production et utilisation de Lumen, Nanite et Ray Tracing pour le rendu avancé.</div>
+    </div>
+    <div class="exp-item">
+      <div class="exp-year">12.2022 — 04.2023</div>
+      <h3 class="exp-role">Multimedia Generalist</h3>
+      <p class="exp-co">Polyverse Life · Denizli</p>
+      <div class="exp-body">Modélisation low poly et high poly pour jeux vidéo, animation et architecture. Création d'environnements 3D et de scènes. Animation 3D personnages, objets et caméras avec shape keys, drivers et des rigs custom. Maîtrise des moteurs de rendu Cycles et Eevee.</div>
+    </div>
+    <div class="exp-item">
+      <div class="exp-year">01.2022 — 12.2022</div>
+      <h3 class="exp-role">3D Artist</h3>
+      <p class="exp-co">Funika Games · Denizli</p>
+      <div class="exp-body">Maîtrise d'Unity (Editor, Prefabs, Timeline, Shader Graph, VFX Graph). Modélisation et rigging low poly et high poly pour jeux vidéo. Animation et rigging dans Unity (Animator, IK, Mocap). Retopologie et baking de textures (normal maps, AO, roughness).</div>
+    </div>
+  </div>
+
+  <section class="section-title">
+    <div class="section-title-tag">— Mot de l'Auteur —</div>
+    <h2>À Propos</h2>
+  </section>
+
+  <div class="about">
+    <p class="about-bio">« Salut! Je suis un Artiste avec de l'expérience dans le domaine du design graphique et de la modélisation 3D. J'ai une forte passion pour la création de modèles 3D, et je m'efforce toujours d'améliorer mes compétences et mes connaissances dans ce domaine. »</p>
+
+    <div class="about-contact">
+      <dl>
+        <dt>Phone</dt><dd>+33 6 51 63 50 08</dd>
+        <dt>Mail</dt><dd>axel.offret@gmail.com</dd>
+        <dt>Insta</dt><dd>@axel.offret</dd>
+      </dl>
+    </div>
+  </div>
+
+  <footer>Axel Offret · Édition N°01 · 2026</footer>
+
+</div>
+</body>
+</html>

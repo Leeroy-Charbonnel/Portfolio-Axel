@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>02 — Grid · Axel Offret</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    background: #0a0a0a;
+    color: #d0d0d0;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    position: relative;
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.16;
+    mix-blend-mode: overlay;
+    z-index: 200;
+  }
+  /*12-COL GRID OVERLAY VISIBLE*/
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    padding: 0 3rem;
+    gap: 1rem;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .grid-bg > div { border-left: 1px solid rgba(255,255,255,0.04); }
+  .grid-bg > div:last-child { border-right: 1px solid rgba(255,255,255,0.04); }
+
+  .wrap { padding: 3rem; max-width: 1600px; margin: 0 auto; position: relative; z-index: 1; }
+  .ruled-top {
+    display: flex;
+    justify-content: space-between;
+    border-top: 2px solid #fff;
+    border-bottom: 1px solid #333;
+    padding: 1rem 0;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #888;
+    margin-bottom: 8rem;
+  }
+
+  .hero { padding: 4rem 0 8rem; }
+  .hero-num {
+    font-size: 1rem;
+    color: #666;
+    letter-spacing: 0.4em;
+    margin-bottom: 2rem;
+  }
+  .hero-title {
+    font-size: clamp(5rem, 14vw, 12rem);
+    line-height: 0.85;
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 2px #fff;
+    letter-spacing: -0.05em;
+    margin-bottom: 1rem;
+  }
+  .hero-sub-row {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1rem;
+    border-top: 1px solid #333;
+    padding-top: 1.5rem;
+    margin-top: 3rem;
+  }
+  .hero-sub-row > span:nth-child(1) { grid-column: 1 / 4; font-size: 0.75rem; letter-spacing: 0.3em; text-transform: uppercase; color: #888; }
+  .hero-sub-row > span:nth-child(2) { grid-column: 5 / 9; font-size: 0.75rem; letter-spacing: 0.3em; text-transform: uppercase; color: #fff; }
+  .hero-sub-row > span:nth-child(3) { grid-column: 10 / 13; font-size: 0.75rem; letter-spacing: 0.3em; text-transform: uppercase; color: #888; text-align: right; }
+
+  .section-header {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1rem;
+    border-top: 2px solid #fff;
+    padding-top: 1rem;
+    margin: 6rem 0 3rem;
+    align-items: baseline;
+  }
+  .section-header h2 {
+    grid-column: 1 / 7;
+    font-size: 2.5rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    color: #fff;
+  }
+  .section-header .meta {
+    grid-column: 9 / 13;
+    text-align: right;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #888;
+  }
+
+  /*PROJECT*/
+  .project {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1rem;
+    margin-bottom: 6rem;
+    padding-bottom: 3rem;
+    border-bottom: 1px solid #222;
+  }
+  .p-num {
+    grid-column: 1 / 3;
+    font-size: 8rem;
+    line-height: 0.85;
+    color: transparent;
+    -webkit-text-stroke: 2px #fff;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+  }
+  .p-title-wrap { grid-column: 3 / 8; padding-top: 1rem; }
+  .p-title {
+    font-size: 2rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    line-height: 1;
+    margin-bottom: 1rem;
+    color: #fff;
+  }
+  .p-desc {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #aaa;
+    margin-bottom: 1.5rem;
+  }
+  .p-software {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0;
+  }
+  .p-sw { width: 2.5rem; height: 2.5rem; border: 1px solid #555; padding: 0.3rem; }
+  .p-sw img { width: 100%; height: 100%; object-fit: contain; }
+
+  .p-stats { grid-column: 9 / 13; padding-top: 1rem; }
+  .p-stats > div {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed #333;
+    font-size: 0.85rem;
+  }
+  .p-stats span:first-child { color: #777; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.7rem; }
+  .p-stats span:last-child { color: #fff; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+  .p-viewer { grid-column: 1 / 9; margin-top: 2rem; aspect-ratio: 16/10; border: 1px solid #2a2a2a; overflow: hidden; }
+  .p-viewer iframe { width: 100%; height: 100%; border: 0; }
+
+  .p-thumbs { grid-column: 9 / 13; margin-top: 2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .p-thumb { aspect-ratio: 4/3; border: 1px solid #2a2a2a; overflow: hidden; }
+  .p-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+  /*GALLERY*/
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+  .g-item {
+    border: 1px solid #2a2a2a;
+    background: #0e0e0e;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+  }
+  .g-item-img { aspect-ratio: 4/3; overflow: hidden; }
+  .g-item-img img { width: 100%; height: 100%; object-fit: cover; }
+  .g-item-body { padding: 1rem; border-top: 1px solid #2a2a2a; }
+  .g-item-num { font-size: 0.7rem; color: #666; letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 0.4rem; }
+  .g-item-title { font-size: 0.85rem; color: #fff; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; line-height: 1.3; }
+
+  /*EXP - rule-based table*/
+  .exp-table { width: 100%; border-collapse: collapse; }
+  .exp-table tr { border-bottom: 1px solid #222; }
+  .exp-table td {
+    padding: 1.5rem 1rem;
+    vertical-align: top;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .exp-table td:nth-child(1) { width: 15%; color: #fff; font-weight: 900; letter-spacing: 0.05em; }
+  .exp-table td:nth-child(2) { width: 30%; }
+  .exp-table td:nth-child(2) .role { color: #fff; font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .exp-table td:nth-child(2) .co { color: #888; font-size: 0.75rem; margin-top: 0.25rem; }
+  .exp-table td:nth-child(3) { color: #aaa; }
+  .exp-table td:nth-child(3) ul { list-style: none; padding: 0; }
+  .exp-table td:nth-child(3) li { padding-left: 1rem; position: relative; margin-bottom: 0.3rem; }
+  .exp-table td:nth-child(3) li::before { content: "—"; position: absolute; left: 0; color: #555; }
+
+  /*ABOUT*/
+  .about-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; }
+  .about-text { grid-column: 1 / 7; font-size: 1.05rem; line-height: 1.7; color: #b8b8b8; padding-right: 2rem; }
+  .about-contact { grid-column: 8 / 13; }
+  .about-contact dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.6rem 2rem; font-size: 0.85rem; }
+  .about-contact dt { color: #666; text-transform: uppercase; letter-spacing: 0.2em; font-size: 0.7rem; align-self: center; }
+  .about-contact dd { color: #fff; font-variant-numeric: tabular-nums; }
+
+  footer {
+    margin-top: 8rem;
+    padding-top: 1rem;
+    border-top: 2px solid #fff;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg">
+  <div></div><div></div><div></div><div></div><div></div><div></div>
+  <div></div><div></div><div></div><div></div><div></div><div></div>
+</div>
+
+<div class="wrap">
+
+  <div class="ruled-top">
+    <span>AXEL OFFRET · PORTFOLIO</span>
+    <span>2026 · v.01</span>
+    <span>HELSINKI · FINLAND</span>
+  </div>
+
+  <section class="hero">
+    <div class="hero-num">N°01 — INTRO</div>
+    <h1 class="hero-title">AXEL<br>OFFRET</h1>
+    <div class="hero-sub-row">
+      <span>3D Artist</span>
+      <span>Sculpteur Numérique</span>
+      <span>2026 / Portfolio</span>
+    </div>
+  </section>
+
+  <section class="section-header">
+    <h2>Main Projects</h2>
+    <div class="meta">03 — Items</div>
+  </section>
+
+  <article class="project">
+    <div class="p-num">01</div>
+    <div class="p-title-wrap">
+      <h3 class="p-title">Tables / Chaises de Bureau</h3>
+      <p class="p-desc">Mobilier d'open space pour projet d'aménagement intérieur. Modélisation hard-surface optimisée pour rendu temps réel et inspection détaillée.</p>
+      <div class="p-software">
+        <div class="p-sw"><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+        <div class="p-sw"><img src="https://axel.somerandomcreator.com/media/d0d7885a-e28d-4a79-952b-e9e55efc5099.png"></div>
+        <div class="p-sw"><img src="https://axel.somerandomcreator.com/media/dfaab84f-b66c-4d8d-add7-821aa970b57f.png"></div>
+      </div>
+    </div>
+    <div class="p-stats">
+      <div><span>Vertices</span><span>46.09K</span></div>
+      <div><span>Edges</span><span>92.10K</span></div>
+      <div><span>Faces</span><span>46.06K</span></div>
+      <div><span>Renderer</span><span>Eevee</span></div>
+      <div><span>Year</span><span>2025</span></div>
+    </div>
+    <div class="p-viewer">
+      <iframe src="https://sketchfab.com/models/441d21b8a12a4971ab67eaac5cef0888/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+    <div class="p-thumbs">
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/7e9ddb78-ba2b-4227-826c-e7310018a3fb.png"></div>
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/4bf6f82e-4d01-4414-9414-fdbcebb83b0c.png"></div>
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/4d0ca325-60b2-461e-a479-666ad36dbf94.png"></div>
+    </div>
+  </article>
+
+  <article class="project">
+    <div class="p-num">02</div>
+    <div class="p-title-wrap">
+      <h3 class="p-title">Siège / Table / Lampe Bambou</h3>
+      <p class="p-desc">Composition mobilier organique avec lampe en bambou et sièges cylindriques. Étude d'éclairage tamisé et matériaux naturels.</p>
+      <div class="p-software">
+        <div class="p-sw"><img src="https://axel.somerandomcreator.com/media/dfaab84f-b66c-4d8d-add7-821aa970b57f.png"></div>
+        <div class="p-sw"><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+        <div class="p-sw"><img src="https://axel.somerandomcreator.com/media/99a22a7c-00a8-4214-a278-8ec1206a2d2b.png"></div>
+      </div>
+    </div>
+    <div class="p-stats">
+      <div><span>Vertices</span><span>25.60K</span></div>
+      <div><span>Edges</span><span>51.20K</span></div>
+      <div><span>Faces</span><span>25.55K</span></div>
+      <div><span>Renderer</span><span>Cycles</span></div>
+      <div><span>Year</span><span>2025</span></div>
+    </div>
+    <div class="p-viewer">
+      <iframe src="https://sketchfab.com/models/a7bccdc2d8d24ef6814bfed7a3ed3922/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+    <div class="p-thumbs">
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/68d88152-e7ec-4d7c-9d03-f38ed7c37c12.png"></div>
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/47020228-2df0-4ac7-a7ee-7e0a396b6b5d.png"></div>
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/588613c0-a3f9-4504-ad61-9bd500e2eb69.png"></div>
+    </div>
+  </article>
+
+  <article class="project">
+    <div class="p-num">03</div>
+    <div class="p-title-wrap">
+      <h3 class="p-title">Table & Chaises Hautes</h3>
+      <p class="p-desc">Scène cafétéria/lobby haute densité. 85K vertices, géométrie hard-surface complexe optimisée pour rendu temps réel.</p>
+      <div class="p-software">
+        <div class="p-sw"><img src="https://axel.somerandomcreator.com/media/0af07019-220b-4929-a1d5-2327477bae93.png"></div>
+        <div class="p-sw"><img src="https://axel.somerandomcreator.com/media/d0d7885a-e28d-4a79-952b-e9e55efc5099.png"></div>
+      </div>
+    </div>
+    <div class="p-stats">
+      <div><span>Vertices</span><span>85.70K</span></div>
+      <div><span>Edges</span><span>171.40K</span></div>
+      <div><span>Faces</span><span>85.65K</span></div>
+      <div><span>Renderer</span><span>Eevee</span></div>
+      <div><span>Year</span><span>2025</span></div>
+    </div>
+    <div class="p-viewer">
+      <iframe src="https://sketchfab.com/models/07dc155556b9403bb4853c9ba2a44a84/embed?autostart=0&ui_controls=0&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0"></iframe>
+    </div>
+    <div class="p-thumbs">
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/4113b082-f87b-41f5-9fe1-d18023897aee.png"></div>
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/37933062-0ac9-4808-a0ea-5aef02db90ed.png"></div>
+      <div class="p-thumb"><img src="https://axel.somerandomcreator.com/media/6098a92a-d31a-47f4-ae34-d8eebec95c4e.png"></div>
+    </div>
+  </article>
+
+  <section class="section-header">
+    <h2>Gallery</h2>
+    <div class="meta">08 — Items</div>
+  </section>
+
+  <div class="gallery">
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-item-img"><img src="https://axel.somerandomcreator.com/media/c5274885-e4bd-4479-b79b-c4ab78ad25e4.png"></div>
+      <div class="g-item-body"><div class="g-item-num">01</div><div class="g-item-title">Tables Bureau</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-item-img"><img src="https://axel.somerandomcreator.com/media/96495fa5-6820-441d-ac4b-66ef595e3247.png"></div>
+      <div class="g-item-body"><div class="g-item-num">02</div><div class="g-item-title">Siège Bambou</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-item-img"><img src="https://axel.somerandomcreator.com/media/c40e8c21-05be-49d7-9239-156097ed148c.png"></div>
+      <div class="g-item-body"><div class="g-item-num">03</div><div class="g-item-title">Chaises Hautes</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-item-img"><img src="https://axel.somerandomcreator.com/media/6606e8c9-7c1b-4786-b624-a21aa862ea6c.png"></div>
+      <div class="g-item-body"><div class="g-item-num">04</div><div class="g-item-title">Homme Dystopique</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-item-img"><img src="https://axel.somerandomcreator.com/media/1fc1f99a-1ae4-48f9-8ac2-70adf3c86723.png"></div>
+      <div class="g-item-body"><div class="g-item-num">05</div><div class="g-item-title">Chien Rétro-Futuriste</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-item-img"><img src="https://axel.somerandomcreator.com/media/f96557e3-4466-4270-9866-ac3c504f0774.png"></div>
+      <div class="g-item-body"><div class="g-item-num">06</div><div class="g-item-title">Voiture Dystopique</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-item-img"><img src="https://axel.somerandomcreator.com/media/242a4d56-8ee5-4f3c-b814-bce7c75550aa.png"></div>
+      <div class="g-item-body"><div class="g-item-num">07</div><div class="g-item-title">Plésiosaure</div></div>
+    </a>
+    <a class="g-item" href="#" target="_blank">
+      <div class="g-item-img"><img src="https://axel.somerandomcreator.com/media/35d7aaf5-4781-48a4-a8d4-39bb3ac1dca2.png"></div>
+      <div class="g-item-body"><div class="g-item-num">08</div><div class="g-item-title">Spinosaure</div></div>
+    </a>
+  </div>
+
+  <section class="section-header">
+    <h2>Experience</h2>
+    <div class="meta">03 — Roles</div>
+  </section>
+
+  <table class="exp-table">
+    <tr>
+      <td>06.2023 — ACT.</td>
+      <td><div class="role">Tech Artist 3D</div><div class="co">Ailivesim · Helsinki</div></td>
+      <td><ul><li>Maîtrise Unreal Engine (Blueprints, Material Editor, Niagara, Sequencer)</li><li>Optimisation assets temps réel (LOD, atlasing, occlusion culling)</li><li>Intégration et gestion d'assets 3D dans Unreal Engine</li><li>Connaissance pipelines de production</li><li>Lumen, Nanite et Ray Tracing pour rendu avancé</li></ul></td>
+    </tr>
+    <tr>
+      <td>12.2022 — 04.2023</td>
+      <td><div class="role">Multimedia Generalist</div><div class="co">Polyverse Life · Denizli</div></td>
+      <td><ul><li>Modélisation low/high poly pour jeux vidéo, animation, architecture</li><li>Création d'environnements et scènes 3D</li><li>Animation 3D personnages/objets/caméras (shape keys, drivers, rigs custom)</li><li>Maîtrise des moteurs Cycles et Eevee</li></ul></td>
+    </tr>
+    <tr>
+      <td>01.2022 — 12.2022</td>
+      <td><div class="role">3D Artist</div><div class="co">Funika Games · Denizli</div></td>
+      <td><ul><li>Maîtrise Unity (Editor, Prefabs, Timeline, Shader Graph, VFX Graph)</li><li>Modélisation low/high poly pour jeux vidéo</li><li>Animation et rigging dans Unity (Animator, IK, Mocap)</li><li>Retopologie et baking de textures (normal maps, AO, roughness)</li></ul></td>
+    </tr>
+  </table>
+
+  <section class="section-header">
+    <h2>About</h2>
+    <div class="meta">Bio · Contact</div>
+  </section>
+
+  <div class="about-grid">
+    <div class="about-text">
+      Salut! Je suis un Artiste avec de l'expérience dans le domaine du design graphique et de la modélisation 3D. J'ai une forte passion pour la création de modèles 3D, et je m'efforce toujours d'améliorer mes compétences et mes connaissances dans ce domaine.
+    </div>
+    <div class="about-contact">
+      <dl>
+        <dt>Phone</dt><dd>+33 6 51 63 50 08</dd>
+        <dt>Mail</dt><dd>AXEL.OFFRET@GMAIL.COM</dd>
+        <dt>Insta</dt><dd>AXEL.OFFRET</dd>
+        <dt>Loc.</dt><dd>Helsinki — Finland</dd>
+        <dt>Games</dt><dd>BOARD · VIDEO · TTRPG</dd>
+        <dt>Art</dt><dd>DRAWING · PAINTING · MODELLING</dd>
+      </dl>
+    </div>
+  </div>
+
+  <footer>
+    <span>AXEL OFFRET</span>
+    <span>PORTFOLIO 2026</span>
+    <span>ALL RIGHTS RESERVED</span>
+  </footer>
+
+</div>
+</body>
+</html>

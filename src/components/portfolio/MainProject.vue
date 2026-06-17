@@ -122,6 +122,13 @@ function initSketchfab() {
       autostart:   1,
       preload:     1,
       ui_controls: 0,
+      ui_infos:    0,
+      ui_inspector:0,
+      ui_stop:     0,
+      ui_watermark:0,
+      //transparent background so the 3D model "floats" on the page bg
+      //instead of sitting in a visible iframe rectangle
+      transparent: 1,
     })
   } catch (err) {
     console.error("[MainProject] Error initializing Sketchfab:", err)
@@ -366,9 +373,10 @@ async function replaceThumbnailWireframe(idx: number) {
         />
       </header>
 
-      <!--BODY - viewer + (optional) thumbnail strip. CSS grid arranges them per layout-->
-      <div class="main-project__body">
-        <div class="main-project__viewer border-sm">
+      <!--STAGE - viewer is the container; thumbnails sit absolutely positioned
+      on top of it (right-edge column by default, switched per layout).-->
+      <div class="main-project__stage">
+        <div class="main-project__viewer">
           <img
             v-if="showMainImage && mainImageUrl"
             :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
@@ -388,25 +396,13 @@ async function replaceThumbnailWireframe(idx: number) {
           ></iframe>
 
           <ReplaceImageButton v-if="editMode" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
-
-          <button
-            v-if="!editMode"
-            type="button"
-            class="main-project__wireframe-btn"
-            :class="{ 'main-project__wireframe-btn--active': isWireframe }"
-            :disabled="!sketchfabLoaded"
-            aria-label="Toggle wireframe"
-            @click="toggleWireframe"
-          >
-            <Grid :size="16" />
-          </button>
         </div>
 
         <div v-if="showThumbnails" class="main-project__thumbnails">
           <div
             v-for="(thumb, i) in project.thumbnails"
             :key="i"
-            class="main-project__thumbnail border-sm"
+            class="main-project__thumbnail"
           >
             <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
             <div v-else class="main-project__thumbnail-empty">No image</div>
@@ -424,6 +420,21 @@ async function replaceThumbnailWireframe(idx: number) {
             <Plus :size="20" />
           </button>
         </div>
+
+        <!--Wireframe toggle - tucked at the bottom-LEFT of the stage so it
+        doesn't collide with the thumbnail column on the right. Only visible
+        in view mode and when the Sketchfab viewer is loaded.-->
+        <button
+          v-if="!editMode"
+          type="button"
+          class="main-project__wireframe-btn"
+          :class="{ 'main-project__wireframe-btn--active': isWireframe }"
+          :disabled="!sketchfabLoaded"
+          aria-label="Toggle wireframe"
+          @click="toggleWireframe"
+        >
+          <Grid :size="16" />
+        </button>
       </div>
 
       <!--DETAILS - description, optional Sketchfab id, stats + software meta row-->
@@ -588,60 +599,23 @@ Layout picker pins top-right of the article (absolute), never clips.
   background-color: hsl(var(--primary) / 0.12);
 }
 
-/*BODY - viewer + (optional) thumbnails. ALL layouts share the same 16/9
-viewer aspect. The arrangement is what varies, not the maths.*/
-.main-project__body {
-  display: grid;
-  gap: var(--spacing-md);
-  align-items: stretch;
-}
-
-/*thumbs-left: vertical thumbnail column on the left, viewer fills the rest.*/
-.main-project--layout-thumbs-left .main-project__body {
-  grid-template-columns: var(--thumb-strip) 1fr;
-}
-.main-project--layout-thumbs-left .main-project__thumbnails { order: 1; }
-.main-project--layout-thumbs-left .main-project__viewer     { order: 2; }
-
-/*thumbs-right: mirror.*/
-.main-project--layout-thumbs-right .main-project__body {
-  grid-template-columns: 1fr var(--thumb-strip);
-}
-.main-project--layout-thumbs-right .main-project__viewer     { order: 1; }
-.main-project--layout-thumbs-right .main-project__thumbnails { order: 2; }
-
-/*thumbs-bottom: viewer full-width, thumbnails in a 4-up horizontal row below.*/
-.main-project--layout-thumbs-bottom .main-project__body {
-  grid-template-columns: 1fr;
-  grid-template-rows: auto auto;
-}
-.main-project--layout-thumbs-bottom .main-project__viewer { order: 1; }
-.main-project--layout-thumbs-bottom .main-project__thumbnails {
-  order: 2;
-  flex-direction: row;
-  flex-wrap: wrap;
-}
-.main-project--layout-thumbs-bottom .main-project__thumbnail,
-.main-project--layout-thumbs-bottom .main-project__thumbnail-add {
-  flex: 1 1 calc(25% - var(--spacing-sm));
-  max-width: calc(25% - var(--spacing-sm));
-}
-
-/*viewer-only: just the viewer, full width, no thumbnail strip rendered.*/
-.main-project--layout-viewer-only .main-project__body {
-  grid-template-columns: 1fr;
-}
-
-/*VIEWER - same aspect across every layout, only the surrounding arrangement
-changes. Inner img / iframe fill the absolute box.*/
-.main-project__viewer {
+/*STAGE - one positioned container that holds the viewer (no frame, transparent
+background) and the thumbnail column as absolute overlays on top. Layout
+variants only switch where the thumbnail column sits.*/
+.main-project__stage {
   position: relative;
   aspect-ratio: var(--viewer-aspect);
   width: 100%;
+}
+
+/*VIEWER - fills the entire stage with NO background, NO border. The Sketchfab
+iframe gets a transparent BG via the API so the 3D model literally floats on
+the page; same idea for the static image fallback.*/
+.main-project__viewer {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  background-color: var(--color-background-gray-50);
-  outline: var(--border-width-sm) solid var(--color-gray-medium);
-  outline-offset: calc(-1 * var(--border-width-sm));
+  background: transparent;
 }
 
 .main-project__viewer-image,
@@ -650,8 +624,9 @@ changes. Inner img / iframe fill the absolute box.*/
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border: none;
+  background: transparent;
 }
 
 .main-project__viewer-embed--hidden { display: none; }
@@ -668,51 +643,90 @@ changes. Inner img / iframe fill the absolute box.*/
   text-transform: uppercase;
 }
 
-/*Sketchfab wireframe toggle - the lone explicit circle in the design.*/
+/*Sketchfab wireframe toggle - bottom-LEFT corner of the stage, opposite from
+the thumbnail column on the right. Keeps it visible without colliding.*/
 .main-project__wireframe-btn {
   position: absolute;
   bottom: var(--spacing-md);
-  right:  var(--spacing-md);
+  left:   var(--spacing-md);
   width:  var(--spacing-2xl);
   height: var(--spacing-2xl);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-text-secondary);
+  background-color: hsl(0 0% 0% / 0.6);
+  border: var(--border-width-sm) solid var(--color-text-secondary);
   border-radius: var(--border-radius-full);
-  color: hsl(var(--background));
+  color: var(--color-text-hover);
   cursor: pointer;
-  z-index: 10;
-  transition: background-color 0.2s ease;
+  z-index: 15;
+  backdrop-filter: blur(var(--filter-blur));
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .main-project__wireframe-btn--active  { background-color: var(--color-accent); }
 
-/*THUMBNAILS strip ----------------------------------------------------------
-In thumbs-left/right layouts the strip is a flex COLUMN that grows to match
-the viewer height (stretch). Each thumbnail uses flex:1 so they distribute
-evenly and the column never has empty trailing space. In thumbs-bottom the
-strip becomes a horizontal row (handled in the layout-specific rule above).*/
+/*THUMBNAILS - absolute overlay ON TOP of the viewer. Default position:
+right-edge column, vertically centered. Layout variants reposition the
+column (left edge, bottom row, hidden entirely).*/
 .main-project__thumbnails {
+  position: absolute;
+  top: 50%;
+  right: var(--spacing-md);
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-  height: 100%;
+  z-index: 10;
+  max-height: calc(100% - var(--spacing-xl) * 2);
+  width: calc(var(--thumb-strip) - var(--spacing-md));
 }
 
 .main-project__thumbnail {
   position: relative;
-  flex: 1;
-  min-height: 0;
   width: 100%;
+  aspect-ratio: var(--thumb-aspect);
   overflow: hidden;
+  border: var(--border-width-sm) solid var(--color-text-hover);
+  background-color: hsl(0 0% 0% / 0.5);
+  backdrop-filter: blur(var(--filter-blur));
 }
 
-.main-project--layout-thumbs-bottom .main-project__thumbnail {
-  flex: 1 1 calc(25% - var(--spacing-sm));
+/*LAYOUT VARIANTS - the stage stays the same, only the thumbnails reposition*/
+.main-project--layout-thumbs-right .main-project__thumbnails {
+  right: var(--spacing-md);
+  left: auto;
+  flex-direction: column;
+}
+
+.main-project--layout-thumbs-left .main-project__thumbnails {
+  left: var(--spacing-md);
+  right: auto;
+  flex-direction: column;
+}
+
+.main-project--layout-thumbs-bottom .main-project__thumbnails {
+  top: auto;
+  bottom: var(--spacing-md);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  flex-direction: row;
+  width: auto;
+  max-width: calc(100% - var(--spacing-xl) * 2);
+  max-height: none;
+  height: calc(var(--spacing-6xl) + var(--spacing-md));
+}
+.main-project--layout-thumbs-bottom .main-project__thumbnail,
+.main-project--layout-thumbs-bottom .main-project__thumbnail-add {
+  width: auto;
+  height: 100%;
   aspect-ratio: var(--thumb-aspect);
-  min-height: 0;
+}
+
+.main-project--layout-viewer-only .main-project__thumbnails {
+  display: none;
 }
 
 .main-project__thumbnail img {
@@ -741,26 +755,20 @@ strip becomes a horizontal row (handled in the layout-specific rule above).*/
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 1 calc(var(--spacing-3xl) + var(--spacing-md));
-  min-height: calc(var(--spacing-3xl) + var(--spacing-md));
   width: 100%;
-  background-color: transparent;
-  border: var(--border-width-md) dashed var(--color-gray-medium);
-  color: var(--color-text-secondary);
+  aspect-ratio: var(--thumb-aspect);
+  background-color: hsl(0 0% 0% / 0.5);
+  backdrop-filter: blur(var(--filter-blur));
+  border: var(--border-width-md) dashed var(--color-text-hover);
+  color: var(--color-text-hover);
   cursor: pointer;
   transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
-}
-
-.main-project--layout-thumbs-bottom .main-project__thumbnail-add {
-  flex: 1 1 calc(25% - var(--spacing-sm));
-  aspect-ratio: var(--thumb-aspect);
-  min-height: 0;
 }
 
 .main-project__thumbnail-add:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
-  background-color: hsl(var(--primary) / 0.05);
+  background-color: hsl(var(--primary) / 0.15);
 }
 
 /*DETAILS - single column stack. Description first (max-width capped for
@@ -874,41 +882,35 @@ mirrors the article-header hairline, framing the project visually.*/
 .main-project__software img { filter: brightness(0.8); transition: filter 0.2s ease; }
 .main-project__software:hover img { filter: brightness(1); }
 
-/*RESPONSIVE - collapse layouts gracefully ----------------------------------*/
+/*RESPONSIVE - mobile keeps the same stage approach. Thumbnails shrink to
+fit the side column or move to a horizontal row at the bottom.*/
 @media (max-width: 900px) {
   .main-project { padding: var(--spacing-xl) 0; margin-bottom: var(--spacing-5xl); }
+  .main-project__stage { aspect-ratio: 4 / 5; }
 
-  /*every layout collapses to viewer-then-thumbs vertically. Thumbs become a
-  3-up row underneath instead of vertical column or 4-up grid.*/
-  .main-project__body,
-  .main-project--layout-thumbs-left  .main-project__body,
-  .main-project--layout-thumbs-right .main-project__body,
-  .main-project--layout-thumbs-bottom .main-project__body,
-  .main-project--layout-viewer-only  .main-project__body {
-    grid-template-columns: 1fr;
-  }
-
-  .main-project--layout-thumbs-left  .main-project__viewer,
-  .main-project--layout-thumbs-right .main-project__viewer { order: 1; }
   .main-project--layout-thumbs-left  .main-project__thumbnails,
-  .main-project--layout-thumbs-right .main-project__thumbnails { order: 2; }
-
-  .main-project__thumbnails {
+  .main-project--layout-thumbs-right .main-project__thumbnails {
+    top: auto;
+    bottom: var(--spacing-md);
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
     flex-direction: row;
-    flex-wrap: wrap;
-    height: auto;
+    width: auto;
+    max-width: calc(100% - var(--spacing-xl) * 2);
+    max-height: none;
+    height: var(--spacing-5xl);
   }
-  .main-project__thumbnail {
-    flex: 1 1 calc(33.333% - var(--spacing-xs));
-    max-width: calc(33.333% - var(--spacing-xs));
+
+  .main-project--layout-thumbs-left  .main-project__thumbnail,
+  .main-project--layout-thumbs-right .main-project__thumbnail,
+  .main-project--layout-thumbs-bottom .main-project__thumbnail,
+  .main-project--layout-thumbs-left  .main-project__thumbnail-add,
+  .main-project--layout-thumbs-right .main-project__thumbnail-add,
+  .main-project--layout-thumbs-bottom .main-project__thumbnail-add {
+    width: auto;
+    height: 100%;
     aspect-ratio: var(--thumb-aspect);
-    min-height: 0;
-  }
-  .main-project__thumbnail-add {
-    flex: 1 1 calc(33.333% - var(--spacing-xs));
-    max-width: calc(33.333% - var(--spacing-xs));
-    aspect-ratio: var(--thumb-aspect);
-    min-height: 0;
   }
 
   .main-project__layout-picker {
@@ -916,10 +918,7 @@ mirrors the article-header hairline, framing the project visually.*/
     margin-left: auto;
     align-self: flex-end;
   }
-  .main-project__header {
-    flex-wrap: wrap;
-    align-items: baseline;
-  }
+  .main-project__header { flex-wrap: wrap; align-items: baseline; }
 }
 
 @media (max-width: 600px) {

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Layout Tests — Axel Offret</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0a;
+    color: #d8d8d8;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    min-height: 100vh;
+    padding: 4rem;
+    position: relative;
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.18;
+    mix-blend-mode: overlay;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; position: relative; z-index: 1; }
+  .top {
+    border-top: 2px solid #fff;
+    border-bottom: 1px solid #444;
+    padding: 1rem 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 4rem;
+  }
+  h1 {
+    font-size: 4rem;
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 2px #fff;
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+    line-height: 0.9;
+    margin-bottom: 0.5rem;
+  }
+  .sub { color: #888; font-size: 0.85rem; margin-bottom: 3rem; line-height: 1.6; }
+  .sub span { color: #fff; font-weight: 700; }
+
+  .grid { display: grid; gap: 0; border-top: 1px solid #333; }
+  .item {
+    display: grid;
+    grid-template-columns: 4rem 1fr 12rem;
+    gap: 2rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid #333;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.2s, padding 0.2s;
+    align-items: baseline;
+  }
+  .item:hover {
+    background: rgba(255,255,255,0.03);
+    padding-left: 1rem;
+  }
+  .item:hover .name { color: #2dced4; }
+  .num {
+    font-size: 2rem;
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 1.5px #888;
+  }
+  .item:hover .num { -webkit-text-stroke-color: #fff; }
+  .name { font-size: 1.5rem; font-weight: 700; color: #fff; transition: color 0.2s; text-transform: uppercase; letter-spacing: -0.01em; }
+  .name small { display: block; font-size: 0.7rem; color: #888; font-weight: 400; text-transform: uppercase; letter-spacing: 0.2em; margin-top: 0.4rem; }
+  .tags { text-align: right; font-size: 0.7rem; letter-spacing: 0.15em; color: #888; text-transform: uppercase; line-height: 1.6; }
+
+  .note {
+    margin-top: 4rem;
+    padding: 1.5rem;
+    border: 1px dashed #444;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #888;
+  }
+  .note strong { color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="top">
+    <span>AXEL OFFRET / LAYOUT TESTS</span>
+    <span>2026 / 5 VARIANTS</span>
+  </div>
+
+  <h1>LAYOUT<br>TESTS</h1>
+  <p class="sub">5 directions visuelles pour le portfolio complet. Toutes <span>dark</span>, <span>brutalist</span>, <span>grain</span>, vraies images, vrai embed Sketchfab. Ouvre une variante pour voir un site complet (hero / 3 projets / gallery / experience / about).</p>
+
+  <div class="grid">
+    <a class="item" href="01-floating.html">
+      <div class="num">01</div>
+      <div class="name">Floating <small>Le modèle 3D flotte sur le fond, pas de cadre, labels top-left, badges software en bas, thumbnails à droite. Très "porte clef" reference.</small></div>
+      <div class="tags">FLOATING<br>NO FRAME<br>SIDE LABELS</div>
+    </a>
+    <a class="item" href="02-grid.html">
+      <div class="num">02</div>
+      <div class="name">Grid <small>Grille 12 colonnes visible, hairlines, ruled lines, swiss-modernist, datasheet aesthetic. Très structuré, presque industriel.</small></div>
+      <div class="tags">12-COL<br>HAIRLINES<br>SWISS</div>
+    </a>
+    <a class="item" href="03-magazine.html">
+      <div class="num">03</div>
+      <div class="name">Magazine <small>Éditorial sombre, serif Cormorant Garamond, columns body, drop cap, pull quotes, ornaments. Très "vintage CGI catalogue".</small></div>
+      <div class="tags">EDITORIAL<br>SERIF<br>COLUMNS</div>
+    </a>
+    <a class="item" href="04-asymmetric.html">
+      <div class="num">04</div>
+      <div class="name">Asymmetric <small>Brutalist raw, off-balance, big numbers watermark, type rotated, accent rouge, tags slashed. Zine / punk aesthetic.</small></div>
+      <div class="tags">BRUTAL<br>RAW<br>ACCENT RED</div>
+    </a>
+    <a class="item" href="05-cinematic.html">
+      <div class="num">05</div>
+      <div class="name">Cinematic <small>Full-bleed Sketchfab embed en hero plein écran, title overlay, navigation discrète. Chaque projet = un viewport. Très immersif.</small></div>
+      <div class="tags">FULL-BLEED<br>IMMERSIVE<br>OVERLAY</div>
+    </a>
+  </div>
+
+  <div class="note">
+    <strong>NOTE :</strong> les iframes Sketchfab et les images réelles sont chargées depuis <strong>axel.somerandomcreator.com</strong>. Si le site est down ou que t'es offline, les viewers et thumbnails seront vides — c'est normal. Le textes des sections sont inventés/reformulés mais les stats, software et structure viennent des vraies données.
+  </div>
+
+</div>
+</body>
+</html>
