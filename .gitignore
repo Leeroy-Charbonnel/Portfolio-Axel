@@ -29,10 +29,4 @@ dist-ssr
 # File storage - portfolio media uploaded by admin. Persisted as a Docker
 # named volume in prod (Dokploy: Mount Type = Volume Mount, NOT Bind Mount).
 storage/
-
-# seed-files/ contains a one-time bootstrap set of media baked into the image.
-# server.ts copies them to /app/storage/files/ on first boot if the named
-# volume is empty. Once the volume is populated they can be removed from git
-# (a follow-up commit) and future builds won't ship them.
-# seed-files/  <- left tracked for now, remove the leading # once the prod
-#                 volume is confirmed populated
+seed-files/
