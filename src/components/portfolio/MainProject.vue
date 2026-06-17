@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue"
-import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus } from "lucide-vue-next"
+import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink } from "lucide-vue-next"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { usePortfolio } from "../../composables/usePortfolio"
@@ -119,13 +119,29 @@ function initSketchfab() {
         sketchfabError.value = true
         isLoading.value = false
       },
-      autostart:   1,
-      preload:     1,
-      ui_controls: 0,
-      ui_infos:    0,
-      ui_inspector:0,
-      ui_stop:     0,
-      ui_watermark:0,
+      autostart:    1,
+      preload:      1,
+      //KILL every Sketchfab UI overlay - keep only the canvas. Cursor still
+      //orbits/pans the model, but no toolbar, no help text, no watermark,
+      //no fullscreen button, no settings, no annotations, no AR.
+      ui_animations:       0,
+      ui_controls:         0,
+      ui_general_controls: 0,
+      ui_help:             0,
+      ui_hint:             0,
+      ui_infos:            0,
+      ui_inspector:        0,
+      ui_settings:         0,
+      ui_sound:            0,
+      ui_start:            0,
+      ui_stop:             0,
+      ui_theatre:          0,
+      ui_vr:               0,
+      ui_watermark:        0,
+      ui_fullscreen:       0,
+      ui_annotations:      0,
+      ui_ar:               0,
+      ui_loading:          0,
       //transparent background so the 3D model "floats" on the page bg
       //instead of sitting in a visible iframe rectangle
       transparent: 1,
@@ -435,6 +451,20 @@ async function replaceThumbnailWireframe(idx: number) {
         >
           <Grid :size="16" />
         </button>
+
+        <!--Sketchfab link - top-right, accent color. Opens the model page on
+        sketchfab.com in a new tab so visitors can inspect / fork / download.-->
+        <a
+          v-if="!editMode && project.modelId"
+          class="main-project__sketchfab-link"
+          :href="`https://sketchfab.com/models/${project.modelId}`"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open on Sketchfab"
+        >
+          <ExternalLink :size="14" />
+          <span>Sketchfab</span>
+        </a>
       </div>
 
       <!--DETAILS - description, optional Sketchfab id, stats + software meta row-->
@@ -665,7 +695,33 @@ the thumbnail column on the right. Keeps it visible without colliding.*/
 }
 
 .main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.main-project__wireframe-btn--active  { background-color: var(--color-accent); }
+.main-project__wireframe-btn--active  { background-color: var(--color-accent); border-color: var(--color-accent); color: hsl(0 0% 0%); }
+
+/*Sketchfab external-link button - top-right of the stage, accent-coloured*/
+.main-project__sketchfab-link {
+  position: absolute;
+  top:   var(--spacing-md);
+  right: var(--spacing-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: hsl(0 0% 0% / 0.6);
+  border: var(--border-width-sm) solid var(--color-accent);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  text-decoration: none;
+  backdrop-filter: blur(var(--filter-blur));
+  z-index: 15;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.main-project__sketchfab-link:hover {
+  background-color: var(--color-accent);
+  color: hsl(0 0% 0%);
+}
 
 /*THUMBNAILS - absolute overlay ON TOP of the viewer. Default position:
 right-edge column, vertically centered. Layout variants reposition the
@@ -688,9 +744,7 @@ column (left edge, bottom row, hidden entirely).*/
   width: 100%;
   aspect-ratio: var(--thumb-aspect);
   overflow: hidden;
-  border: var(--border-width-sm) solid var(--color-text-hover);
-  background-color: hsl(0 0% 0% / 0.5);
-  backdrop-filter: blur(var(--filter-blur));
+  /*no border - thumbnails sit raw on top of the viewer*/
 }
 
 /*LAYOUT VARIANTS - the stage stays the same, only the thumbnails reposition*/

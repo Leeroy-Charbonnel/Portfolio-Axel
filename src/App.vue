@@ -48,18 +48,26 @@ const chromeFreeRoutes = ["/login", "/settings", "/pending", "/banned", "/forgot
 </template>
 
 <style scoped>
+/*Flex column with explicit min-height: 100vh ensures the wrapper grows to
+the full document height. Without this, .portfolio-app's box collapses to
+its first-child's height and the grain (position:absolute; inset:0) stops
+short of the bottom of the page.*/
 .portfolio-app {
   position: relative;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /*Main content sits above the grain (z-index:1). isolation:isolate creates a
 fresh stacking context so descendants never get clipped by the grain layer,
-regardless of transforms applied inside (AnimatedReveal etc.).*/
+regardless of transforms applied inside (AnimatedReveal etc.). flex:1 lets
+main absorb the remaining height so .portfolio-app spans the whole document.*/
 .portfolio-app__main {
   position: relative;
   z-index: 2;
   isolation: isolate;
+  flex: 1 0 auto;
 }
 
 /*Fixed language switch in the top-right corner (matches the original portfolio).*/
