@@ -2,7 +2,7 @@ import express from "express"
 import cors from "cors"
 import helmet from "helmet"
 import multer from "multer"
-import { join, extname } from "path"
+import { join, extname, relative } from "path"
 import { mkdirSync, unlinkSync, readdirSync, copyFileSync, existsSync } from "fs"
 import { fileURLToPath } from "url"
 import { randomUUID } from "crypto"
@@ -255,17 +255,43 @@ app.get(["/diag", "/api/_diag"], (_req, res) => {
 </html>`)
 })
 
+//UPLOAD ROUTING - uploads are sorted into sub-directories by extension so
+//the single storage volume stays organized:
+//   storage/files/models/  - .glb / .gltf
+//   storage/files/hdri/    - .hdr / .exr / .hdri
+//   storage/files/images/  - everything else (jpg, png, webp, mp4, ...)
+//Existing files at the root of storage/files/ (pre-split) keep working
+//because their stored_filename has no sub-dir prefix and express.static
+//still resolves /media/<flat-file> against the root.
+function uploadSubdirFor(filename: string): "models" | "hdri" | "images" {
+  if (/\.(glb|gltf)$/i.test(filename))       return "models"
+  if (/\.(hdr|exr|hdri)$/i.test(filename))   return "hdri"
+  return "images"
+}
+
 const upload = multer({
   storage: multer.diskStorage({
-    destination: storageDir,
+    destination: (_req, file, cb) => {
+      const sub = uploadSubdirFor(file.originalname)
+      const dir = join(storageDir, sub)
+      mkdirSync(dir, { recursive: true })
+      cb(null, dir)
+    },
     filename: (_req, file, cb) => {
       const id  = randomUUID()
       const ext = extname(file.originalname).toLowerCase()
       cb(null, `${id}${ext}`)
     },
   }),
-  limits: { fileSize: 100 * 1024 * 1024 }, //100 MB per file - large enough for short videos
+  limits: { fileSize: 200 * 1024 * 1024 }, //200 MB - .glb can be chunky
 })
+
+//For each upload we store the path RELATIVE to storageDir (with the
+//subdir prefix) so /media/<storedFilename> resolves to the right file.
+function relativeStoredName(file: Express.Multer.File): string {
+  const rel = relative(storageDir, join(file.destination, file.filename)).split("\\").join("/")
+  return rel
+}
 
 function inferKind(mimeType: string): "image" | "video" | "other" {
   if (mimeType.startsWith("image/")) return "image"
@@ -389,10 +415,11 @@ app.post("/api/files", requireAuth, requireAdmin, upload.single("file"), async (
   //the filename comes from our multer config above as `{uuid}.{ext}` so we
   //can recover the uuid as the file id
   const id = req.file.filename.split(".")[0]!
+  const stored = relativeStoredName(req.file)
   const [row] = await db.insert(fileTable).values({
     id,
     originalFilename: req.file.originalname,
-    storedFilename:   req.file.filename,
+    storedFilename:   stored,
     mimeType:         req.file.mimetype,
     sizeBytes:        req.file.size,
     kind:             inferKind(req.file.mimetype),
@@ -422,7 +449,7 @@ app.post("/api/main-project", requireAuth, requireAdmin, async (_req, res) => {
     description: { en: "Project description", fr: "Description du projet" },
     thumbnails:  [],
     wireframeParameters: { whiteMaterialColor: "ffffff", lightsOverwrite: [], emissiveMaterialsOverwrite: [] },
-    stats:       { vertices: 0, edges: 0, faces: 0 },
+    stats:       { vertices: 0, edges: 0, faces: 0, triangles: 0 },
     sortOrder,
   }).returning()
   res.json(row)
@@ -451,7 +478,7 @@ app.post("/api/gallery-project", requireAuth, requireAdmin, async (_req, res) =>
   const [row] = await db.insert(galleryProject).values({
     title:       { en: "New gallery item", fr: "Nouvel élément" },
     link:        "",
-    stats:       { vertices: 0, edges: 0 },
+    stats:       { vertices: 0, edges: 0, faces: 0, triangles: 0 },
     sortOrder,
   }).returning()
   res.json(row)
@@ -507,19 +534,44 @@ app.delete("/api/experience/:id", requireAuth, requireAdmin, async (req, res) =>
 })
 
 //SOFTWARE ---
-app.post("/api/software", requireAuth, requireAdmin, async (_req, res) => {
-  const sortOrder = await nextSortOrder(software)
-  //find first file row to use as a logo placeholder; if no files exist yet the
-  //admin must upload one before the row can be inserted (logoFileId is not null)
-  const [firstFile] = await db.select({ id: fileTable.id }).from(fileTable).limit(1)
-  if (!firstFile) { res.status(400).json({ error: "upload at least one logo file before adding software" }); return }
-  const [row] = await db.insert(software).values({
-    key:        `Software ${sortOrder + 1}`,
-    logoFileId: firstFile.id,
-    url:        "https://",
-    sortOrder,
-  }).returning()
-  res.json(row)
+//POST is multipart: the client uploads the logo image alongside key + url so
+//creating a software is a single round-trip instead of two (upload then link).
+//The logo lands in the file table the same way a regular /api/files upload
+//does, then we insert the software row referencing it.
+app.post("/api/software", requireAuth, requireAdmin, upload.single("logo"), async (req, res) => {
+  if (!req.file) { res.status(400).json({ error: "logo file is required" }); return }
+  const key = String(req.body?.key ?? "").trim()
+  const url = String(req.body?.url ?? "").trim()
+  if (!key) { res.status(400).json({ error: "key is required" }); return }
+
+  const fileId = req.file.filename.split(".")[0]!
+  const storedRel = relativeStoredName(req.file)
+  await db.insert(fileTable).values({
+    id:               fileId,
+    originalFilename: req.file.originalname,
+    storedFilename:   storedRel,
+    mimeType:         req.file.mimetype,
+    sizeBytes:        req.file.size,
+    kind:             inferKind(req.file.mimetype),
+    uploadedBy:       (req as any).user?.id ?? null,
+  })
+
+  try {
+    const sortOrder = await nextSortOrder(software)
+    const [row] = await db.insert(software).values({
+      key,
+      logoFileId: fileId,
+      url:        url || "https://",
+      sortOrder,
+    }).returning()
+    res.json(row)
+  } catch (e) {
+    //software insert failed (unique key collision, etc.) - roll the orphaned
+    //file row + binary back so the upload doesn't accumulate dead bytes
+    try { unlinkSync(join(storageDir, storedRel)) } catch { /* ignore */ }
+    await db.delete(fileTable).where(eq(fileTable.id, fileId)).catch(() => {})
+    res.status(409).json({ error: e instanceof Error ? e.message : "software insert failed" })
+  }
 })
 
 app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
@@ -532,11 +584,60 @@ app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
   res.json(row)
 })
 
+//Deleting a software row also removes its logo file (the user explicitly
+//asked for cascading delete - the file would otherwise become an orphan in
+//the file table). The file table FK uses ON DELETE RESTRICT, so we have to
+//drop the software row FIRST then the file. Junction rows in
+//main_project_software cascade automatically via their own ON DELETE.
 app.delete("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
   const id = parseInt(String(req.params.id ?? ""), 10)
   if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const [row] = await db.select().from(software).where(eq(software.id, id))
+  if (!row) { res.json({ ok: true }); return }
+
   await db.delete(software).where(eq(software.id, id))
+
+  //check if the logo file is now an orphan (no other software pointing at it)
+  const [stillRef] = await db.select({ id: software.id }).from(software).where(eq(software.logoFileId, row.logoFileId)).limit(1)
+  if (!stillRef) {
+    const [fileRow] = await db.select().from(fileTable).where(eq(fileTable.id, row.logoFileId))
+    if (fileRow) {
+      try { unlinkSync(join(storageDir, fileRow.storedFilename)) } catch (e) { console.warn(`[software] disk unlink failed:`, e) }
+      await db.delete(fileTable).where(eq(fileTable.id, row.logoFileId)).catch(() => {})
+    }
+  }
+
   res.json({ ok: true })
+})
+
+//VIEWER SETTINGS - the entire editor snapshot (materials / lights / HDR /
+//wireframe state) as a single jsonb blob. Frontend posts its full payload
+//on Save and we just store it; the viewer applies it on load.
+app.put("/api/main-project/:id/viewer-settings", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  await db.update(mainProject)
+    .set({ viewerSettings: req.body, updatedAt: new Date() })
+    .where(eq(mainProject.id, id))
+  res.json({ ok: true })
+})
+
+//GET single project - returns the editor everything it needs without
+//pulling the whole portfolio. Used by the /edit-3d page.
+app.get("/api/main-project/:id", async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const [row] = await db.select().from(mainProject).where(eq(mainProject.id, id))
+  if (!row) { res.status(404).json({ error: "not found" }); return }
+
+  //resolve glb URL the same way the portfolio endpoint does
+  let glbUrl: string | null = null
+  if (row.glbFileId) {
+    const [f] = await db.select({ storedFilename: fileTable.storedFilename })
+      .from(fileTable).where(eq(fileTable.id, row.glbFileId))
+    if (f) glbUrl = `/media/${f.storedFilename}`
+  }
+  res.json({ ...row, glbUrl })
 })
 
 //MAIN_PROJECT <-> SOFTWARE junction
@@ -728,7 +829,7 @@ app.get("/api/portfolio", async (_req, res) => {
       .filter((j) => j.mainProjectId === p.id)
       .map((j) => softwareById[j.softwareId])
       .filter((s): s is typeof softwareRows[number] => Boolean(s))
-      .map((s) => ({ key: s.key, url: s.url, logoUrl: urlOf(s.logoFileId) }))
+      .map((s) => ({ id: s.id, key: s.key, url: s.url, logoFileId: s.logoFileId, logoUrl: urlOf(s.logoFileId) }))
 
     return {
       id:                  p.id,
@@ -739,6 +840,12 @@ app.get("/api/portfolio", async (_req, res) => {
       mainImageUrl:        urlOf(p.mainImageFileId),
       mainWireframeUrl:    urlOf(p.mainWireframeFileId),
       videoUrl:            urlOf(p.videoFileId),
+      //3D MODEL - when glbFileId is non-null the frontend renders via the
+      //local Three.js viewer (using viewerSettings); otherwise it falls
+      //back to the Sketchfab iframe (modelId).
+      glbFileId:           p.glbFileId,
+      glbUrl:              urlOf(p.glbFileId),
+      viewerSettings:      p.viewerSettings,
       thumbnails: (p.thumbnails ?? []).map((t) => ({
         //expose both file ids (for round-tripping edits back into the jsonb)
         //and resolved URLs (for direct img/iframe rendering on the client)
@@ -778,7 +885,7 @@ app.get("/api/portfolio", async (_req, res) => {
   const [profileRow] = await db.select().from(profile)
 
   res.json({
-    software:        softwareRows.map((s) => ({ key: s.key, url: s.url, logoUrl: urlOf(s.logoFileId) })),
+    software:        softwareRows.map((s) => ({ id: s.id, key: s.key, url: s.url, logoFileId: s.logoFileId, logoUrl: urlOf(s.logoFileId) })),
     mainProjects,
     galleryProjects,
     experiences:     experienceRows.map((e) => ({

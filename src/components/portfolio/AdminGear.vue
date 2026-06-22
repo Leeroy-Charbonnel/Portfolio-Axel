@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue"
 import { useRouter } from "vue-router"
-import { Settings as Gear, Pencil, SlidersHorizontal, LogOut } from "lucide-vue-next"
+import { Settings as Gear, Pencil, SlidersHorizontal, Paintbrush, BookOpen, LogOut } from "lucide-vue-next"
 import { useAdmin } from "../../composables/useAdmin"
+import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 
 //Admin-only entry point. Renders nothing for visitors. For admins, a small
 //gear icon top-right opens a dropdown with: edit-mode toggle, settings link
@@ -10,6 +11,7 @@ import { useAdmin } from "../../composables/useAdmin"
 
 const router = useRouter()
 const { isAdmin, editMode, toggleEdit, signOut } = useAdmin()
+const { show: showCssPanel } = useCssVarsPanel()
 
 const open        = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -40,6 +42,16 @@ function goSettings() {
   router.push("/settings")
 }
 
+function goSketchfabHowTo() {
+  close()
+  router.push("/sketchfab-howto")
+}
+
+function openCssPanel() {
+  close()
+  showCssPanel()
+}
+
 async function handleSignOut() {
   close()
   await signOut()
@@ -66,9 +78,17 @@ async function handleSignOut() {
           <Pencil :size="14" />
           <span>{{ editMode ? "Stop editing" : "Edit content" }}</span>
         </button>
+        <button class="admin-gear__item" role="menuitem" @click="openCssPanel">
+          <Paintbrush :size="14" />
+          <span>Customize CSS</span>
+        </button>
         <button class="admin-gear__item" role="menuitem" @click="goSettings">
           <SlidersHorizontal :size="14" />
           <span>Settings</span>
+        </button>
+        <button class="admin-gear__item" role="menuitem" @click="goSketchfabHowTo">
+          <BookOpen :size="14" />
+          <span>Sketchfab how-to</span>
         </button>
         <div class="admin-gear__divider"></div>
         <button class="admin-gear__item admin-gear__item--danger" role="menuitem" @click="handleSignOut">

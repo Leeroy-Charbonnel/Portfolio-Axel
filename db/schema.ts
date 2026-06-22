@@ -76,6 +76,13 @@ export const mainProject = pgTable("main_project", {
   layout:               text("layout").notNull().default("thumbs-left"),
   mainImageFileId:      uuid("main_image_file_id").references(() => file.id, { onDelete: "set null" }),
   mainWireframeFileId:  uuid("main_wireframe_file_id").references(() => file.id, { onDelete: "set null" }),
+  //3D MODEL - when set, the portfolio renders this project via the local
+  //Three.js viewer instead of the Sketchfab iframe. The .glb file lives
+  //in storage like every other binary; viewer_settings is the editor
+  //snapshot (materials / lights / HDR / wireframe picks) the viewer
+  //applies at load.
+  glbFileId:            uuid("glb_file_id").references(() => file.id, { onDelete: "set null" }),
+  viewerSettings:       jsonb("viewer_settings"),
   thumbnails:           jsonb("thumbnails").$type<{
                           fileId:          string
                           wireframeFileId: string | null
@@ -88,7 +95,7 @@ export const mainProject = pgTable("main_project", {
                           lightsOverwrite:             { index: number; intensity?: number; color: string }[]
                           emissiveMaterialsOverwrite:  string[]
                         }>().notNull(),
-  stats:                jsonb("stats").$type<{ vertices: number; edges: number; faces?: number }>().notNull(),
+  stats:                jsonb("stats").$type<{ vertices: number; edges: number; faces?: number; triangles?: number }>().notNull(),
   sortOrder:            integer("sort_order").notNull().default(0),
   createdAt:            timestamp("created_at").notNull().defaultNow(),
   updatedAt:            timestamp("updated_at").notNull().defaultNow(),
@@ -110,7 +117,7 @@ export const galleryProject = pgTable("gallery_project", {
   title:       jsonb("title").$type<{ en: string; fr: string }>().notNull(),
   link:        text("link").notNull(),
   imageFileId: uuid("image_file_id").references(() => file.id, { onDelete: "set null" }),
-  stats:       jsonb("stats").$type<{ vertices: number; edges: number }>().notNull(),
+  stats:       jsonb("stats").$type<{ vertices: number; edges: number; faces?: number; triangles?: number }>().notNull(),
   sortOrder:   integer("sort_order").notNull().default(0),
 })
 

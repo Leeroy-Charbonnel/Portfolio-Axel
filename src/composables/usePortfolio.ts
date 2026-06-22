@@ -88,8 +88,22 @@ async function createExperience() { await apiJson("POST", "/api/experience"); aw
 async function updateExperience(id: number, patch: Record<string, unknown>) { await apiJson("PUT", `/api/experience/${id}`, patch); await reload() }
 async function deleteExperience(id: number) { await apiJson("DELETE", `/api/experience/${id}`); await reload() }
 
-//SOFTWARE mutations
-async function createSoftware() { await apiJson("POST", "/api/software"); await reload() }
+//SOFTWARE mutations - create is multipart (logo upload + key + url in one
+//round-trip). Update / delete are regular JSON. Delete on the server also
+//removes the logo file when no other software references it.
+async function createSoftware(logo: File, key: string, url: string) {
+  const fd = new FormData()
+  fd.append("logo", logo)
+  fd.append("key", key)
+  fd.append("url", url)
+  const res = await fetch("/api/software", { method: "POST", credentials: "include", body: fd })
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "")
+    throw new Error(`POST /api/software -> ${res.status} ${txt}`)
+  }
+  await reload()
+}
+
 async function updateSoftware(id: number, patch: Record<string, unknown>) { await apiJson("PUT", `/api/software/${id}`, patch); await reload() }
 async function deleteSoftware(id: number) { await apiJson("DELETE", `/api/software/${id}`); await reload() }
 

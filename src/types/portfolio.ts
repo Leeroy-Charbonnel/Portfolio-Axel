@@ -7,9 +7,10 @@ export interface Bilingual {
 }
 
 export interface ProjectStats {
-  vertices: number
-  edges:    number
-  faces?:   number
+  vertices:   number
+  edges:      number
+  faces?:     number
+  triangles?: number
 }
 
 export interface WireframeLight {
@@ -26,9 +27,11 @@ export interface WireframeParameters {
 }
 
 export interface SoftwareDto {
-  key:     string
-  url:     string
-  logoUrl: string | null
+  id:          number
+  key:         string
+  url:         string
+  logoFileId:  string | null
+  logoUrl:     string | null
 }
 
 export interface ThumbnailDto {
@@ -57,6 +60,9 @@ export interface MainProjectDto {
   mainImageUrl:        string | null
   mainWireframeUrl:    string | null
   videoUrl:            string | null
+  glbFileId:           string | null
+  glbUrl:              string | null
+  viewerSettings:      unknown | null
   thumbnails:          ThumbnailDto[]
   wireframeParameters: WireframeParameters
   stats:               ProjectStats
@@ -69,8 +75,10 @@ export interface GalleryProjectDto {
   link:     string
   imageUrl: string | null
   stats: {
-    vertices: number
-    edges:    number
+    vertices:   number
+    edges:      number
+    faces?:     number
+    triangles?: number
   }
 }
 

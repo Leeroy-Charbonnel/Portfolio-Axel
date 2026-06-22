@@ -70,12 +70,12 @@ onBeforeUnmount(() => {
 .side-nav {
   position: fixed;
   top: 50%;
-  left: var(--spacing-md);
+  left: var(--nav-left);
   transform: translateY(-50%);
   z-index: 50;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--nav-gap);
 }
 
 .side-nav__link {
@@ -83,8 +83,8 @@ onBeforeUnmount(() => {
   background: transparent;
   border: none;
   padding: 0;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--nav-font-size);
+  font-weight: var(--nav-font-weight);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   writing-mode: vertical-rl;

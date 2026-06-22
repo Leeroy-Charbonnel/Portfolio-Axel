@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router"
-import HomePage     from "../pages/HomePage.vue"
-import SettingsPage from "../pages/SettingsPage.vue"
+import HomePage           from "../pages/HomePage.vue"
+import SettingsPage       from "../pages/SettingsPage.vue"
+import SketchfabHowToPage from "../pages/SketchfabHowToPage.vue"
+import ThreeTestPage      from "../pages/ThreeTestPage.vue"
 import {
   LoginPage,
   PendingPage,
@@ -22,6 +24,14 @@ const router = createRouter({
     //Settings page kept available so the user can tweak accent_color / theme
     //even in public mode. Drop the route if you don't want users on /settings.
     { path: "/settings",        component: SettingsPage },
+
+    //Static admin-only reference for preparing a Sketchfab model. No auth
+    //guard since the link only appears in the admin gear menu anyway.
+    { path: "/sketchfab-howto", component: SketchfabHowToPage },
+
+    //Three.js model editor - per-project edit page. Replaces the Sketchfab
+    //iframe with a local viewer when a .glb has been uploaded.
+    { path: "/edit-3d/:id(\\d+)", component: ThreeTestPage },
 
     //Auth pages from vue-shared-ui. Only reachable if AUTH_MODE != "public".
     { path: "/login",           component: LoginPage },

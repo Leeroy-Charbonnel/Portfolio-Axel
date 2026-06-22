@@ -164,6 +164,79 @@ through the whole UI.*/
   --filter-blur:   6px;
   --tooltip-delay: 0.7s;
 
+  /*--tag-bg drives every stat-badge / pill / empty-viewer surface in the
+  portfolio. Defaults to a translucent foreground tint so it visually maps
+  to whatever the user sets for foreground, but the side panel can override
+  it directly with a flat color and the change propagates everywhere.*/
+  --tag-bg: hsl(var(--foreground) / 0.1);
+
+  /*--panel-width starts at 0 and is raised by .css-panel-open on the root
+  when the CSS variables side panel is open, so body and all the fixed-right
+  UI (lang switch, admin gear) reserve real space for the panel instead of
+  letting it overlay on top of content.*/
+  --panel-width: 0px;
+
+  /*DOMAIN-SPECIFIC TOKENS - per-section knobs the CSS panel exposes one
+  group at a time. Components below use these instead of the global spacing
+  / font tokens so the admin can tweak each section independently and the
+  randomize-section button can shuffle them in isolation. Defaults mirror
+  the values the components used before the refactor.*/
+
+  /*MAIN PROJECT*/
+  --mp-padding-y:         4rem;
+  --mp-margin-bottom:     10rem;
+  --mp-section-gap:       3rem;
+  --mp-title-size:        2.5rem;
+  --mp-number-size:       6rem;
+  --mp-description-size:  1rem;
+  --mp-description-lh:    1.75;
+  --mp-stat-value-size:   2rem;
+  --mp-stat-badge-size:   2rem;
+  --mp-stat-gap:          1rem;
+  --mp-viewer-aspect:     16 / 9;
+  --mp-thumb-aspect:      1;
+  --mp-thumb-strip-width: 16%;
+  --mp-thumb-gap:         0.4rem;
+  --mp-thumb-bg:          hsl(var(--foreground) / 0.1);  /*thumbnail box fill - separate knob from --tag-bg*/
+  --mp-software-size:     0.8rem;
+  --mp-details-gap:       4rem;
+
+  /*GALLERY*/
+  --gallery-columns:          3;
+  --gallery-gap:              2rem;
+  --gallery-card-padding:     1rem;
+  --gallery-thumb-aspect:     4 / 3;
+  --gallery-title-size:       1.2rem;
+  --gallery-stat-size:        0.9rem;
+  --gallery-stat-badge-size:  1.5rem;
+
+  /*HOME (title screen)*/
+  --home-grid-size:           50px;
+  --home-grid-line-width:     1px;
+  --home-grid-drift-speed:    20s;
+  --home-title-size:          5rem;
+  --home-subtitle-size:       2rem;
+  --home-role-size:           1.2rem;
+  --home-container-margin:    170px;
+  --home-content-gap:         1rem;
+  --home-arrow-delay:         1.5s;
+
+  /*NAV (vertical side nav)*/
+  --nav-font-size:   0.8rem;
+  --nav-gap:         1.5rem;
+  --nav-left:        1rem;
+  --nav-font-weight: 700;
+
+  /*EXPERIENCE*/
+  --exp-period-column:        8rem;
+  --exp-grid-gap:             1rem;
+  --exp-item-gap:             3rem;
+  --exp-content-padding-left: 2rem;
+  --exp-title-size:           1.5rem;
+  --exp-company-size:         1.2rem;
+  --exp-bullet-gap:           0.4rem;
+  --exp-line-height:          1.6;
+
   /*vue-shared-ui surface tokens - mapped to shadcn so its components inherit the theme*/
   --vsui-nav-bg:                 hsl(var(--background));
   --vsui-nav-border:             hsl(var(--border-color));
@@ -215,6 +288,21 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/*CSS variables side panel - reserves real layout space instead of overlaying.
+.css-panel-open is toggled on <html> by the panel's setup. Body shifts left
+via padding-right; the fixed-right UI (lang switch + admin gear) shifts in
+sync so nothing sits underneath the panel.*/
+html.css-panel-open                         { --panel-width: 28rem; }
+html.css-panel-open body                    { padding-right: var(--panel-width); }
+html.css-panel-open .portfolio-app__lang-switch { right: calc(var(--spacing-md) + var(--panel-width)); }
+html.css-panel-open .admin-gear             { right: calc(var(--spacing-md) + var(--spacing-5xl) + var(--panel-width)); }
+
+body,
+.portfolio-app__lang-switch,
+.admin-gear {
+  transition: padding-right 0.2s ease, right 0.2s ease;
 }
 
 button {
@@ -278,11 +366,14 @@ where 'border-radius-sm' was misused as a width. Now they correctly use the
   left: 25%;
 }
 
-/*Full-bleed grain overlay - sits BEHIND everything (z-index:1). Content
-(main, nav, gear, etc.) is lifted above with z-index >= 2, so the grain
-shows only where content is transparent. No mix-blend-mode: predictable
-compositing, no darkening of images. Scrolls with the page since the
-parent .portfolio-app expands to the full document height.*/
+/*Full-bleed film-grain overlay - position:absolute so the grain SCROLLS
+with the page (fixed-position grain felt locked-in-place and the user
+explicitly rejected that). The grain stretches inset:0 over .portfolio-app,
+which is a flex column with min-height:100vh and grows to the full document
+height as content stacks. Z:1 sits above section backgrounds (which paint
+at z:auto) so the grain reaches every corner of the page; media (img,
+iframe, video, canvas) is lifted to z:2 below so it covers the grain
+instead of being covered by it.*/
 .grain-overlay {
   position: absolute;
   inset: 0;
@@ -291,6 +382,18 @@ parent .portfolio-app expands to the full document height.*/
   z-index: 1;
   pointer-events: none;
   opacity: var(--grain-opacity);
+}
+
+/*Lift every media element above the grain layer so the grain texture never
+appears on top of a photo, Sketchfab embed, gallery thumbnail or video.
+Anything visual the user can recognise as content gets its own z-index
+higher than .grain-overlay above.*/
+img,
+video,
+iframe,
+canvas {
+  position: relative;
+  z-index: 2;
 }
 
 /*Legacy helper - kept as a no-op for any consumer that still applies it.*/

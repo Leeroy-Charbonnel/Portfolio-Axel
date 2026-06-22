@@ -167,9 +167,9 @@ async function removeBullet(idx: number) {
 .experience-item {
   position: relative;
   display: grid;
-  grid-template-columns: var(--spacing-5xl) 1fr;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-2xl);
+  grid-template-columns: var(--exp-period-column) 1fr;
+  gap: var(--exp-grid-gap);
+  margin-bottom: var(--exp-item-gap);
   padding-right: var(--spacing-2xl);
   align-items: start;
 }
@@ -184,7 +184,7 @@ async function removeBullet(idx: number) {
 
 .experience-item__content {
   position: relative;
-  padding-left: var(--spacing-xl);
+  padding-left: var(--exp-content-padding-left);
   border-left: var(--border-width-sm) solid var(--color-gray-medium);
   display: flex;
   flex-direction: column;
@@ -192,13 +192,13 @@ async function removeBullet(idx: number) {
 }
 
 .experience-item__title {
-  font-size: var(--font-size-lg);
+  font-size: var(--exp-title-size);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-normal);
 }
 
 .experience-item__company {
-  font-size: var(--font-size-md);
+  font-size: var(--exp-company-size);
   color: var(--color-text-secondary);
 }
 
@@ -206,7 +206,7 @@ async function removeBullet(idx: number) {
 .experience-item__location      { color: var(--color-text-tertiary); }
 
 .experience-item__summary {
-  line-height: 1.6;
+  line-height: var(--exp-line-height);
   color: var(--color-text);
 }
 
@@ -218,7 +218,7 @@ doesn't take a separate column when in edit mode.*/
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--exp-bullet-gap);
 }
 
 .experience-item__bullet {
@@ -227,7 +227,7 @@ doesn't take a separate column when in edit mode.*/
   align-items: baseline;
   gap: var(--spacing-sm);
   padding-left: var(--spacing-lg);
-  line-height: 1.6;
+  line-height: var(--exp-line-height);
 }
 
 .experience-item__bullet::before {

@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue"
-import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink } from "lucide-vue-next"
+import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from "vue"
+import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink, Box } from "lucide-vue-next"
+import { useRouter } from "vue-router"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { usePortfolio } from "../../composables/usePortfolio"
-import { hexToRgb, pickImageFile } from "../../lib/portfolio-utils"
+import { pickImageFile, statLetter, statName } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import AnimatedCounter from "./AnimatedCounter.vue"
 import EditableText from "./EditableText.vue"
 import RemoveButton from "./RemoveButton.vue"
 import ReplaceImageButton from "./ReplaceImageButton.vue"
+import ThreeViewer from "./ThreeViewer.vue"
 import { MAIN_PROJECT_LAYOUTS, type MainProjectDto, type MainProjectLayout } from "../../types/portfolio"
 
 //Sketchfab viewer is loaded from a global <script> tag in index.html.
@@ -24,9 +26,27 @@ const props = defineProps<{
   index:   number
 }>()
 
-const { t, lang } = useLanguage()
+const { lang } = useLanguage()
 const { editMode } = useAdmin()
-const { uploadFile, updateMainProject, deleteMainProject } = usePortfolio()
+const { data: portfolioData, uploadFile, updateMainProject, deleteMainProject, setMainProjectSoftware } = usePortfolio()
+const router = useRouter()
+
+function openModelEditor() {
+  router.push(`/edit-3d/${props.project.id}`)
+}
+
+//Software catalog for the edit-mode picker - read from the same shared
+//portfolio fetch so /api/portfolio's `software` array drives the choices.
+const allSoftware = computed(() => portfolioData.value?.software ?? [])
+const selectedSoftwareIds = computed(() => new Set(props.project.software.map((s) => s.id)))
+
+async function toggleSoftware(softwareId: number) {
+  const nextIds = props.project.software.map((s) => s.id)
+  const idx = nextIds.indexOf(softwareId)
+  if (idx >= 0) nextIds.splice(idx, 1)
+  else          nextIds.push(softwareId)
+  await setMainProjectSoftware(props.project.id, nextIds)
+}
 
 const containerRef = ref<HTMLElement | null>(null)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
@@ -41,19 +61,23 @@ const isWireframe             = ref(false)
 //Sketchfab handles (kept as plain refs - they are non-reactive mutable objects)
 let sketchfabClient: any = null
 let sketchfabAPI: any    = null
-let geometryNodes: any[] = []
-const originalMaterials: Record<string, any> = {}
-let whiteMaterialId:    string | null = null
-let emissiveMaterialId: string | null = null
-const originalLights: Record<number, { intensity: number; color: number[] }> = {}
-
-const wireframeColor             = computed(() => props.project.wireframeParameters?.wireframeColor ?? "00000020")
-const whiteMaterialColor         = computed(() => props.project.wireframeParameters?.whiteMaterialColor ?? "ffffff")
-const emissiveMaterialsOverwrite = computed(() => props.project.wireframeParameters?.emissiveMaterialsOverwrite ?? [])
-const emissiveMaterialColor      = "#85efff"
 
 const mainImageUrl      = computed(() => props.project.mainImageUrl)
 const wireframeImageUrl = computed(() => props.project.mainWireframeUrl ?? props.project.mainImageUrl)
+
+//Used to decide whether to render the wireframe button. We show it when
+//ANY of these has a wireframe variant available:
+//  - the 3D viewer (we always have one when a .glb is uploaded - the
+//    ThreeViewer carries its own wireframe-mode rig from the editor)
+//  - the main image
+//  - at least one thumbnail
+//Without a .glb and without any wireframe image variants, the button
+//would be a no-op so we hide it.
+const hasAnyWireframeImage = computed(() => {
+  if (props.project.glbUrl) return true
+  if (props.project.mainWireframeUrl) return true
+  return props.project.thumbnails.some((t) => t.wireframeUrl)
+})
 const layoutClass       = computed(() => `main-project--layout-${props.project.layout}`)
 
 //ICON used for each layout choice in the picker (visually communicates the arrangement)
@@ -92,6 +116,24 @@ watch(isInView, (val) => {
   if (val && !sketchfabInitialized.value && !editMode.value) initSketchfab()
 })
 
+//Switching between edit and view mode tears down / re-mounts the iframe via
+//v-if. The Sketchfab API was bound to the previous iframe instance, so it
+//ends up dead after the toggle. Reset the state machine when going back
+//to view mode and re-init once the iframe is back in the DOM.
+watch(editMode, async (newVal) => {
+  if (newVal === false && props.project.modelId) {
+    sketchfabInitialized.value = false
+    sketchfabLoaded.value      = false
+    sketchfabError.value       = false
+    isLoading.value            = false
+    sketchfabAPI               = null
+    sketchfabClient            = null
+    isWireframe.value          = false
+    await nextTick()
+    if (isInView.value) initSketchfab()
+  }
+})
+
 function initSketchfab() {
   if (!iframeRef.value || !isInView.value || sketchfabInitialized.value) return
   if (!props.project.modelId) return
@@ -110,7 +152,6 @@ function initSketchfab() {
       success: (api: any) => {
         sketchfabAPI = api
         api.start()
-        api.addEventListener("viewerready", onViewerReady)
         sketchfabLoaded.value = true
         isLoading.value = false
       },
@@ -153,97 +194,21 @@ function initSketchfab() {
   }
 }
 
-function onViewerReady() {
-  if (!sketchfabAPI) return
-  initMaterials()
-  storeOriginalLights()
-  sketchfabAPI.getNodeMap((err: any, nodes: any) => {
-    if (err) { console.error("[MainProject] getNodeMap error:", err); return }
-    geometryNodes = (Object.values(nodes) as any[]).filter((n) => n.type === "Geometry")
-    for (const node of geometryNodes) originalMaterials[node.name] = node.materialID
-  })
-}
-
-function storeOriginalLights() {
-  if (!sketchfabAPI) return
-  for (let i = 0; i < 3; i++) {
-    sketchfabAPI.getLight(i, (err: any, light: any) => {
-      if (err) { console.error(`[MainProject] getLight ${i} error:`, err); return }
-      originalLights[i] = { intensity: light.intensity, color: light.color }
-    })
-  }
-}
-
-function initMaterials() {
-  if (!sketchfabAPI) return
-  sketchfabAPI.createMaterial({
-    channels: {
-      AlbedoPBR:    { color: [hexToRgb(emissiveMaterialColor)] },
-      EmitColor:    { enable: true, type: "additive", factor: 1, color: hexToRgb(emissiveMaterialColor) },
-      RoughnessPBR: { factor: 1 },
-    },
-  }, (err: any, material: any) => {
-    if (err) { console.error("[MainProject] createMaterial (emissive) error:", err); return }
-    emissiveMaterialId = material.id
-  })
-  sketchfabAPI.createMaterial({
-    channels: {
-      AlbedoPBR:    { color: hexToRgb(whiteMaterialColor.value) },
-      EmitColor:    { enable: false },
-      RoughnessPBR: { factor: 1 },
-    },
-  }, (err: any, material: any) => {
-    if (err) { console.error("[MainProject] createMaterial (white) error:", err); return }
-    whiteMaterialId = material.id
-  })
-}
-
-function setLightsForWireframe() {
-  if (!sketchfabAPI || !props.project.wireframeParameters?.lightsOverwrite) return
-  for (const light of props.project.wireframeParameters.lightsOverwrite) {
-    if (light.index < 0 || light.index >= 3) continue
-    const intensity = light.intensity ?? originalLights[light.index]?.intensity
-    const color     = light.color ? hexToRgb(light.color) : originalLights[light.index]?.color
-    sketchfabAPI.setLight(light.index, { intensity, color })
-  }
-}
-
-function restoreOriginalLights() {
-  if (!sketchfabAPI) return
-  for (const [indexStr, settings] of Object.entries(originalLights)) {
-    sketchfabAPI.setLight(parseInt(indexStr), { intensity: settings.intensity, color: settings.color })
-  }
-}
-
+//Wireframe button only swaps the still-image sources (main image +
+//thumbnails) to their `wireframeUrl` variants. It does NOT touch the
+//Sketchfab viewer (no setWireframe, no material override, no light
+//override) and it does NOT touch the local Three.js viewer either -
+//the ThreeViewer has its own wireframe button for the 3D model itself.
 function toggleWireframe(e: Event) {
   e.preventDefault()
-  if (!sketchfabAPI || whiteMaterialId === null || emissiveMaterialId === null) {
-    isWireframe.value = false
-    return
-  }
-  const next = !isWireframe.value
-  sketchfabAPI.setWireframe(true, { color: next ? wireframeColor.value : "00000000" })
-  if (next) {
-    setLightsForWireframe()
-    for (const node of geometryNodes) {
-      const matId = originalMaterials[node.name]
-      if (emissiveMaterialsOverwrite.value.includes(matId)) {
-        sketchfabAPI.assignMaterial(node, emissiveMaterialId)
-      } else {
-        sketchfabAPI.assignMaterial(node, whiteMaterialId)
-      }
-    }
-  } else {
-    restoreOriginalLights()
-    for (const node of geometryNodes) sketchfabAPI.assignMaterial(node, originalMaterials[node.name])
-  }
-  isWireframe.value = next
+  isWireframe.value = !isWireframe.value
 }
 
 const statRows = computed(() => [
-  { key: "vertices" as const, labelKey: "projectsStatVertices", value: props.project.stats.vertices ?? 0 },
-  { key: "edges"    as const, labelKey: "projectsStatEdges",    value: props.project.stats.edges ?? 0 },
-  { key: "faces"    as const, labelKey: "projectsStatFaces",    value: props.project.stats.faces ?? 0 },
+  { key: "vertices"  as const, value: props.project.stats.vertices  ?? 0 },
+  { key: "edges"     as const, value: props.project.stats.edges     ?? 0 },
+  { key: "faces"     as const, value: props.project.stats.faces     ?? 0 },
+  { key: "triangles" as const, value: props.project.stats.triangles ?? 0 },
 ])
 
 function thumbSrc(t: { url: string | null; wireframeUrl: string | null }): string {
@@ -272,7 +237,7 @@ async function onLayoutChange(layout: MainProjectLayout) {
   await updateMainProject(props.project.id, { layout })
 }
 
-async function onStatSave(key: "vertices" | "edges" | "faces", val: string) {
+async function onStatSave(key: "vertices" | "edges" | "faces" | "triangles", val: string) {
   const n = parseInt(val.replace(/[^\d-]/g, ""), 10)
   if (Number.isNaN(n)) return
   await updateMainProject(props.project.id, {
@@ -393,25 +358,50 @@ async function replaceThumbnailWireframe(idx: number) {
       on top of it (right-edge column by default, switched per layout).-->
       <div class="main-project__stage">
         <div class="main-project__viewer">
+          <!--3D MODEL - when the project has a .glb uploaded, render via
+          local Three.js viewer (wireframe + materials + lights are driven
+          by the saved viewerSettings). Fallback to the Sketchfab iframe
+          when no .glb is present.-->
+          <ThreeViewer
+            v-if="project.glbUrl && !editMode"
+            :glb-url="project.glbUrl"
+            :settings="(project.viewerSettings as any) ?? null"
+            :wireframe="isWireframe"
+            :is-in-view="isInView"
+            class="main-project__three"
+          />
+
           <img
-            v-if="showMainImage && mainImageUrl"
+            v-if="!project.glbUrl && showMainImage && mainImageUrl"
             :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
             :alt="project.title[lang]"
             class="main-project__viewer-image"
           />
-          <div v-else-if="showMainImage && !mainImageUrl" class="main-project__viewer-empty">
+          <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="main-project__viewer-empty">
             No image
           </div>
 
           <iframe
-            v-if="project.modelId && !editMode"
+            v-if="!project.glbUrl && project.modelId && !editMode"
             ref="iframeRef"
             :title="`Sketchfab Model - ${project.title[lang]}`"
             class="main-project__viewer-embed"
             :class="{ 'main-project__viewer-embed--hidden': !showSketchfab || isLoading }"
           ></iframe>
 
-          <ReplaceImageButton v-if="editMode" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
+          <ReplaceImageButton v-if="editMode && !project.glbUrl" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
+
+          <!--EDIT 3D - admin-only shortcut to the model editor page-->
+          <button
+            v-if="editMode"
+            type="button"
+            class="main-project__edit-3d"
+            :title="project.glbUrl ? 'Edit 3D model settings' : 'Upload a .glb and edit'"
+            @click="openModelEditor"
+          >
+            <Box :size="14" />
+            <span>Edit 3D</span>
+          </button>
         </div>
 
         <div v-if="showThumbnails" class="main-project__thumbnails">
@@ -437,59 +427,53 @@ async function replaceThumbnailWireframe(idx: number) {
           </button>
         </div>
 
-        <!--Wireframe toggle - tucked at the bottom-LEFT of the stage so it
-        doesn't collide with the thumbnail column on the right. Only visible
-        in view mode and when the Sketchfab viewer is loaded.-->
-        <button
-          v-if="!editMode"
-          type="button"
-          class="main-project__wireframe-btn"
-          :class="{ 'main-project__wireframe-btn--active': isWireframe }"
-          :disabled="!sketchfabLoaded"
-          aria-label="Toggle wireframe"
-          @click="toggleWireframe"
+        <!--Viewer-corner cluster: wireframe toggle + sketchfab link sit
+        as a single flex row in the bottom-right of the stage so the two
+        affordances read as a unit. Wireframe flips images + 3D mode; the
+        Sketchfab icon opens the model page on sketchfab.com.-->
+        <div
+          v-if="hasAnyWireframeImage || (!editMode && project.modelId)"
+          class="main-project__viewer-actions"
         >
-          <Grid :size="16" />
-        </button>
+          <button
+            v-if="hasAnyWireframeImage"
+            type="button"
+            class="main-project__wireframe-btn"
+            :class="{ 'main-project__wireframe-btn--active': isWireframe }"
+            @click="toggleWireframe"
+          >
+            <Grid :size="14" />
+            <span>Wireframe</span>
+          </button>
 
-        <!--Sketchfab link - top-right, accent color. Opens the model page on
-        sketchfab.com in a new tab so visitors can inspect / fork / download.-->
-        <a
-          v-if="!editMode && project.modelId"
-          class="main-project__sketchfab-link"
-          :href="`https://sketchfab.com/models/${project.modelId}`"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Open on Sketchfab"
-        >
-          <ExternalLink :size="14" />
-          <span>Sketchfab</span>
-        </a>
+          <a
+            v-if="!editMode && project.modelId"
+            class="main-project__sketchfab-link"
+            :href="`https://sketchfab.com/models/${project.modelId}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open on Sketchfab"
+            title="Open on Sketchfab"
+          >
+            <ExternalLink :size="14" />
+          </a>
+        </div>
       </div>
 
-      <!--DETAILS - description, optional Sketchfab id, stats + software meta row-->
+      <!--DETAILS - 2-col grid: description LEFT (wide), stats sidebar RIGHT.
+      The software list and optional model-id sit below as a full-width row
+      so the project frame stays balanced regardless of stats column height.-->
       <div class="main-project__details">
-        <EditableText
-          tag="p"
-          class="main-project__description"
-          :value="project.description[lang]"
-          :multiline="true"
-          placeholder="Project description..."
-          @save="onDescriptionSave"
-        />
-
-        <div v-if="editMode" class="main-project__model-id">
-          <span class="main-project__model-id-label">Sketchfab model ID</span>
+        <div class="main-project__details-top">
           <EditableText
-            tag="span"
-            class="main-project__model-id-value"
-            :value="project.modelId"
-            placeholder="(empty = no embed)"
-            @save="onModelIdSave"
+            tag="p"
+            class="main-project__description"
+            :value="project.description[lang]"
+            :multiline="true"
+            placeholder="Project description..."
+            @save="onDescriptionSave"
           />
-        </div>
 
-        <div class="main-project__meta">
           <div class="main-project__stats">
             <AnimatedReveal
               v-for="(item, idx) in statRows"
@@ -502,7 +486,11 @@ async function replaceThumbnailWireframe(idx: number) {
               :final-opacity="1"
               class="main-project__stat"
             >
-              <div class="main-project__stat-label">{{ t(item.labelKey) }}</div>
+              <span
+                class="main-project__stat-icon"
+                :title="statName(item.key, lang)"
+                :aria-label="statName(item.key, lang)"
+              >{{ statLetter(item.key, lang) }}</span>
               <AnimatedCounter v-if="!editMode" :from="0" :to="item.value" :duration="2" />
               <EditableText
                 v-else
@@ -513,20 +501,54 @@ async function replaceThumbnailWireframe(idx: number) {
               />
             </AnimatedReveal>
           </div>
+        </div>
 
-          <div class="main-project__software-list">
-            <a
-              v-for="(sw, idx) in project.software"
-              :key="idx"
-              :href="sw.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="main-project__software"
-            >
-              <img v-if="sw.logoUrl" :src="sw.logoUrl" :alt="sw.key" width="20" height="20" />
-              <span class="main-project__software-name">{{ sw.key }}</span>
-            </a>
-          </div>
+        <!--SOFTWARE - moved ABOVE the separator so the badges sit visually
+        attached to the description block. View mode renders only the
+        attached entries as link pills. Edit mode renders the FULL catalog
+        as toggleable pills so the admin can add or remove by clicking.
+        Empty catalog hints at the Settings page.-->
+        <div v-if="!editMode" class="main-project__software-list">
+          <a
+            v-for="sw in project.software"
+            :key="sw.id"
+            :href="sw.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="main-project__software"
+          >
+            <img v-if="sw.logoUrl" :src="sw.logoUrl" :alt="sw.key" width="20" height="20" />
+            <span class="main-project__software-name">{{ sw.key }}</span>
+          </a>
+        </div>
+
+        <div v-else class="main-project__software-list main-project__software-list--edit">
+          <button
+            v-for="sw in allSoftware"
+            :key="sw.id"
+            type="button"
+            class="main-project__software"
+            :class="{ 'main-project__software--active': selectedSoftwareIds.has(sw.id) }"
+            :title="sw.key"
+            @click="toggleSoftware(sw.id)"
+          >
+            <img v-if="sw.logoUrl" :src="sw.logoUrl" :alt="sw.key" width="20" height="20" />
+            <span class="main-project__software-name">{{ sw.key }}</span>
+          </button>
+          <span v-if="!allSoftware.length" class="main-project__software-empty">
+            No software in catalog. Add some in /settings.
+          </span>
+        </div>
+
+        <div v-if="editMode" class="main-project__model-id">
+          <span class="main-project__model-id-label">Sketchfab model ID</span>
+          <EditableText
+            tag="span"
+            class="main-project__model-id-value"
+            :value="project.modelId"
+            placeholder="(empty = no embed)"
+            @save="onModelIdSave"
+          />
         </div>
       </div>
     </article>
@@ -550,21 +572,18 @@ Layout picker pins top-right of the article (absolute), never clips.
 */
 
 .main-project {
-  --thumb-aspect:  1;
-  --viewer-aspect: 16 / 9;
-  --thumb-strip:   16%;     /*width of the side thumbnail column*/
-  --content-max:   62ch;
+  --content-max: 62ch;
   position: relative;
   width: 100%;
-  margin-bottom: var(--spacing-6xl);
-  padding: var(--spacing-3xl) 0;
+  margin-bottom: var(--mp-margin-bottom);
+  padding: var(--mp-padding-y) 0;
 }
 
 .main-project__article {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2xl);
+  gap: var(--mp-section-gap);
 }
 
 /*HEADER - watermark number + bold title -----------------------------------*/
@@ -577,7 +596,7 @@ Layout picker pins top-right of the article (absolute), never clips.
 }
 
 .main-project__number {
-  font-size: clamp(3rem, 8vw, 6rem);
+  font-size: var(--mp-number-size);
   font-weight: 900;
   line-height: 1;
   color: transparent;
@@ -587,7 +606,7 @@ Layout picker pins top-right of the article (absolute), never clips.
 }
 
 .main-project__title {
-  font-size: clamp(1.5rem, 3vw, var(--font-size-2xl));
+  font-size: var(--mp-title-size);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-tight);
   line-height: 1.1;
@@ -634,7 +653,7 @@ background) and the thumbnail column as absolute overlays on top. Layout
 variants only switch where the thumbnail column sits.*/
 .main-project__stage {
   position: relative;
-  aspect-ratio: var(--viewer-aspect);
+  aspect-ratio: var(--mp-viewer-aspect);
   width: 100%;
 }
 
@@ -656,10 +675,55 @@ the page; same idea for the static image fallback.*/
   height: 100%;
   object-fit: contain;
   border: none;
+}
+
+/*Static image fallback: same neutral fill as the stat badges so the empty
+viewer reads as part of the same visual family instead of a transparent
+hole in the layout. Resolved through --tag-bg so the side panel can retint
+the empty-viewer + every badge in one knob.*/
+.main-project__viewer-image {
+  background-color: var(--tag-bg);
+}
+
+.main-project__viewer-embed {
   background: transparent;
 }
 
 .main-project__viewer-embed--hidden { display: none; }
+
+/*Local Three.js viewer replaces the iframe when a .glb is uploaded.*/
+.main-project__three {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+/*Admin-only "Edit 3D" shortcut - jumps to /edit-3d/:id*/
+.main-project__edit-3d {
+  position: absolute;
+  top:   var(--spacing-md);
+  right: var(--spacing-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: hsl(0 0% 0% / 0.7);
+  border: var(--border-width-sm) solid var(--color-accent);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  cursor: pointer;
+  z-index: 20;
+  backdrop-filter: blur(var(--filter-blur));
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.main-project__edit-3d:hover {
+  background-color: var(--color-accent);
+  color: hsl(0 0% 0%);
+}
 
 .main-project__viewer-empty {
   position: absolute;
@@ -673,48 +737,54 @@ the page; same idea for the static image fallback.*/
   text-transform: uppercase;
 }
 
-/*Sketchfab wireframe toggle - bottom-LEFT corner of the stage, opposite from
-the thumbnail column on the right. Keeps it visible without colliding.*/
-.main-project__wireframe-btn {
+/*Sketchfab wireframe toggle - bottom-LEFT corner of the stage, mirrors the
+shape and metrics of .main-project__sketchfab-link on the top-right so the
+two floating controls feel like a matched pair.*/
+/*Viewer-corner action cluster: bottom-right of the stage, holds the
+wireframe toggle + sketchfab link as a horizontal pair.*/
+.main-project__viewer-actions {
   position: absolute;
   bottom: var(--spacing-md);
-  left:   var(--spacing-md);
-  width:  var(--spacing-2xl);
-  height: var(--spacing-2xl);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: hsl(0 0% 0% / 0.6);
-  border: var(--border-width-sm) solid var(--color-text-secondary);
-  border-radius: var(--border-radius-full);
-  color: var(--color-text-hover);
-  cursor: pointer;
+  right:  var(--spacing-md);
+  display: inline-flex;
+  align-items: stretch;
+  gap: var(--spacing-xs);
   z-index: 15;
-  backdrop-filter: blur(var(--filter-blur));
-  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.main-project__wireframe-btn--active  { background-color: var(--color-accent); border-color: var(--color-accent); color: hsl(0 0% 0%); }
-
-/*Sketchfab external-link button - top-right of the stage, accent-coloured*/
-.main-project__sketchfab-link {
-  position: absolute;
-  top:   var(--spacing-md);
-  right: var(--spacing-md);
+.main-project__wireframe-btn {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
   background-color: hsl(0 0% 0% / 0.6);
-  border: var(--border-width-sm) solid var(--color-accent);
-  color: var(--color-accent);
+  border: var(--border-width-sm) solid var(--color-text-secondary);
+  color: var(--color-text-hover);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
+  cursor: pointer;
+  backdrop-filter: blur(var(--filter-blur));
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.main-project__wireframe-btn--active  { background-color: var(--color-accent); border-color: var(--color-accent); color: hsl(0 0% 0%); }
+
+/*Sketchfab icon link - square button next to the wireframe toggle.
+Same height as the wireframe button (align-items:stretch on the cluster
+makes both buttons share the wireframe's intrinsic height).*/
+.main-project__sketchfab-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  padding: 0 var(--spacing-xs);
+  background-color: hsl(0 0% 0% / 0.6);
+  border: var(--border-width-sm) solid var(--color-accent);
+  color: var(--color-accent);
   text-decoration: none;
   backdrop-filter: blur(var(--filter-blur));
-  z-index: 15;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -733,18 +803,21 @@ column (left edge, bottom row, hidden entirely).*/
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--mp-thumb-gap);
   z-index: 10;
   max-height: calc(100% - var(--spacing-xl) * 2);
-  width: calc(var(--thumb-strip) - var(--spacing-md));
+  width: calc(var(--mp-thumb-strip-width) - var(--spacing-md));
 }
 
 .main-project__thumbnail {
   position: relative;
   width: 100%;
-  aspect-ratio: var(--thumb-aspect);
+  aspect-ratio: var(--mp-thumb-aspect);
   overflow: hidden;
-  /*no border - thumbnails sit raw on top of the viewer*/
+  /*no border - thumbnails sit raw on top of the viewer. Independent knob
+  --mp-thumb-bg lets the admin retint the strip without touching the stat
+  badges (--tag-bg).*/
+  background-color: var(--mp-thumb-bg);
 }
 
 /*LAYOUT VARIANTS - the stage stays the same, only the thumbnails reposition*/
@@ -776,7 +849,7 @@ column (left edge, bottom row, hidden entirely).*/
 .main-project--layout-thumbs-bottom .main-project__thumbnail-add {
   width: auto;
   height: 100%;
-  aspect-ratio: var(--thumb-aspect);
+  aspect-ratio: var(--mp-thumb-aspect);
 }
 
 .main-project--layout-viewer-only .main-project__thumbnails {
@@ -797,7 +870,7 @@ column (left edge, bottom row, hidden entirely).*/
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-background-gray-100);
+  background-color: var(--mp-thumb-bg);
   color: var(--color-text-tertiary);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
@@ -810,7 +883,7 @@ column (left edge, bottom row, hidden entirely).*/
   align-items: center;
   justify-content: center;
   width: 100%;
-  aspect-ratio: var(--thumb-aspect);
+  aspect-ratio: var(--mp-thumb-aspect);
   background-color: hsl(0 0% 0% / 0.5);
   backdrop-filter: blur(var(--filter-blur));
   border: var(--border-width-md) dashed var(--color-text-hover);
@@ -825,8 +898,10 @@ column (left edge, bottom row, hidden entirely).*/
   background-color: hsl(var(--primary) / 0.15);
 }
 
-/*DETAILS - single column stack. Description first (max-width capped for
-readability), then optional model-id, then a full-width meta row.*/
+/*DETAILS - 2-col top row (description + stats sidebar), then optional
+model-id, then a full-width software row. The top row uses CSS grid so the
+description gets the bulk of the width and the stats column sits flush to
+the right without forcing the description to wrap mid-paragraph.*/
 .main-project__details {
   display: flex;
   flex-direction: column;
@@ -834,11 +909,18 @@ readability), then optional model-id, then a full-width meta row.*/
   padding-top: var(--spacing-md);
 }
 
+.main-project__details-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--mp-details-gap);
+  align-items: start;
+}
+
 .main-project__description {
-  line-height: 1.75;
-  font-size: var(--font-size-base);
+  line-height: var(--mp-description-lh);
+  font-size: var(--mp-description-size);
   color: var(--color-text);
-  max-width: var(--content-max);
+  min-width: 0;       /*prevents the description from forcing the grid to overflow*/
 }
 
 .main-project__model-id {
@@ -863,54 +945,62 @@ readability), then optional model-id, then a full-width meta row.*/
   color: var(--color-text-hover);
 }
 
-/*META row - stats LEFT, software list RIGHT. Hairline separator above
-mirrors the article-header hairline, framing the project visually.*/
-.main-project__meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: var(--spacing-2xl);
-  flex-wrap: wrap;
-  padding-top: var(--spacing-lg);
-  border-top: var(--border-width-sm) solid var(--color-gray-medium);
-}
-
-/*STATS - horizontal row of stat columns ----------------------------------*/
+/*STATS - vertical column sidebar in the details-top grid. Each row is icon
++ number on a single horizontal line. Replaces the old text labels with
+the StatIcon SVG so a quick glance shows vert/edge/face counts.*/
 .main-project__stats {
   display: flex;
-  gap: var(--spacing-2xl);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--mp-stat-gap);
+  min-width: 8rem;
 }
 
 .main-project__stat {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--spacing-xxs);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--spacing-sm);
 }
 
-.main-project__stat-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
+/*Letter badge - shares the visual language of the gallery letters. Square,
+filled with --tag-bg, mono font for the single character (V/E/F/T or the
+French S/A/F/T). Title attribute carries the full name as a tooltip.*/
+.main-project__stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width:  var(--mp-stat-badge-size);
+  height: var(--mp-stat-badge-size);
+  background-color: var(--tag-bg);
+  color: var(--color-text-hover);
+  font-size: calc(var(--mp-stat-badge-size) * 0.5);
+  font-weight: var(--font-weight-bold);
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  letter-spacing: 0;
+  cursor: default;
+  flex-shrink: 0;
 }
 
 .main-project__stat :deep(span),
 .main-project__stat-value {
-  font-size: var(--font-size-xl);
+  font-size: var(--mp-stat-value-size);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-hover);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
-/*SOFTWARE LIST - inline pills, right side of the meta row ----------------*/
+/*SOFTWARE LIST - sits directly under the description block. The hairline
+that used to live above the software now lives BELOW it so the badges
+read as part of the description's meta strip and the separator marks the
+end of the visible content (admin model-id row goes below the line).*/
 .main-project__software-list {
   display: flex;
   gap: var(--spacing-xs);
   flex-wrap: wrap;
   align-items: center;
+  padding-bottom: var(--spacing-lg);
+  border-bottom: var(--border-width-sm) solid var(--color-gray-medium);
 }
 
 .main-project__software {
@@ -921,7 +1011,7 @@ mirrors the article-header hairline, framing the project visually.*/
   background-color: transparent;
   border: var(--border-width-sm) solid var(--color-gray-medium);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--mp-software-size);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-normal);
   font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
@@ -931,6 +1021,27 @@ mirrors the article-header hairline, framing the project visually.*/
 .main-project__software:hover {
   border-color: var(--color-accent);
   color: var(--color-text-hover);
+}
+
+/*Edit-mode software list shows every catalog entry as a toggleable pill.
+Unselected entries fade slightly so the active set reads at a glance.*/
+.main-project__software-list--edit { gap: var(--spacing-sm); }
+
+.main-project__software-list--edit .main-project__software {
+  cursor: pointer;
+  opacity: 0.45;
+}
+
+.main-project__software-list--edit .main-project__software--active {
+  opacity: 1;
+  border-color: var(--color-accent);
+  color: var(--color-text-hover);
+}
+
+.main-project__software-empty {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-style: italic;
 }
 
 .main-project__software img { filter: brightness(0.8); transition: filter 0.2s ease; }
@@ -976,10 +1087,18 @@ fit the side column or move to a horizontal row at the bottom.*/
 }
 
 @media (max-width: 600px) {
-  .main-project__meta {
-    flex-direction: column;
-    align-items: flex-start;
+  /*Collapse the description + stats grid into a single stack on narrow
+  viewports - stats sit under the description in a horizontal row instead
+  of a sidebar column to save vertical space.*/
+  .main-project__details-top {
+    grid-template-columns: 1fr;
     gap: var(--spacing-lg);
+  }
+  .main-project__stats {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+    min-width: 0;
   }
   .main-project__software-name { display: none; }
 }

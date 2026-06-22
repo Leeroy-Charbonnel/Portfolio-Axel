@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router"
 import { ToastHost, useAccent, useLang } from "vue-shared-ui"
-import SideNav    from "./components/portfolio/SideNav.vue"
-import AdminGear  from "./components/portfolio/AdminGear.vue"
+import SideNav      from "./components/portfolio/SideNav.vue"
+import AdminGear    from "./components/portfolio/AdminGear.vue"
+import CssVarsPanel from "./components/portfolio/CssVarsPanel.vue"
 
 //ensure accent_color is seeded then applied to --primary (HSL). In public auth
 //mode the DB seed call no-ops gracefully if there is no user session.
@@ -17,12 +18,13 @@ const { toggleLang, lang } = useLang()
 //hide portfolio chrome on auth-related routes (login, settings, etc.) so
 //vue-shared-ui's pages render against the bare background
 const route = useRoute()
-const chromeFreeRoutes = ["/login", "/settings", "/pending", "/banned", "/forgot-password", "/reset-password"]
+const chromeFreeRoutes = ["/login", "/settings", "/sketchfab-howto", "/pending", "/banned", "/forgot-password", "/reset-password"]
+//edit-3d uses a dynamic id so check by prefix in the template instead
 </script>
 
 <template>
   <div class="vsui-app portfolio-app">
-    <template v-if="!chromeFreeRoutes.includes(route.path)">
+    <template v-if="!chromeFreeRoutes.includes(route.path) && !route.path.startsWith('/edit-3d/')">
       <SideNav />
 
       <button
@@ -43,6 +45,8 @@ const chromeFreeRoutes = ["/login", "/settings", "/pending", "/banned", "/forgot
 
     <div class="grain-overlay"></div>
 
+    <CssVarsPanel />
+
     <ToastHost />
   </div>
 </template>
@@ -59,14 +63,15 @@ short of the bottom of the page.*/
   flex-direction: column;
 }
 
-/*Main content sits above the grain (z-index:1). isolation:isolate creates a
-fresh stacking context so descendants never get clipped by the grain layer,
-regardless of transforms applied inside (AnimatedReveal etc.). flex:1 lets
-main absorb the remaining height so .portfolio-app spans the whole document.*/
+/*Main flows in the root stacking context (no z-index, no isolation:isolate)
+so media inside it can be lifted ABOVE the grain via the global rule in
+style.css. If main owned its own stacking context, child z-index values
+would be clamped to main's local layer and grain would always sit on top
+of images or always sit below them - we need them interleaved instead.
+flex:1 lets main absorb the remaining height so .portfolio-app spans the
+whole document.*/
 .portfolio-app__main {
   position: relative;
-  z-index: 2;
-  isolation: isolate;
   flex: 1 0 auto;
 }
 

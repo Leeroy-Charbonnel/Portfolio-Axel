@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
 import { Trash2, AlertTriangle, RefreshCw } from "lucide-vue-next"
+import { usePortfolio } from "../../composables/usePortfolio"
 
 //Admin-only file manager. Lists every row in the file table with a usage
 //count, lets the admin delete individual files (only when unused) and bulk-
-//delete every orphan in one click (with a confirm modal).
+//delete every orphan in one click (with a confirm modal). HDR / EXR files
+//and software logos are excluded from the list since they're managed via
+//dedicated UIs (HDR tab in the model editor, SoftwareEditor in /settings).
 
 interface FileRow {
   id:               string
@@ -18,6 +21,8 @@ interface FileRow {
   url:              string
 }
 
+const { data: portfolioData } = usePortfolio()
+
 const files   = ref<FileRow[]>([])
 const loading = ref(false)
 const error   = ref<string | null>(null)
@@ -25,9 +30,25 @@ const error   = ref<string | null>(null)
 const showBulkConfirm = ref(false)
 const bulkInFlight    = ref(false)
 
-const orphans     = computed(() => files.value.filter((f) => f.referenceCount === 0))
+//Software logo file ids - excluded from the file list so logos only live
+//in the SoftwareEditor.
+const softwareLogoIds = computed<Set<string>>(() => {
+  const ids = (portfolioData.value?.software ?? []).map((s) => s.logoFileId).filter((v): v is string => Boolean(v))
+  return new Set(ids)
+})
+
+function isHdr(filename: string): boolean {
+  return /\.(hdr|exr|hdri)$/i.test(filename)
+}
+
+//Visible list = all files minus HDR / EXR / HDRI and minus software logos.
+const visibleFiles = computed(() => files.value.filter((f) =>
+  !isHdr(f.originalFilename) && !softwareLogoIds.value.has(f.id)
+))
+
+const orphans     = computed(() => visibleFiles.value.filter((f) => f.referenceCount === 0))
 const orphanCount = computed(() => orphans.value.length)
-const totalSize   = computed(() => files.value.reduce((a, f) => a + f.sizeBytes, 0))
+const totalSize   = computed(() => visibleFiles.value.reduce((a, f) => a + f.sizeBytes, 0))
 const orphanSize  = computed(() => orphans.value.reduce((a, f) => a + f.sizeBytes, 0))
 
 function formatBytes(n: number): string {
@@ -90,7 +111,7 @@ onMounted(load)
       <div>
         <h2 class="file-manager__title">Files</h2>
         <p class="file-manager__summary">
-          {{ files.length }} total · {{ formatBytes(totalSize) }} ·
+          {{ visibleFiles.length }} total · {{ formatBytes(totalSize) }} ·
           <strong>{{ orphanCount }} unreferenced</strong> ({{ formatBytes(orphanSize) }})
         </p>
       </div>
@@ -124,7 +145,7 @@ onMounted(load)
       </thead>
       <tbody>
         <tr
-          v-for="file in files"
+          v-for="file in visibleFiles"
           :key="file.id"
           class="file-manager__row"
           :class="{ 'file-manager__row--orphan': file.referenceCount === 0 }"
@@ -157,7 +178,7 @@ onMounted(load)
             </button>
           </td>
         </tr>
-        <tr v-if="files.length === 0">
+        <tr v-if="visibleFiles.length === 0">
           <td colspan="5" class="file-manager__empty">No files yet.</td>
         </tr>
       </tbody>

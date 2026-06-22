@@ -1,39 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { ArrowLeft } from "lucide-vue-next"
-import { useAccent, useSettings } from "vue-shared-ui"
-import FileManager from "../components/portfolio/FileManager.vue"
+import FileManager     from "../components/portfolio/FileManager.vue"
+import SoftwareEditor  from "../components/portfolio/SoftwareEditor.vue"
 
-//Custom Settings page - portfolio shows ONLY the accent color picker.
-//vue-shared-ui's SettingsPage would also surface theme + language rows
-//(seeded by useTheme / useLang). The portfolio is dark-only and language
-//is controlled by the top-right toggle, so neither belongs here.
+//Settings page - software catalog + file management. Accent color and every
+//other CSS token live in the CssVarsPanel (gear menu > Customize CSS), so
+//this page focuses purely on data/asset admin.
 
-useAccent()
 const router = useRouter()
-const { getString, update, loaded } = useSettings()
 
-const accent = ref(getString("accent_color", "#0891b2"))
-
-//Re-sync local ref when the settings call finishes loading
-watch(loaded, () => { if (loaded.value) accent.value = getString("accent_color", "#0891b2") })
-
-const previewSwatch = computed(() => accent.value)
-
-async function onAccentInput(e: Event) {
-  const hex = (e.target as HTMLInputElement).value
-  accent.value = hex
-  try {
-    await update("accent_color", hex)
-  } catch (err) {
-    console.error("[settings] save accent failed:", err)
-  }
-}
-
-function goBack() {
-  router.push("/")
-}
+function goBack() { router.push("/") }
 </script>
 
 <template>
@@ -47,29 +24,9 @@ function goBack() {
     </header>
 
     <section class="settings-page__group">
-      <h2 class="settings-page__group-title">Appearance</h2>
-
-      <label class="settings-page__field">
-        <div class="settings-page__field-info">
-          <span class="settings-page__field-label">Accent color</span>
-          <span class="settings-page__field-desc">Primary accent used across the UI - buttons, focus rings, the gear icon when editing.</span>
-        </div>
-        <div class="settings-page__color-control">
-          <span class="settings-page__color-swatch" :style="{ backgroundColor: previewSwatch }" aria-hidden="true"></span>
-          <input
-            type="color"
-            class="settings-page__color-input"
-            :value="accent"
-            @input="onAccentInput"
-          />
-          <span class="settings-page__color-hex">{{ accent }}</span>
-        </div>
-      </label>
+      <SoftwareEditor />
     </section>
 
-    <!--File manager - always rendered. The component handles its own state:
-    if you aren't logged in as admin, the API returns 401 and the FileManager
-    shows an inline error instead of disappearing silently.-->
     <section class="settings-page__group">
       <FileManager />
     </section>
@@ -125,83 +82,6 @@ function goBack() {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-}
-
-.settings-page__group-title {
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
-  color: var(--color-text-tertiary);
-}
-
-.settings-page__field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-xl);
-  padding: var(--spacing-md);
-  background-color: var(--color-background-secondary);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-}
-
-.settings-page__field-info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  flex: 1;
-  min-width: 0;
-}
-
-.settings-page__field-label {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-tight);
-  color: var(--color-text-hover);
-}
-
-.settings-page__field-desc {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-  line-height: 1.5;
-}
-
-.settings-page__color-control {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  flex-shrink: 0;
-}
-
-.settings-page__color-swatch {
-  width:  var(--spacing-2xl);
-  height: var(--spacing-2xl);
-  border: var(--border-width-sm) solid var(--color-border-muted);
-}
-
-.settings-page__color-input {
-  width:  var(--spacing-2xl);
-  height: var(--spacing-2xl);
-  padding: 0;
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  background: transparent;
-  cursor: pointer;
-}
-
-.settings-page__color-input::-webkit-color-swatch-wrapper { padding: 0; }
-.settings-page__color-input::-webkit-color-swatch { border: none; }
-.settings-page__color-input::-moz-color-swatch { border: none; }
-
-.settings-page__color-hex {
-  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  min-width: 4.5rem;
-}
-
-@media (max-width: 600px) {
-  .settings-page__field {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+  margin-bottom: var(--spacing-2xl);
 }
 </style>

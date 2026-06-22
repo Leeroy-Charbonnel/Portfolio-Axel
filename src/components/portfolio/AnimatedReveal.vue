@@ -48,7 +48,14 @@ const initialTransform = computed(() => {
   }
 })
 
+//transform creates a stacking context, which would trap child media in a
+//local layer (z-index relative to this wrapper, not to the page grain).
+//Marking the wrapper position:relative + z-index:2 hoists the whole
+//AnimatedReveal box above .grain-overlay (z:1) so every image, iframe and
+//video inside it paints on top of the grain instead of underneath it.
 const style = computed(() => ({
+  position:        "relative" as const,
+  zIndex:          2,
   opacity:         visible.value ? props.finalOpacity : props.initialOpacity,
   transform:       visible.value ? "translate(0, 0)" : initialTransform.value,
   transition:      `opacity ${props.duration}s ease, transform ${props.duration}s ease`,
