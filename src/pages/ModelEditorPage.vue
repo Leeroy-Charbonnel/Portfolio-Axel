@@ -266,7 +266,6 @@ const selectedLightId = ref<string | null>(null)
 //WIREFRAME MODE
 //===========================================================================
 const wireframeMode      = ref(false)
-const wireframeColor     = ref("#14b8a6")  //teal - forced color of every wf light + emissive picks
 const wireframeEmissive  = ref(2)
 const wireframeOverlayOn    = ref(true)
 
@@ -276,8 +275,14 @@ const wireframeOverlayOn    = ref(true)
 //they show up grouped on the /settings page if the admin wants to see
 //them. update() is self-seeding, so first write also creates the row.
 const { getString, update: updateSetting, loaded: settingsLoaded } = useSettings()
+
+//Mode color tints emissive picks + is the default for new wf lights.
+//Global like the line color + material params: lives in the settings
+//table so a tweak in one project follows the author into every other.
+const wireframeColor = ref(getString("editor3d_wireframe_mode_color", "#14b8a6"))
 const WF_LINE_COLOR_KEY  = "editor3d_wireframe_line_color"
 const WF_MAT_PARAMS_KEY  = "editor3d_wireframe_material"
+const WF_MODE_COLOR_KEY  = "editor3d_wireframe_mode_color"
 
 const wireframeOverlayColor = ref(getString(WF_LINE_COLOR_KEY, "#000000"))
 const showLightGizmos       = ref(true)        //sphere/diamond helpers visibility
@@ -459,6 +464,7 @@ function fitCanvasSize(containerW: number, containerH: number): { w: number; h: 
 watch(settingsLoaded, (loaded) => {
   if (!loaded) return
   wireframeOverlayColor.value = getString(WF_LINE_COLOR_KEY, "#000000")
+  wireframeColor.value        = getString(WF_MODE_COLOR_KEY, "#14b8a6")
   wfMatParams.value = parseWfMatParams(getString(WF_MAT_PARAMS_KEY, ""))
   //push the freshly-loaded values onto the live materials / overlays
   if (wfBaseMat || wfPickMat) syncWfMaterialsParams()
@@ -873,11 +879,10 @@ function hydrateFromSavedSettings(payload: unknown) {
   if (s.normalMode?.hdrIntensity !== undefined)     normalHdrIntensity.value  = s.normalMode.hdrIntensity
   if (s.wireframeMode?.hdrId !== undefined)         wfHdrId.value             = s.wireframeMode.hdrId
   if (s.wireframeMode?.hdrIntensity !== undefined)  wfHdrIntensity.value      = s.wireframeMode.hdrIntensity
-  if (s.wireframeMode?.color)                       wireframeColor.value      = s.wireframeMode.color
   if (s.wireframeMode?.overlayOn !== undefined)     wireframeOverlayOn.value  = s.wireframeMode.overlayOn
-  //s.wireframeMode.overlayColor + s.wireframeMode.material are GLOBAL
-  //editor prefs (settings table). Ignore the per-project values during
-  //hydration so the DB-backed global wins.
+  //s.wireframeMode.color (mode color) + .overlayColor (line color) +
+  //.material are GLOBAL editor prefs (settings table). Ignore the
+  //per-project values during hydration so the DB-backed global wins.
   //start view (camera pose) is the bridge between the editor and the
   //production viewer's intro animation. Just a 6-number snapshot.
   if (s.startView)                                  startView.value = s.startView
@@ -1665,6 +1670,22 @@ function selectGizmo(idx: number, which: "source" | "target") {
   if (which === "target" && entry.target) transformCtrls.attach(entry.target)
   else                                    transformCtrls.attach(entry.light)
 
+  //Surface the matching panel section: in wireframe mode flip to the
+  //Wireframe tab + open its Lights accordion; in normal mode flip to
+  //the Lights tab + open the Lights accordion. Both also slide to the
+  //selected row via scrollIntoView once the panel rerenders.
+  if (wireframeMode.value) {
+    tab.value = "wireframe"
+    sectionOpen.value.wfLights = true
+  } else {
+    tab.value = "lights"
+    sectionOpen.value.lightsList = true
+  }
+  queueMicrotask(() => {
+    const el = document.querySelector(`.editor__mat--selected`)
+    if (el instanceof HTMLElement) el.scrollIntoView({ behavior: "smooth", block: "center" })
+  })
+
   //smoothly move the camera so the gizmo is in frame
   if (cameraRef && controls) {
     const focus = which === "target" ? entry.target!.position.clone() : entry.light.position.clone()
@@ -1898,10 +1919,15 @@ function onWireframeOverlayToggle(v: boolean) {
 }
 
 function onWireframeColorChange(hex: string) {
-  //Mode color is now just the DEFAULT for newly-added wf lights and the
-  //tint applied to emissive picks. Existing wf lights keep their own
-  //color so the user can color-pick each independently.
+  //Mode color is the DEFAULT for newly-added wf lights and the tint
+  //applied to emissive picks. Existing wf lights keep their own color
+  //so the user can color-pick each independently. Persisted globally.
   wireframeColor.value = hex
+  updateSetting(WF_MODE_COLOR_KEY, hex, {
+    type: "string",
+    group: "editor3d",
+    description: "Wireframe mode color (shared across every project in the editor).",
+  }).catch((err: unknown) => console.warn("[model-editor] save mode color failed:", err))
   for (const e of emissiveList.value) {
     e.material.emissive.set(hex)
     e.material.needsUpdate = true
@@ -2646,7 +2672,9 @@ async function onSave() {
         WIREFRAME - wireframe-mode rig + shared material + emissive picks
         ====================================================================-->
         <div v-show="tab === 'wireframe'" class="editor__group">
-          <!--MODE section: overlay on/off, line color, mode color, emissive intensity-->
+          <!--MODE section: just the overlay on/off toggle. Lines color +
+          mode color are GLOBAL so they live with the other global params
+          in the Material section below.-->
           <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfMode }">
             <button type="button" class="editor__section-head" @click="sectionOpen.wfMode = !sectionOpen.wfMode">
               <span class="editor__section-title">Wireframe</span>
@@ -2656,20 +2684,6 @@ async function onSave() {
               <div class="editor__row editor__row--inline">
                 <input type="checkbox" class="editor__check" id="wf-overlay" :checked="wireframeOverlayOn" @change="(e) => onWireframeOverlayToggle((e.target as HTMLInputElement).checked)" />
                 <label class="editor__row-label" for="wf-overlay">Lines overlay</label>
-              </div>
-              <div class="editor__row">
-                <label class="editor__row-label">Lines color</label>
-                <div class="editor__row-control">
-                  <input type="color" class="editor__color" :value="wireframeOverlayColor" @input="(e) => onWireframeOverlayColor((e.target as HTMLInputElement).value)" />
-                  <span class="editor__readout">{{ wireframeOverlayColor }}</span>
-                </div>
-              </div>
-              <div class="editor__row">
-                <label class="editor__row-label">Mode color</label>
-                <div class="editor__row-control">
-                  <input type="color" class="editor__color" :value="wireframeColor" @input="(e) => onWireframeColorChange((e.target as HTMLInputElement).value)" />
-                  <span class="editor__readout">{{ wireframeColor }}</span>
-                </div>
               </div>
             </div>
           </section>
@@ -2707,7 +2721,21 @@ async function onSave() {
               <ChevronDown :size="14" class="editor__section-chevron" />
             </button>
             <div v-show="sectionOpen.wfMaterial" class="editor__section-body">
-              <p class="editor__warning">⚠ This material is shared across the wireframe mode of every project — changes apply everywhere.</p>
+              <p class="editor__warning">⚠ Material, lines color and mode color are shared across the wireframe mode of every project — changes apply everywhere.</p>
+              <div class="editor__row">
+                <label class="editor__row-label">Lines color</label>
+                <div class="editor__row-control">
+                  <input type="color" class="editor__color" :value="wireframeOverlayColor" @input="(e) => onWireframeOverlayColor((e.target as HTMLInputElement).value)" />
+                  <span class="editor__readout">{{ wireframeOverlayColor }}</span>
+                </div>
+              </div>
+              <div class="editor__row">
+                <label class="editor__row-label">Mode color</label>
+                <div class="editor__row-control">
+                  <input type="color" class="editor__color" :value="wireframeColor" @input="(e) => onWireframeColorChange((e.target as HTMLInputElement).value)" />
+                  <span class="editor__readout">{{ wireframeColor }}</span>
+                </div>
+              </div>
               <div class="editor__row">
                 <label class="editor__row-label">Color</label>
                 <div class="editor__row-control">
@@ -2997,23 +3025,22 @@ they pair visually with the ViewHelper cube.*/
 .editor__group-title { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); color: var(--color-text-tertiary); padding-bottom: var(--spacing-xxs); }
 
 /*CARD - common look for every collapsible item in the panel (materials,
-lights, accordion sections). Subtle fill + full border + small radius
-so items are clearly delimited instead of melting together. Full border
-+ radius is allowed (project rule #2 only forbids single-side border
-with radius).*/
+lights, accordion sections). Background fill does the delimiting work;
+border is hairline-thin so adjacent cards don't look caged. Vertical
+spacing between cards is tight (--spacing-xxs) so the panel feels dense.*/
 .editor__mat {
   display: flex;
   flex-direction: column;
-  background-color: hsl(var(--background) / 0.5);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  margin-bottom: var(--spacing-sm);
+  background-color: hsl(0 0% 100% / 0.04);
+  border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
+  margin-bottom: var(--spacing-xxs);
   padding: 0 var(--spacing-sm);
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: background-color 0.15s ease;
 }
-.editor__mat:hover { border-color: var(--color-text-tertiary); }
+.editor__mat:hover { background-color: hsl(0 0% 100% / 0.07); }
 .editor__mat:last-child { margin-bottom: 0; }
-.editor__mat-head { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-sm) 0; background: transparent; border: none; color: inherit; cursor: pointer; text-align: left; width: 100%; }
-.editor__mat-head--static { cursor: default; padding-top: var(--spacing-sm); }
+.editor__mat-head { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-xs) 0; background: transparent; border: none; color: inherit; cursor: pointer; text-align: left; width: 100%; }
+.editor__mat-head--static { cursor: default; padding-top: var(--spacing-xs); }
 .editor__mat-head--static:hover .editor__mat-chevron { color: var(--color-text-tertiary); }
 
 .editor__mat-swatch { width: var(--spacing-lg); height: var(--spacing-lg); flex-shrink: 0; border: var(--border-width-sm) solid var(--color-gray-medium); }
@@ -3025,29 +3052,29 @@ with radius).*/
 .editor__mat-body {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-sm) 0;
-  border-top: var(--border-width-sm) dashed var(--color-gray-medium);
+  gap: var(--spacing-xxs);
+  padding: var(--spacing-xs) 0;
+  border-top: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
 }
 .editor__mat--selected {
-  border-color: var(--color-accent);
-  background-color: hsl(var(--primary) / 0.08);
+  background-color: hsl(var(--primary) / 0.12);
+  border-color: hsl(var(--primary) / 0.35);
 }
 
-.editor__sub { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-md); border-top: var(--border-width-sm) solid var(--color-gray-medium); }
+.editor__sub { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-sm); border-top: var(--border-width-sm) solid hsl(0 0% 100% / 0.06); }
 
-/*ACCORDION sections for the Lights / Wireframe tabs - same card treatment
-as materials so the eye groups them as peers.*/
+/*ACCORDION sections - SAME card treatment but a notch darker so when a
+section contains item-cards inside, the two layers are visually distinct.*/
 .editor__section {
   display: flex;
   flex-direction: column;
-  background-color: hsl(var(--background) / 0.5);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  margin-bottom: var(--spacing-sm);
+  background-color: hsl(0 0% 100% / 0.025);
+  border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
+  margin-bottom: var(--spacing-xxs);
   padding: 0 var(--spacing-sm);
 }
 .editor__section:last-child { margin-bottom: 0; }
-.editor__section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); padding: var(--spacing-sm) 0; background: transparent; border: none; color: inherit; cursor: pointer; text-align: left; width: 100%; }
+.editor__section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); padding: var(--spacing-xs) 0; background: transparent; border: none; color: inherit; cursor: pointer; text-align: left; width: 100%; }
 .editor__section-title { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); color: var(--color-text-hover); }
 .editor__section-chevron { color: var(--color-text-tertiary); transition: transform 0.15s ease, color 0.15s ease; }
 .editor__section-head:hover .editor__section-chevron { color: var(--color-text-hover); }
@@ -3055,9 +3082,9 @@ as materials so the eye groups them as peers.*/
 .editor__section-body {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) 0;
-  border-top: var(--border-width-sm) dashed var(--color-gray-medium);
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) 0;
+  border-top: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
 }
 .editor__sub-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
 .editor__sub-add-group { display: inline-flex; gap: var(--spacing-xxs); }
@@ -3119,12 +3146,30 @@ author can see at a glance which set of values they're editing.*/
   color: var(--color-text-tertiary);
 }
 
-.editor__row { display: flex; flex-direction: column; gap: var(--spacing-xxs); }
+/*Default row layout is now HORIZONTAL: label - slider/picker - readout
+all on one line. Saves vertical space and matches the panel's density.
+The inline variant keeps a checkbox-friendly layout.*/
+.editor__row { display: flex; flex-direction: row; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-xxs) 0; }
 .editor__row--inline { flex-direction: row; align-items: center; gap: var(--spacing-sm); }
-.editor__row-label { font-size: var(--font-size-xs); color: var(--color-text); letter-spacing: var(--letter-spacing-tight); cursor: pointer; }
-.editor__row-control { display: flex; align-items: center; gap: var(--spacing-sm); }
+/*Fixed label column so sliders + readouts align vertically across rows
+in the same body (no jagged left edge from variable-length labels).*/
+.editor__row-label { flex: 0 0 6.5rem; font-size: var(--font-size-xs); color: var(--color-text); letter-spacing: var(--letter-spacing-tight); cursor: pointer; }
+.editor__row-control { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--spacing-sm); }
 
-.editor__color { width: var(--spacing-lg); height: var(--spacing-lg); padding: 0; border: none; background: transparent; cursor: pointer; flex-shrink: 0; }
+/*Color swatch - explicit border so it reads as a clickable picker, not
+a flat fill. The native swatch is borderless inside (browsers vary), so
+we draw our own around the input element.*/
+.editor__color {
+  width:  var(--spacing-lg);
+  height: var(--spacing-lg);
+  padding: 0;
+  background: transparent;
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s ease;
+}
+.editor__color:hover { border-color: var(--color-text-hover); }
 .editor__color::-webkit-color-swatch-wrapper { padding: 0; }
 .editor__color::-webkit-color-swatch { border: none; }
 .editor__color::-moz-color-swatch { border: none; }
@@ -3136,7 +3181,7 @@ author can see at a glance which set of values they're editing.*/
 .editor__slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; background: var(--color-accent); cursor: pointer; border: none; }
 .editor__slider::-moz-range-thumb { width: 12px; height: 12px; background: var(--color-accent); cursor: pointer; border: none; }
 
-.editor__readout { font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace; font-size: var(--font-size-xs); color: var(--color-text-secondary); min-width: 4rem; text-align: right; }
+.editor__readout { font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace; font-size: var(--font-size-xs); color: var(--color-text-secondary); min-width: 3rem; text-align: right; flex-shrink: 0; }
 .editor__check { width: var(--spacing-md); height: var(--spacing-md); cursor: pointer; accent-color: var(--color-accent); }
 .editor__empty { font-size: var(--font-size-sm); color: var(--color-text-tertiary); font-style: italic; text-align: center; padding: var(--spacing-lg) 0; }
 .editor__error { font-size: var(--font-size-xs); color: hsl(var(--destructive)); padding: var(--spacing-xs) 0; }
