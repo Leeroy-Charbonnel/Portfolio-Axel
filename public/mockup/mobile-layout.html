@@ -5,26 +5,27 @@
 <title>Mobile staggered layout mockup</title>
 <style>
 /*STATIC MOCKUP - one page, four projects, no JS.
-Real portfolio colors. Layout alternates side per project: project 1
-thumbs+desc LEFT, project 2 thumbs+desc RIGHT, etc. Thumbnails sit at
-the top of the viewer column; description sits at the bottom of the
-same column.
+Real placeholder images (picsum.photos). Real overlap: projects share
+30px of vertical space with their neighbours via thumbs that poke UP into
+the previous project and a description that poke DOWN into the next.
 
-Cascade ("quinconce") rules:
-  - thumbnails column of each project is translated UP 15% so it pokes into
-    the space above (previous project's viewer/desc area)
-  - description is anchored at the BOTTOM and extends PAST the project
-    bottom so it spills onto the project BELOW*/
+Cascade rules:
+  - thumbs column (3 stacked) is shifted UP 60px so the first thumb sits
+    inside the previous project's viewer area
+  - description is anchored BELOW the project bottom so it spills into
+    the next project's viewer area on the SAME side as the thumbs
+  - the projects themselves have ZERO margin between them so the cascade
+    is continuous - no gap, just element-level overlap*/
 
 :root {
-  --bg-main:          #000;
-  --bg-surface:       hsl(0 0% 4%);
-  --bg-elev:          hsl(0 0% 7%);
-  --border:           hsl(0 0% 16%);
-  --text-main:        hsl(0 0% 65%);
-  --text-strong:      hsl(0 0% 95%);
-  --text-muted:       hsl(0 0% 50%);
-  --accent:           hsl(184 65% 51%);
+  --bg-main:     #000;
+  --bg-surface:  hsl(0 0% 4%);
+  --bg-elev:     hsl(0 0% 7%);
+  --border:      hsl(0 0% 16%);
+  --text-main:   hsl(0 0% 65%);
+  --text-strong: hsl(0 0% 95%);
+  --text-muted:  hsl(0 0% 50%);
+  --accent:      hsl(184 65% 51%);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; color: var(--text-main); }
@@ -32,77 +33,123 @@ Cascade ("quinconce") rules:
 body {
   background: var(--bg-main);
   min-height: 100vh;
-  padding: 16px;
+  padding: 12px;
 }
 
+/*===== PROJECT - one card, no margin between siblings. Layout:
+  - header        (~30px)
+  - viewer area   (~360px tall)
+  - desc gap      (~140px, this is where the desc floats and where the
+                   NEXT project's thumbs poke UP into)
+  total card height = 530px*/
 .project {
   position: relative;
-  margin-bottom: 48px;
+  height: 530px;
+  margin: 0;
+  padding-top: 36px;
 }
 
-/*--- THUMBS column - 3 vertical squares, pulled UP 15% into space above ---*/
+/*HEADER - number + title row at the top of each card.*/
+.project__header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 4px 10px;
+}
+.project__number {
+  font-weight: 900;
+  font-size: 16px;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--border);
+  line-height: 1;
+}
+.project__title {
+  color: var(--text-strong);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+/*MAIN ROW - holds the viewer + thumbs + desc, all absolutely positioned
+inside it. Height leaves a generous bottom area for the desc to live
+between this project's viewer and the NEXT project's viewer.*/
+.project__main {
+  position: relative;
+  height: 460px;
+}
+
+/*THUMBS - vertical 3-square column, shifted UP 60px so the top thumb
+crosses INTO the previous project's viewer.*/
 .project__thumbs {
   position: absolute;
-  top: 0;
-  transform: translateY(-15%);
+  top: -60px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 72px;
-  z-index: 3;
+  width: 84px;
+  z-index: 5;
 }
-.project__thumbs > div {
-  height: 72px;
+.project__thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
   background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px;
-  color: var(--text-muted);
+}
+.project__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-/*--- VIEWER - the centre block ---*/
+/*VIEWER - takes the side opposite the thumbs. Fixed height so there's
+empty space below it where the description lives.*/
 .project__viewer {
-  height: 240px;
-  background: var(--bg-surface);
+  position: absolute;
+  top: 0;
+  height: 320px;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 4px;
-  display: flex; align-items: center; justify-content: center;
-  position: relative;
+  background: var(--bg-surface);
   z-index: 1;
-  color: var(--text-muted);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+}
+.project__viewer img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-/*--- DESCRIPTION - 50% width, height hugs content, anchored to BELOW
-the project bottom so it spills onto the next project ---*/
+/*DESCRIPTION - 56% width, sits BELOW the viewer in the empty gap area.
+No background, no border - just text floating in the space between two
+viewers. Same side as thumbs.*/
 .project__desc {
   position: absolute;
-  bottom: -40px;
-  width: 50%;
-  padding: 12px 14px;
-  background: hsl(0 0% 4% / 0.85);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  top: 336px;       /*right below the viewer (320px + 16px gap)*/
+  width: 56%;
+  padding: 0 4px;
   color: var(--text-main);
-  font-size: 11px;
-  line-height: 1.5;
-  z-index: 2;
+  font-size: 12px;
+  line-height: 1.55;
+  z-index: 4;
 }
 
-/*=== LAYOUT VARIANTS ===*/
-/*Thumbs LEFT, desc aligned LEFT under thumbs (odd projects).*/
+/*=== LAYOUT VARIANTS - alternate sides per project ===*/
+/*Thumbs + desc LEFT, viewer RIGHT (odd projects).*/
 .project--left .project__thumbs { left: 0; }
-.project--left .project__viewer { margin-left: 84px; margin-right: 0; }
 .project--left .project__desc   { left: 0; }
+.project--left .project__viewer { left: 96px; right: 0; }
 
-/*Thumbs RIGHT, desc aligned RIGHT under thumbs (even projects - mirror).*/
+/*Thumbs + desc RIGHT, viewer LEFT (even projects - mirror).*/
 .project--right .project__thumbs { right: 0; }
-.project--right .project__viewer { margin-right: 84px; margin-left: 0; }
 .project--right .project__desc   { right: 0; }
+.project--right .project__viewer { right: 96px; left: 0; }
+
+/*FALLBACK - project-4 has no thumbnails in the asset set; reuse project-1
+images as a placeholder so the layout is complete.*/
 
 h1 {
   padding: 0 0 16px;
@@ -117,56 +164,88 @@ h1 {
 
 <h1>Mobile staggered layout</h1>
 
-<!--PROJECT 1 - thumbs + desc LEFT-->
+<!--PROJECT 1 - thumbs + desc LEFT, viewer RIGHT-->
 <div class="project project--left">
-  <div class="project__thumbs">
-    <div>thumb 1</div>
-    <div>thumb 2</div>
-    <div>thumb 3</div>
-  </div>
-  <div class="project__viewer">VIEWER 1</div>
-  <div class="project__desc">
-    Furniture range for a Parisian loft. Oak frames, steel legs,
-    leather webbing.
+  <header class="project__header">
+    <span class="project__number">01</span>
+    <span class="project__title">Parisian loft furniture</span>
+  </header>
+  <div class="project__main">
+    <div class="project__thumbs">
+      <div class="project__thumb"><img src="projects/project-1/thumbnail1.png" alt=""></div>
+      <div class="project__thumb"><img src="projects/project-1/thumbnail2.png" alt=""></div>
+      <div class="project__thumb"><img src="projects/project-1/thumbnail3.png" alt=""></div>
+    </div>
+    <div class="project__viewer">
+      <img src="projects/project-1/main.png" alt="">
+    </div>
+    <p class="project__desc">
+      Furniture range for a Parisian loft. Oak frames, steel legs, leather webbing.
+    </p>
   </div>
 </div>
 
-<!--PROJECT 2 - thumbs + desc RIGHT-->
+<!--PROJECT 2 - thumbs + desc RIGHT, viewer LEFT-->
 <div class="project project--right">
-  <div class="project__thumbs">
-    <div>thumb 1</div>
-    <div>thumb 2</div>
-    <div>thumb 3</div>
-  </div>
-  <div class="project__viewer">VIEWER 2</div>
-  <div class="project__desc">
-    Bamboo lamp + cylinder seat. Woven shade, hand-painted brass patina.
+  <header class="project__header">
+    <span class="project__number">02</span>
+    <span class="project__title">Bamboo lamp + seat</span>
+  </header>
+  <div class="project__main">
+    <div class="project__thumbs">
+      <div class="project__thumb"><img src="projects/project-2/thumbnail1.png" alt=""></div>
+      <div class="project__thumb"><img src="projects/project-2/thumbnail2.png" alt=""></div>
+      <div class="project__thumb"><img src="projects/project-2/thumbnail3.png" alt=""></div>
+    </div>
+    <div class="project__viewer">
+      <img src="projects/project-2/main.png" alt="">
+    </div>
+    <p class="project__desc">
+      Bamboo lamp + cylinder seat. Woven shade, hand-painted brass patina.
+    </p>
   </div>
 </div>
 
 <!--PROJECT 3 - thumbs + desc LEFT-->
 <div class="project project--left">
-  <div class="project__thumbs">
-    <div>thumb 1</div>
-    <div>thumb 2</div>
-    <div>thumb 3</div>
-  </div>
-  <div class="project__viewer">VIEWER 3</div>
-  <div class="project__desc">
-    High table + bar chairs. Co-working pitch, low-poly with painted wear.
+  <header class="project__header">
+    <span class="project__number">03</span>
+    <span class="project__title">High table + bar chairs</span>
+  </header>
+  <div class="project__main">
+    <div class="project__thumbs">
+      <div class="project__thumb"><img src="projects/project-3/thumbnail1.png" alt=""></div>
+      <div class="project__thumb"><img src="projects/project-3/thumbnail2.png" alt=""></div>
+      <div class="project__thumb"><img src="projects/project-3/thumbnail3.png" alt=""></div>
+    </div>
+    <div class="project__viewer">
+      <img src="projects/project-3/main.png" alt="">
+    </div>
+    <p class="project__desc">
+      High table + bar chairs. Co-working pitch, low-poly with painted wear.
+    </p>
   </div>
 </div>
 
-<!--PROJECT 4 - thumbs + desc RIGHT-->
+<!--PROJECT 4 - thumbs + desc RIGHT (only main.png is available, reuse
+project-1 thumbnails as a placeholder so the layout is complete).-->
 <div class="project project--right">
-  <div class="project__thumbs">
-    <div>thumb 1</div>
-    <div>thumb 2</div>
-    <div>thumb 3</div>
-  </div>
-  <div class="project__viewer">VIEWER 4</div>
-  <div class="project__desc">
-    Office desk + chair pairing. Modular for re-skin, ~9.6k tris.
+  <header class="project__header">
+    <span class="project__number">04</span>
+    <span class="project__title">Office desk + chair</span>
+  </header>
+  <div class="project__main">
+    <div class="project__thumbs">
+      <div class="project__thumb"><img src="projects/project-1/thumbnail1.png" alt=""></div>
+      <div class="project__thumb"><img src="projects/project-1/thumbnail2.png" alt=""></div>
+      <div class="project__thumb"><img src="projects/project-1/thumbnail3.png" alt=""></div>
+    </div>
+    <div class="project__viewer">
+      <img src="projects/project-4/main.png" alt="">
+    </div>
+    <p class="project__desc">
+      Office desk + chair pairing. Modular for re-skin, ~9.6k tris.
+    </p>
   </div>
 </div>
 
