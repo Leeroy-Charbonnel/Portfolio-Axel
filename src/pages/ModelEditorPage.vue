@@ -35,8 +35,6 @@ import {
   Texture,
   UnsignedByteType,
   Vector2,
-  Euler,
-  Object3D,
   Quaternion,
   Vector3,
   WebGLRenderer,
@@ -722,28 +720,6 @@ onMounted(() => {
       requestRender()
     }
 
-    //AXIS SNAP - three.js-style dual rotateTowards. Position is derived
-    //from q1 (which advances on the great-circle toward q2) so the camera
-    //stays exactly on the sphere of radius `radius` around focus for the
-    //entire animation. Orientation slerps independently to targetQuaternion
-    //at the same angular rate, finishing at the same time.
-    if (viewSnapAnim && cameraRef && controls) {
-      const a = viewSnapAnim
-      const step = delta * a.turnRate
-      a.q1.rotateTowards(a.q2, step)
-      cameraRef.position.set(0, 0, 1).applyQuaternion(a.q1).multiplyScalar(a.radius).add(a.focus)
-      cameraRef.quaternion.rotateTowards(a.targetQuaternion, step)
-      if (a.q1.angleTo(a.q2) === 0) {
-        //Final: lock the camera EXACTLY on the target (no float residue)
-        //and tilt camera.up so OrbitControls' subsequent spherical math
-        //doesn't re-clamp phi away from the pole at top / bottom.
-        cameraRef.quaternion.copy(a.targetQuaternion)
-        cameraRef.up.copy(a.endUp)
-        viewSnapAnim = null
-        controls.update()
-      }
-      requestRender()
-    }
     //ViewHelper.update only matters when ViewHelper is driving its own
     //animation. We took over the axis-click animation (see snapToView)
     //so this just keeps the gizmo's own visual state in sync.
@@ -759,7 +735,7 @@ onMounted(() => {
       //internal spherical every update). That's what made the top-view
       //snap at the end of the animation: OrbitControls re-clamped phi
       //away from 0, shifting the camera off the axis.
-      if (!cameraAnim && !viewSnapAnim) controls!.update()
+      if (!cameraAnim) controls!.update()
       composer!.render()
       if (viewHelper && renderer) {
         renderer.autoClear = false
@@ -2128,81 +2104,47 @@ function switchCamera(mode: "persp" | "ortho") {
 }
 
 //===========================================================================
-//AXIS VIEW SNAP - direct port of three.js ViewHelper's prepareAnimationData
-//+ update algorithm. Reference: three/examples/jsm/helpers/ViewHelper.js
-//(licensed MIT). Works for every axis including top / bottom because the
-//rotation happens in two coordinated quaternion-rotateTowards calls (one
-//for the orbit position, one for camera orientation) at the same angular
-//rate, so they finish in lockstep without gimbal-lock or end snaps.
+//AXIS VIEW SNAP - compute target pose at click time, then slerp the
+//camera quaternion + lerp the camera position. Same easing the gizmo
+//selection uses. Done.
 //
-//Why a separate animation type from cameraAnim:
-//  cameraAnim is a position+target+quaternion LERP used for gizmo focus
-//  jumps - smooth but it interpolates the QUATERNION directly, which is
-//  fine when the start and end orientations have an obvious shortest arc.
-//  Axis snaps need the orbit-on-sphere behavior (camera always sees the
-//  focus mid-animation, no fly-through), which the dual-rotateTowards
-//  gives for free.
+//Per-axis target pose:
+//  - dir: unit vector from focus toward target camera position (so
+//    target pos = focus + dir * radius)
+//  - toUp: camera.up at the END of the animation (matters for what
+//    OrbitControls treats as "north" when the user starts orbiting
+//    afterwards; for top/bottom we tilt up to (0,0,∓1) to avoid the
+//    Spherical.makeSafe clamp pulling the camera off the pole)
+//  - targetQuat: orientation derived by placing a probe camera at the
+//    target position with the chosen up and pointing it at focus
 //===========================================================================
-type ViewSnapAnim = {
-  q1:               Quaternion          //orbit direction quaternion, advances toward q2
-  q2:               Quaternion          //target orbit direction
-  targetQuaternion: Quaternion          //final camera orientation
-  endUp:            Vector3             //camera.up after the snap (for OrbitControls)
-  focus:            Vector3             //orbit center (controls.target)
-  radius:           number              //distance from focus
-  turnRate:         number              //radians / sec
-}
-let viewSnapAnim: ViewSnapAnim | null = null
-const _viewSnapDummy = new Object3D()
-//Tunes the snap duration indirectly: viewHelper's default is 2π (one full
-//turn per second). Our axis snap is at most a half turn, so 2π rad/s
-//completes in <= 0.5s. Higher = snappier.
-const VIEW_SNAP_TURN_RATE = 2 * Math.PI
-
 function snapToView(axis: string) {
   if (!cameraRef || !controls) return
   switchCamera("ortho")
 
-  const focus = controls.target.clone()
+  const focus  = controls.target.clone()
   const radius = cameraRef.position.distanceTo(focus)
 
-  //Target orbit-position direction (unit vector) + target orientation
-  //(Euler) per axis. Matches the three.js reference one-to-one.
-  const targetPosition = new Vector3()
-  const targetQuaternion = new Quaternion()
-  const endUp = new Vector3(0, 1, 0)
+  const dir  = new Vector3()
+  const toUp = new Vector3(0, 1, 0)
   switch (axis) {
-    case "posX": targetPosition.set( 1, 0, 0); targetQuaternion.setFromEuler(new Euler(0,  Math.PI * 0.5, 0));  break
-    case "negX": targetPosition.set(-1, 0, 0); targetQuaternion.setFromEuler(new Euler(0, -Math.PI * 0.5, 0));  break
-    case "posY": targetPosition.set( 0, 1, 0); targetQuaternion.setFromEuler(new Euler(-Math.PI * 0.5, 0, 0)); endUp.set(0, 0, -1); break
-    case "negY": targetPosition.set( 0,-1, 0); targetQuaternion.setFromEuler(new Euler( Math.PI * 0.5, 0, 0)); endUp.set(0, 0,  1); break
-    case "posZ": targetPosition.set( 0, 0, 1); targetQuaternion.setFromEuler(new Euler()); break
-    case "negZ": targetPosition.set( 0, 0,-1); targetQuaternion.setFromEuler(new Euler(0, Math.PI, 0)); break
+    case "posX": dir.set( 1, 0, 0); break
+    case "negX": dir.set(-1, 0, 0); break
+    case "posY": dir.set( 0, 1, 0); toUp.set(0, 0, -1); break
+    case "negY": dir.set( 0,-1, 0); toUp.set(0, 0,  1); break
+    case "posZ": dir.set( 0, 0, 1); break
+    case "negZ": dir.set( 0, 0,-1); break
     default: return
   }
+  const toPos = focus.clone().add(dir.multiplyScalar(radius))
 
-  //World-space target camera position = unit dir * radius + focus.
-  targetPosition.multiplyScalar(radius).add(focus)
-
-  //q1 / q2 are "look-from-focus-toward-X" quaternions. rotateTowards from
-  //q1 (current camera position) to q2 (target camera position) sweeps
-  //the camera along the great circle on the sphere of radius `radius`.
-  _viewSnapDummy.position.copy(focus)
-  _viewSnapDummy.lookAt(cameraRef.position)
-  const q1 = _viewSnapDummy.quaternion.clone()
-  _viewSnapDummy.lookAt(targetPosition)
-  const q2 = _viewSnapDummy.quaternion.clone()
-
-  //Cancel any concurrent generic camera anim so the two systems don't fight.
-  cameraAnim = null
-
-  viewSnapAnim = {
-    q1, q2, targetQuaternion, endUp,
-    focus,
-    radius,
-    turnRate: VIEW_SNAP_TURN_RATE,
-  }
-  requestRender(1000)
+  cameraAnim = makeCameraAnim({
+    toPos,
+    toTarget: focus,
+    toUp,
+    duration: AXIS_SNAP_DURATION_MS,
+  })
+  requestRender(AXIS_SNAP_DURATION_MS + 200)
 }
 
 function onCanvasPointerUp(e: PointerEvent) {
