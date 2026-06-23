@@ -9,10 +9,19 @@ import EditableText from "./EditableText.vue"
 import ThreeViewer from "./ThreeViewer.vue"
 import type { MainProjectDto } from "../../types/portfolio"
 
-//PHONE PROJECT CARD - clean, readable vertical stack. Each section gets
-//its own row, viewer dominates the middle, thumbs sit underneath as a
-//horizontal strip, description anchors at the bottom. Projects overlap
-//slightly via the parent list's absolute positioning per index.
+//PHONE PROJECT CARD - CSS Grid 2 cols x 6 rows, columns swap per project.
+//
+//  col 1                col 2
+//  +-----------------+  +-------+
+//  | thumb 1         |  | title |  row 1
+//  | thumb 2         |  | view  |  row 2
+//  | thumb 3         |  | view  |  row 3
+//  | desc            |  | view  |  row 4
+//  | desc            |  | view  |  row 5
+//  | desc            |  | view  |  row 6
+//
+//Even projects: thumbs LEFT, viewer RIGHT. Odd: mirrored. Layout mirrors
+//the static mockup at public/mockup/mobile-layout.html.
 
 declare global {
   interface Window {
@@ -64,15 +73,20 @@ const hasAnyWireframeImage = computed(() => {
   return props.project.thumbnails.some((t) => t.wireframeUrl)
 })
 
-//Feeds the CSS rule `top: calc(var(--phone-i) * 65vh)`.
-const indexStyle = computed(() => ({ "--phone-i": String(props.index) }))
-//Alternate sides so even projects have thumbs LEFT, odd RIGHT - quinconce.
-const sideClass  = computed(() => props.index % 2 === 0
-  ? "mp-phone__main--thumbs-left"
-  : "mp-phone__main--thumbs-right")
+const sideClass = computed(() => props.index % 2 === 0
+  ? "mp-phone--left"
+  : "mp-phone--right")
 
 const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && !editMode.value))
 const showMainImage = computed(() => !showSketchfab.value || isLoading.value)
+
+//Pad the thumbnail list with empty slots so the grid always has the 3
+//cells the layout expects, even when a project only saved 1-2 thumbs.
+const thumbCells = computed(() => {
+  const real = props.project.thumbnails.slice(0, 3)
+  while (real.length < 3) real.push({ fileId: null, wireframeFileId: null, url: null, wireframeUrl: null, description: { en: "", fr: "" } })
+  return real
+})
 
 let observer: IntersectionObserver | null = null
 
@@ -197,76 +211,19 @@ async function onDescriptionSave(newVal: string) {
     :distance="50"
     :duration="0.8"
     :threshold="0.1"
-    class="mp-phone"
-    :style="indexStyle"
+    :class="['mp-phone', sideClass]"
   >
-    <!--HEADER - number + title, small row at the top.-->
-    <header class="mp-phone__header">
-      <span class="mp-phone__number">{{ String(index + 1).padStart(2, "0") }}</span>
-      <EditableText
-        tag="h3"
-        class="mp-phone__title"
-        :value="project.title[lang]"
-        placeholder="Project title"
-        @save="onTitleSave"
-      />
-    </header>
-
-    <!--MAIN ROW - vertical thumb column on one side, viewer on the other.
-    Side decided by index parity.-->
-    <div class="mp-phone__main" :class="sideClass">
-      <div v-if="project.thumbnails.length" class="mp-phone__thumbs">
-        <div
-          v-for="(thumb, i) in project.thumbnails.slice(0, 3)"
-          :key="i"
-          class="mp-phone__thumb"
-        >
-          <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
-        </div>
-      </div>
-
-      <div class="mp-phone__viewer">
-        <ThreeViewer
-          v-if="project.glbUrl && !editMode"
-          :glb-url="project.glbUrl"
-          :settings="effectiveViewerSettings"
-          :wireframe="isWireframe"
-          :is-in-view="isInView"
-          class="mp-phone__three"
-        />
-
-        <img
-          v-if="!project.glbUrl && showMainImage && mainImageUrl"
-          :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
-          :alt="project.title[lang]"
-          class="mp-phone__viewer-image"
-        />
-        <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
-          No image
-        </div>
-
-        <iframe
-          v-if="!project.glbUrl && project.modelId && !editMode"
-          ref="iframeRef"
-          :title="`Sketchfab Model - ${project.title[lang]}`"
-          class="mp-phone__viewer-embed"
-          :class="{ 'mp-phone__viewer-embed--hidden': !showSketchfab || isLoading }"
-        ></iframe>
-
-        <button
-          v-if="hasAnyWireframeImage"
-          type="button"
-          class="mp-phone__wf-btn"
-          :class="{ 'mp-phone__wf-btn--active': isWireframe }"
-          aria-label="Toggle wireframe"
-          @click="toggleWireframe"
-        >
-          <Grid :size="14" />
-        </button>
-      </div>
+    <!--THUMBS - rows 1, 2, 3 of column 1 (or column 2 for project--right)-->
+    <div
+      v-for="(thumb, i) in thumbCells"
+      :key="i"
+      class="mp-phone__thumb"
+      :class="`mp-phone__thumb--${i + 1}`"
+    >
+      <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
     </div>
 
-    <!--DESCRIPTION - paragraph below the main row.-->
+    <!--DESC - rows 4-6 of the same column as the thumbs.-->
     <EditableText
       tag="p"
       class="mp-phone__desc"
@@ -275,85 +232,116 @@ async function onDescriptionSave(newVal: string) {
       placeholder="Project description..."
       @save="onDescriptionSave"
     />
+
+    <!--TITLE - row 1 of the viewer column.-->
+    <div class="mp-phone__title">
+      <span class="mp-phone__title-number">{{ String(index + 1).padStart(2, "0") }}</span>
+      <EditableText
+        tag="span"
+        class="mp-phone__title-text"
+        :value="project.title[lang]"
+        placeholder="Project title"
+        @save="onTitleSave"
+      />
+    </div>
+
+    <!--VIEWER - rows 2-6 of the viewer column.-->
+    <div class="mp-phone__viewer">
+      <ThreeViewer
+        v-if="project.glbUrl && !editMode"
+        :glb-url="project.glbUrl"
+        :settings="effectiveViewerSettings"
+        :wireframe="isWireframe"
+        :is-in-view="isInView"
+        class="mp-phone__three"
+      />
+
+      <img
+        v-if="!project.glbUrl && showMainImage && mainImageUrl"
+        :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
+        :alt="project.title[lang]"
+        class="mp-phone__viewer-image"
+      />
+      <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
+        No image
+      </div>
+
+      <iframe
+        v-if="!project.glbUrl && project.modelId && !editMode"
+        ref="iframeRef"
+        :title="`Sketchfab Model - ${project.title[lang]}`"
+        class="mp-phone__viewer-embed"
+        :class="{ 'mp-phone__viewer-embed--hidden': !showSketchfab || isLoading }"
+      ></iframe>
+
+      <button
+        v-if="hasAnyWireframeImage"
+        type="button"
+        class="mp-phone__wf-btn"
+        :class="{ 'mp-phone__wf-btn--active': isWireframe }"
+        aria-label="Toggle wireframe"
+        @click="toggleWireframe"
+      >
+        <Grid :size="14" />
+      </button>
+    </div>
   </AnimatedReveal>
 </template>
 
 <style scoped>
-/*PHONE CARD - absolute-positioned by index so projects overlap subtly
-(parent list has explicit height that contains them).
-
-Layout per project:
-  - header        (number + title, 7vh)
-  - main row      (thumbs vertical column + viewer, 50vh)
-  - desc          (paragraph, ~13vh)
-  total card height = 70vh; next card starts at 60vh, so 10vh overlap.
-
-Sides alternate: even projects have thumbs LEFT / viewer RIGHT, odd are
-mirrored.*/
+/*PHONE CARD - CSS Grid 2 cols x 6 rows. aspect-ratio gives the grid a
+defined height proportional to width so `repeat(6, 1fr)` splits into
+6 EQUAL rows. Tuned so each row matches the thumbnail column width,
+keeping thumbs square. No transforms, no border-radius, no fixed pixel
+heights.*/
 .mp-phone {
-  position: absolute;
-  top: calc(var(--phone-i, 0) * 60vh);
-  left: 0;
-  right: 0;
-  height: 70vh;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: 0 var(--spacing-md);
-  z-index: 1;
+  display: grid;
+  aspect-ratio: 5 / 9;
+  grid-template-rows: repeat(6, 1fr);
+  gap: 4% 4%;
+  padding: 6% 0 4%;
 }
 
-/*HEADER ----------------------------------------------------------------*/
-.mp-phone__header {
-  display: flex;
-  align-items: baseline;
-  gap: var(--spacing-sm);
-  height: 7vh;
-  flex-shrink: 0;
+/*Default = thumbs LEFT, viewer RIGHT.*/
+.mp-phone--left {
+  grid-template-columns: 30% 1fr;
+  grid-template-areas:
+    "thumb1 title"
+    "thumb2 viewer"
+    "thumb3 viewer"
+    "desc   viewer"
+    "desc   viewer"
+    "desc   viewer";
 }
 
-.mp-phone__number {
-  font-family: sans-serif;
-  font-size: var(--font-size-lg);
-  font-weight: 900;
-  color: transparent;
-  -webkit-text-stroke: 1px var(--color-gray-medium);
-  line-height: 1;
+/*Inverted = thumbs RIGHT, viewer LEFT.*/
+.mp-phone--right {
+  grid-template-columns: 1fr 30%;
+  grid-template-areas:
+    "title  thumb1"
+    "viewer thumb2"
+    "viewer thumb3"
+    "viewer desc"
+    "viewer desc"
+    "viewer desc";
 }
 
-.mp-phone__title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-tight);
-  line-height: 1.1;
-  color: var(--color-text-hover);
-}
+/*--- Grid placements ---*/
+.mp-phone__thumb--1 { grid-area: thumb1; }
+.mp-phone__thumb--2 { grid-area: thumb2; }
+.mp-phone__thumb--3 { grid-area: thumb3; }
+.mp-phone__desc     { grid-area: desc; }
+.mp-phone__title    { grid-area: title; }
+.mp-phone__viewer   { grid-area: viewer; }
 
-/*MAIN ROW - thumbs + viewer side-by-side. Direction flips per project.-*/
-.mp-phone__main {
-  display: flex;
-  gap: var(--spacing-sm);
-  flex: 0 0 50vh;
-  min-height: 0;
-}
-.mp-phone__main--thumbs-left  { flex-direction: row; }
-.mp-phone__main--thumbs-right { flex-direction: row-reverse; }
-
-/*THUMBS - vertical column, 3 stacked squares.--------------------------*/
-.mp-phone__thumbs {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  flex: 0 0 22vw;
-  max-width: 100px;
-  height: 100%;
-}
-
+/*THUMBS ---------------------------------------------------------------*/
 .mp-phone__thumb {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
+  height: 100%;
   overflow: hidden;
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  background: var(--color-background-gray-100);
 }
 .mp-phone__thumb img {
   position: absolute;
@@ -363,13 +351,37 @@ mirrored.*/
   object-fit: cover;
 }
 
-/*VIEWER - fills the remaining horizontal space, full row height.-------*/
+/*TITLE ---------------------------------------------------------------*/
+.mp-phone__title {
+  display: flex;
+  align-items: end;
+  gap: var(--spacing-sm);
+  padding-bottom: var(--spacing-xxs);
+}
+.mp-phone__title-number {
+  font-family: sans-serif;
+  font-weight: 900;
+  font-size: var(--font-size-md);
+  color: transparent;
+  -webkit-text-stroke: 1px var(--color-gray-medium);
+  line-height: 1;
+}
+.mp-phone__title-text {
+  color: var(--color-text-hover);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: 1.1;
+}
+
+/*VIEWER ---------------------------------------------------------------*/
 .mp-phone__viewer {
   position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 100%;
   overflow: hidden;
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  background: var(--color-background-secondary);
+  min-height: 0;
+  min-width:  0;
 }
 
 .mp-phone__three,
@@ -383,7 +395,6 @@ mirrored.*/
   border: none;
   background: transparent;
 }
-
 .mp-phone__viewer-embed--hidden { display: none; }
 
 .mp-phone__viewer-empty {
@@ -405,7 +416,7 @@ mirrored.*/
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--spacing-xl);
+  width:  var(--spacing-xl);
   height: var(--spacing-xl);
   background-color: hsl(0 0% 0% / 0.6);
   border: var(--border-width-sm) solid var(--color-text-secondary);
@@ -422,11 +433,10 @@ mirrored.*/
 
 /*DESCRIPTION ----------------------------------------------------------*/
 .mp-phone__desc {
+  color: var(--color-text);
   font-size: var(--font-size-sm);
   line-height: 1.55;
-  color: var(--color-text);
   margin: 0;
-  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
