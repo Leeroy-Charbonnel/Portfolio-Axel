@@ -1131,14 +1131,31 @@ spills past the stage bottom into the next project.*/
   }
 
   /*Negative margin-bottom is the load-bearing trick: each project pulls
-  the NEXT one up by 22vh, so projects literally overlap instead of
-  reading as separated blocks. The boundary becomes the zone where
-  current's bottom-side content sits on top of next's top-side content.*/
-  .main-project { padding: 0; margin-bottom: -22vh; }
+  the NEXT one up by 35vh, so projects literally overlap instead of
+  reading as separated blocks.*/
+  .main-project { padding: 0; margin-bottom: -35vh; position: relative; z-index: 1; }
+  /*Stagger z-index so EACH project paints on a different layer. Even
+  rows go under their neighbors, odd rows over - this is what blends
+  the two stages instead of clean-cutting one block to the next.*/
+  .main-project:nth-child(even) { z-index: 0; }
 
   /*Each project takes ~one screen so the overlap can show two projects
   visible at the same time during scroll.*/
-  .main-project__stage { aspect-ratio: auto; height: 92vh; min-height: 0; }
+  .main-project__stage {
+    aspect-ratio: auto;
+    height: 92vh;
+    min-height: 0;
+    /*Mask the top and bottom into transparency so two overlapping
+    stages bleed into each other instead of cutting at hard edges -
+    this IS the "blurry boundary" the user keeps asking for.*/
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
+  }
+
+  /*Kill the opaque tile fill on the static-image fallback so overlap
+  doesn't read as one rectangle painting over another.*/
+  .main-project__viewer-image,
+  .main-project__viewer-embed { background-color: transparent; }
 
   /*Header floats over the stage so it doesn't add height that would
   push the cascade off the screen.*/
@@ -1218,8 +1235,17 @@ html.simulate-phone .main-project__article {
   padding: 0 !important;
   margin: 0 !important;
 }
-html.simulate-phone .main-project { padding: 0; margin-bottom: -22vh; }
-html.simulate-phone .main-project__stage { aspect-ratio: auto; height: 92vh; min-height: 0; }
+html.simulate-phone .main-project { padding: 0; margin-bottom: -35vh; position: relative; z-index: 1; }
+html.simulate-phone .main-project:nth-child(even) { z-index: 0; }
+html.simulate-phone .main-project__stage {
+  aspect-ratio: auto;
+  height: 92vh;
+  min-height: 0;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
+}
+html.simulate-phone .main-project__viewer-image,
+html.simulate-phone .main-project__viewer-embed { background-color: transparent; }
 
 html.simulate-phone .main-project__header {
   position: absolute;
