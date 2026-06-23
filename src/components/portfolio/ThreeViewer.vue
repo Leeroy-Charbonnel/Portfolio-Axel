@@ -188,7 +188,11 @@ const RENDER_KEEPALIVE_MS_DEFAULT  = 300
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const isWireframe = ref(false)
-const isReady     = ref(false)
+const isReady         = ref(false)
+//Brutalist loading bar - 0..1 progress reported by GLTFLoader's
+//onProgress; flipped invisible once the model is in the scene.
+const loadingProgress = ref(0)
+const isLoading       = ref(true)
 
 let scene:    Scene | null = null
 let camera:   PerspectiveCamera | null = null
@@ -599,6 +603,8 @@ onMounted(() => {
   loader.load(
     props.glbUrl,
     (gltf) => {
+      isLoading.value = false
+      loadingProgress.value = 1
       //Share ONE upgraded Physical instance across meshes that point at
       //the same glTF Standard material - otherwise an edit only touches
       //one mesh while the others keep the original look.
@@ -733,7 +739,10 @@ onMounted(() => {
       requestRender(2000)
     },
     undefined,
-    (err) => { console.error("[ThreeViewer] glb load failed:", err) },
+    (evt) => {
+      if (evt.total > 0) loadingProgress.value = evt.loaded / evt.total
+    },
+    (err) => { console.error("[ThreeViewer] glb load failed:", err); isLoading.value = false },
   )
 
   const tick = () => {
@@ -849,6 +858,12 @@ watch(() => props.settings, (s) => {
 <template>
   <div class="three-viewer">
     <canvas ref="canvas" class="three-viewer__canvas"></canvas>
+    <!--BRUTALIST loading bar - thin strip at the top of the viewer that
+    fills with onProgress percent. No animation, no glow, no rounding;
+    disappears the instant the glb is in the scene.-->
+    <div v-if="isLoading" class="three-viewer__loading">
+      <div class="three-viewer__loading-fill" :style="{ width: (loadingProgress * 100) + '%' }"></div>
+    </div>
   </div>
 </template>
 
@@ -864,5 +879,20 @@ watch(() => props.settings, (s) => {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.three-viewer__loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: hsl(0 0% 100% / 0.1);
+  pointer-events: none;
+  z-index: 10;
+}
+.three-viewer__loading-fill {
+  height: 100%;
+  background-color: var(--color-text-hover);
 }
 </style>

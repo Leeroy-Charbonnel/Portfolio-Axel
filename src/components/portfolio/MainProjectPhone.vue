@@ -377,13 +377,12 @@ heights.*/
 }
 
 /*VIEWER ---------------------------------------------------------------*/
-/*Viewer container is FULLY transparent so the Three.js canvas (alpha:true
-+ ShadowMaterial floor) reads as the model floating on the page bg with
-only the ground shadow visible. Border kept as a layout-edge cue.*/
+/*Viewer container is FULLY transparent and borderless - the model and
+its ground shadow float on the page bg, no frame around them.*/
 .mp-phone__viewer {
   position: relative;
   overflow: hidden;
-  border: var(--border-width-sm) solid var(--color-gray-medium);
+  border: none;
   background: transparent;
   min-height: 0;
   min-width:  0;

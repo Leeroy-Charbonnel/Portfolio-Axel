@@ -2,7 +2,7 @@
 import { computed, markRaw, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useSettings } from "vue-shared-ui"
-import { ArrowLeft, Box, ChevronDown, Eye, EyeOff, Home, MapPin, Monitor, Save, Smartphone, Square, Upload } from "lucide-vue-next"
+import { ArrowLeft, Box, ChevronDown, Crosshair, Eye, EyeOff, Home, MapPin, Monitor, Save, Smartphone, Square, Upload } from "lucide-vue-next"
 import {
   Box3,
   BufferGeometry,
@@ -287,6 +287,7 @@ const WF_MODE_COLOR_KEY  = "editor3d_wireframe_mode_color"
 
 const wireframeOverlayColor = ref(getString(WF_LINE_COLOR_KEY, "#000000"))
 const showLightGizmos       = ref(true)        //sphere/diamond helpers visibility
+const showCenterCrosshair   = ref(false)       //semi-transparent + sign on screen center for framing
 
 //START VIEW - persisted camera pose used by the production viewer for the
 //intro fly-in. Set from the editor via "Save start view" - captures the
@@ -2492,6 +2493,11 @@ async function onSave() {
      <div ref="viewportBox" class="editor__viewport-box">
       <canvas ref="canvas" class="editor__canvas"></canvas>
 
+      <!--SCREEN CENTER crosshair - semi-transparent + sign at the dead
+      centre of the viewport so the author can frame compositions on
+      that axis. Pointer-events: none so it never blocks orbit.-->
+      <div v-if="showCenterCrosshair" class="editor__viewport-crosshair" aria-hidden="true"></div>
+
       <!--Viewport-corner toolbar: clusters in the bottom-right above the
       ViewHelper viewport so axis-snap + scene-debug controls live in the
       same spot. Stacked vertically, each row owns one feature.-->
@@ -2516,6 +2522,15 @@ async function onSave() {
             @click="switchCamera(cameraMode === 'persp' ? 'ortho' : 'persp')"
           >
             <component :is="cameraMode === 'persp' ? Box : Square" :size="14" />
+          </button>
+          <button
+            type="button"
+            class="editor__viewport-tool"
+            :class="{ 'editor__viewport-tool--off': !showCenterCrosshair }"
+            :data-tooltip="showCenterCrosshair ? 'Hide center crosshair' : 'Show center crosshair'"
+            @click="showCenterCrosshair = !showCenterCrosshair"
+          >
+            <Crosshair :size="14" />
           </button>
         </div>
 
@@ -3120,6 +3135,37 @@ between the two pose columns so the toolbar reads as one rhythm.*/
   display: flex;
   flex-direction: row;
   gap: var(--spacing-sm);
+}
+
+/*SCREEN CENTER crosshair - two thin lines crossing in the middle of the
+viewport, painted with the existing accent colour at low alpha so they
+read as a soft guide rather than active content. position:absolute on
+the viewport-box means they always cross at the canvas centre.*/
+.editor__viewport-crosshair {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.editor__viewport-crosshair::before,
+.editor__viewport-crosshair::after {
+  content: "";
+  position: absolute;
+  background-color: hsl(0 0% 100% / 0.35);
+}
+.editor__viewport-crosshair::before {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-0.5px);
+}
+.editor__viewport-crosshair::after {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  transform: translateY(-0.5px);
 }
 
 /*START POSE grid - two columns (desktop / phone) side by side. Each
