@@ -9,9 +9,8 @@ Real portfolio colors. Layout alternates: project 1 thumbs LEFT / desc RIGHT,
 project 2 thumbs RIGHT / desc LEFT, etc.
 
 Cascade ("quinconce") rules:
-  - stats NEVER overlap stats - each project occupies its own vertical slot
   - thumbnails column of each project is translated UP 15% so it pokes into
-    the stats strip of the project ABOVE
+    the space above (previous project's viewer/desc area)
   - description is anchored to the BOTTOM half of the viewer and extends
     PAST the project bottom so it spills onto the project BELOW*/
 
@@ -39,7 +38,7 @@ body {
   margin-bottom: 48px;
 }
 
-/*--- THUMBS column - 3 vertical squares, pulled UP 15% into previous stats ---*/
+/*--- THUMBS column - 3 vertical squares, pulled UP 15% into space above ---*/
 .project__thumbs {
   position: absolute;
   top: 0;
@@ -94,38 +93,6 @@ extends BELOW the project so it spills onto the next project ---*/
   overflow: hidden;
 }
 
-/*--- STATS strip - below the viewer, full width ---*/
-.project__stats {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  height: 36px;
-}
-.project__stats > div {
-  flex: 1;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px;
-  color: var(--text-strong);
-  gap: 5px;
-}
-.project__stats > div .badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  font-size: 9px;
-  color: var(--accent);
-  font-weight: 600;
-  line-height: 1;
-}
-
 /*=== LAYOUT VARIANTS ===*/
 /*Thumbs LEFT, desc RIGHT (odd projects).*/
 .project--left .project__thumbs { left: 0; }
@@ -159,16 +126,8 @@ h1 {
   </div>
   <div class="project__viewer">VIEWER 1</div>
   <div class="project__desc">
-    Furniture range for a Parisian loft renovation. Solid oak frames,
-    powder-coated steel legs, leather webbing. Sketched on paper, built
-    as low-poly mock-ups in Blender, then surfaced in Substance Painter
-    for the final pass.
-  </div>
-  <div class="project__stats">
-    <div><span class="badge">V</span>12.4k</div>
-    <div><span class="badge">E</span>34.1k</div>
-    <div><span class="badge">F</span>22.7k</div>
-    <div><span class="badge">T</span>22.7k</div>
+    Furniture range for a Parisian loft. Oak frames, steel legs,
+    leather webbing.
   </div>
 </div>
 
@@ -181,15 +140,7 @@ h1 {
   </div>
   <div class="project__viewer">VIEWER 2</div>
   <div class="project__desc">
-    Bamboo lamp + cylinder seat study. Procedural texturing for the woven
-    shade, hand-painted darker patina on the brass cap. Rendered in
-    Cycles with two area lights and an HDR backdrop.
-  </div>
-  <div class="project__stats">
-    <div><span class="badge">V</span>8.9k</div>
-    <div><span class="badge">E</span>21.3k</div>
-    <div><span class="badge">F</span>14.8k</div>
-    <div><span class="badge">T</span>14.8k</div>
+    Bamboo lamp + cylinder seat. Woven shade, hand-painted brass patina.
   </div>
 </div>
 
@@ -202,15 +153,7 @@ h1 {
   </div>
   <div class="project__viewer">VIEWER 3</div>
   <div class="project__desc">
-    High table with paired bar chairs for a co-working space pitch.
-    Concept-art moodboard, low-poly silhouette pass, then a final
-    high-poly with hand-painted scratches around the foot rail.
-  </div>
-  <div class="project__stats">
-    <div><span class="badge">V</span>18.2k</div>
-    <div><span class="badge">E</span>49.7k</div>
-    <div><span class="badge">F</span>33.0k</div>
-    <div><span class="badge">T</span>33.0k</div>
+    High table + bar chairs. Co-working pitch, low-poly with painted wear.
   </div>
 </div>
 
@@ -223,15 +166,7 @@ h1 {
   </div>
   <div class="project__viewer">VIEWER 4</div>
   <div class="project__desc">
-    Office desk + ergonomic chair pairing. Modular asset so the chair
-    can be re-skinned for different licences without re-baking the
-    desk's wood grain. Final retopo at ~9.6k tris.
-  </div>
-  <div class="project__stats">
-    <div><span class="badge">V</span>4.7k</div>
-    <div><span class="badge">E</span>12.0k</div>
-    <div><span class="badge">F</span>9.6k</div>
-    <div><span class="badge">T</span>9.6k</div>
+    Office desk + chair pairing. Modular for re-skin, ~9.6k tris.
   </div>
 </div>
 
