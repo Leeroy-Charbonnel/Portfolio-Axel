@@ -5,14 +5,16 @@
 <title>Mobile staggered layout mockup</title>
 <style>
 /*STATIC MOCKUP - one page, four projects, no JS.
-Real portfolio colors. Layout alternates: project 1 thumbs LEFT / desc RIGHT,
-project 2 thumbs RIGHT / desc LEFT, etc.
+Real portfolio colors. Layout alternates side per project: project 1
+thumbs+desc LEFT, project 2 thumbs+desc RIGHT, etc. Thumbnails sit at
+the top of the viewer column; description sits at the bottom of the
+same column.
 
 Cascade ("quinconce") rules:
   - thumbnails column of each project is translated UP 15% so it pokes into
     the space above (previous project's viewer/desc area)
-  - description is anchored to the BOTTOM half of the viewer and extends
-    PAST the project bottom so it spills onto the project BELOW*/
+  - description is anchored at the BOTTOM and extends PAST the project
+    bottom so it spills onto the project BELOW*/
 
 :root {
   --bg-main:          #000;
@@ -92,15 +94,15 @@ the project bottom so it spills onto the next project ---*/
 }
 
 /*=== LAYOUT VARIANTS ===*/
-/*Thumbs LEFT, desc RIGHT (odd projects).*/
+/*Thumbs LEFT, desc aligned LEFT under thumbs (odd projects).*/
 .project--left .project__thumbs { left: 0; }
 .project--left .project__viewer { margin-left: 84px; margin-right: 0; }
-.project--left .project__desc   { right: 0; }
+.project--left .project__desc   { left: 0; }
 
-/*Thumbs RIGHT, desc LEFT (even projects - mirror).*/
+/*Thumbs RIGHT, desc aligned RIGHT under thumbs (even projects - mirror).*/
 .project--right .project__thumbs { right: 0; }
 .project--right .project__viewer { margin-right: 84px; margin-left: 0; }
-.project--right .project__desc   { left: 0; }
+.project--right .project__desc   { right: 0; }
 
 h1 {
   padding: 0 0 16px;
@@ -115,7 +117,7 @@ h1 {
 
 <h1>Mobile staggered layout</h1>
 
-<!--PROJECT 1 - thumbs LEFT, desc RIGHT-->
+<!--PROJECT 1 - thumbs + desc LEFT-->
 <div class="project project--left">
   <div class="project__thumbs">
     <div>thumb 1</div>
@@ -129,7 +131,7 @@ h1 {
   </div>
 </div>
 
-<!--PROJECT 2 - thumbs RIGHT, desc LEFT-->
+<!--PROJECT 2 - thumbs + desc RIGHT-->
 <div class="project project--right">
   <div class="project__thumbs">
     <div>thumb 1</div>
@@ -142,7 +144,7 @@ h1 {
   </div>
 </div>
 
-<!--PROJECT 3 - thumbs LEFT, desc RIGHT-->
+<!--PROJECT 3 - thumbs + desc LEFT-->
 <div class="project project--left">
   <div class="project__thumbs">
     <div>thumb 1</div>
@@ -155,7 +157,7 @@ h1 {
   </div>
 </div>
 
-<!--PROJECT 4 - thumbs RIGHT, desc LEFT-->
+<!--PROJECT 4 - thumbs + desc RIGHT-->
 <div class="project project--right">
   <div class="project__thumbs">
     <div>thumb 1</div>
