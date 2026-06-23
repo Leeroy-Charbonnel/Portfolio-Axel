@@ -1119,27 +1119,38 @@ spills past the stage bottom into the next project.*/
 
 /*=== PHONE QUINCONCE - shared rules + the @media + simulate-phone wrappers ==*/
 @media (max-width: 480px) {
-  .main-project { padding: var(--spacing-md) 0; margin-bottom: var(--spacing-sm); }
-  .main-project__stage { aspect-ratio: auto; height: 80vw; min-height: 280px; }
+  /*Edge-to-edge in phone - kill the .container's 80% width and inner
+  padding so the cascade reads as a single column of bleed-through
+  imagery, not a tidy boxed list.*/
+  .main-project__article {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .main-project { padding: 0; margin-bottom: 0; }
+  .main-project__stage { aspect-ratio: auto; height: 95vw; min-height: 320px; }
 
-  .main-project__header { flex-wrap: wrap; align-items: baseline; }
+  .main-project__header { flex-wrap: wrap; align-items: baseline; padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
   .main-project__layout-picker { position: static; margin-left: auto; align-self: flex-end; }
 
-  /*Thumbs column - vertical strip pulled UP 15% so it pokes into the
-  bottom of the previous project. Side decided by --phone-left / --right.*/
+  /*Thumbs column - vertical strip pulled WAY UP so it crosses into the
+  previous project. Side decided by --phone-left / --right. The big
+  overflow + the no-margin between projects is what makes the page read
+  as a continuous scroll with blurry per-project boundaries.*/
   .main-project__thumbnails {
     top: 0;
     bottom: auto;
-    transform: translateY(-8%);
+    transform: translateY(-22%);
     flex-direction: column;
-    width: var(--mp-phone-side-width, 22vw);
-    max-width: 96px;
+    width: 32vw;
+    max-width: 140px;
     height: auto;
-    max-height: 100%;
+    max-height: 110%;
     gap: var(--spacing-xs);
   }
-  .main-project__article--phone-left  .main-project__thumbnails { left:  var(--spacing-sm); right: auto; }
-  .main-project__article--phone-right .main-project__thumbnails { right: var(--spacing-sm); left:  auto; }
+  .main-project__article--phone-left  .main-project__thumbnails { left:  0; right: auto; }
+  .main-project__article--phone-right .main-project__thumbnails { right: 0; left:  auto; }
 
   .main-project__thumbnail,
   .main-project__thumbnail-add {
@@ -1148,22 +1159,22 @@ spills past the stage bottom into the next project.*/
     aspect-ratio: 1 / 1;
   }
 
-  /*Viewer takes the side OPPOSITE the thumbs so the column reads as a
-  staggered triptych - thumbs aligned to one edge, viewer eating the rest.*/
-  .main-project__article--phone-left  .main-project__viewer { left:  calc(var(--mp-phone-side-width, 22vw) + var(--spacing-md)); right: 0; }
-  .main-project__article--phone-right .main-project__viewer { right: calc(var(--mp-phone-side-width, 22vw) + var(--spacing-md)); left:  0; }
+  /*Viewer takes the side OPPOSITE the thumbs. Edge-to-edge so the column
+  reads as a staggered triptych without any side gutter.*/
+  .main-project__article--phone-left  .main-project__viewer { left:  32vw; right: 0; }
+  .main-project__article--phone-right .main-project__viewer { right: 32vw; left:  0; }
 
-  /*PHONE description overlay - absolute inside the stage, anchored under
-  the thumbs column on the SAME side, spilling past the stage bottom so
-  the cascade reaches into the next project's viewer area.*/
+  /*PHONE description overlay - absolute inside the stage, anchored to the
+  SAME side as the thumbs, hanging well past the stage bottom so it bleeds
+  into the next project's viewer for the "blurry boundary" cascade feel.*/
   .main-project__description--phone {
     display: block;
     position: absolute;
-    bottom: -6%;
-    width: 50%;
+    bottom: -18%;
+    width: 55%;
     padding: var(--spacing-sm) var(--spacing-md);
-    background-color: hsl(var(--background) / 0.85);
-    backdrop-filter: blur(6px);
+    background-color: hsl(var(--background) / 0.7);
+    backdrop-filter: blur(8px);
     border: var(--border-width-sm) solid var(--color-gray-medium);
     color: var(--color-text);
     font-size: var(--font-size-sm);
@@ -1177,45 +1188,52 @@ spills past the stage bottom into the next project.*/
   carries the description, stats are too noisy at this width).*/
   .main-project__details-top { display: none; }
   .main-project__software-name { display: none; }
+  .main-project__software-list { padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
 }
 
 /*simulate-phone mirror so the CssVarsPanel can preview the phone layout
 without resizing the actual window.*/
-html.simulate-phone .main-project { padding: var(--spacing-xl) 0; margin-bottom: var(--spacing-5xl); }
-html.simulate-phone .main-project__stage { aspect-ratio: auto; height: 80vw; min-height: 280px; }
-html.simulate-phone .main-project__header { flex-wrap: wrap; align-items: baseline; }
+html.simulate-phone .main-project__article {
+  width: 100%;
+  max-width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+}
+html.simulate-phone .main-project { padding: 0; margin-bottom: 0; }
+html.simulate-phone .main-project__stage { aspect-ratio: auto; height: 95vw; min-height: 320px; }
+html.simulate-phone .main-project__header { flex-wrap: wrap; align-items: baseline; padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
 html.simulate-phone .main-project__layout-picker { position: static; margin-left: auto; align-self: flex-end; }
 
 html.simulate-phone .main-project__thumbnails {
   top: 0;
   bottom: auto;
-  transform: translateY(-8%);
+  transform: translateY(-22%);
   flex-direction: column;
-  width: var(--mp-phone-side-width, 22vw);
-  max-width: 96px;
+  width: 32vw;
+  max-width: 140px;
   height: auto;
-  max-height: 100%;
+  max-height: 110%;
   gap: var(--spacing-xs);
 }
-html.simulate-phone .main-project__article--phone-left  .main-project__thumbnails { left:  var(--spacing-sm); right: auto; }
-html.simulate-phone .main-project__article--phone-right .main-project__thumbnails { right: var(--spacing-sm); left:  auto; }
+html.simulate-phone .main-project__article--phone-left  .main-project__thumbnails { left:  0; right: auto; }
+html.simulate-phone .main-project__article--phone-right .main-project__thumbnails { right: 0; left:  auto; }
 html.simulate-phone .main-project__thumbnail,
 html.simulate-phone .main-project__thumbnail-add {
   width: 100%;
   height: auto;
   aspect-ratio: 1 / 1;
 }
-html.simulate-phone .main-project__article--phone-left  .main-project__viewer { left:  calc(var(--mp-phone-side-width, 22vw) + var(--spacing-md)); right: 0; }
-html.simulate-phone .main-project__article--phone-right .main-project__viewer { right: calc(var(--mp-phone-side-width, 22vw) + var(--spacing-md)); left:  0; }
+html.simulate-phone .main-project__article--phone-left  .main-project__viewer { left:  32vw; right: 0; }
+html.simulate-phone .main-project__article--phone-right .main-project__viewer { right: 32vw; left:  0; }
 
 html.simulate-phone .main-project__description--phone {
   display: block;
   position: absolute;
-  bottom: -10%;
-  width: 50%;
+  bottom: -18%;
+  width: 55%;
   padding: var(--spacing-sm) var(--spacing-md);
-  background-color: hsl(var(--background) / 0.85);
-  backdrop-filter: blur(6px);
+  background-color: hsl(var(--background) / 0.7);
+  backdrop-filter: blur(8px);
   border: var(--border-width-sm) solid var(--color-gray-medium);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -1227,4 +1245,5 @@ html.simulate-phone .main-project__article--phone-right .main-project__descripti
 
 html.simulate-phone .main-project__details-top { display: none; }
 html.simulate-phone .main-project__software-name { display: none; }
+html.simulate-phone .main-project__software-list { padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
 </style>
