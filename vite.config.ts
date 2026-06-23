@@ -5,15 +5,22 @@ import { fileURLToPath } from "node:url"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-//Vite reads VITE_API_BASE_URL from .env and proxies /api + /media to it.
-//When the value points at prod, `bun dev:client` works transparently:
-//the browser sees localhost URLs but everything is forwarded to prod.
-//Falls back to the local Express at :3001 if the env var is unset.
+//SPLIT PROXY - /api and /media can target different upstreams. Common
+//case: run the local Express for auth (Google OAuth needs the callback
+//to come back to localhost) but pull /media from prod's volume so the
+//browser sees the real images + .glb files.
+//
+//  VITE_API_BASE_URL    - default upstream for both, e.g. "https://prod"
+//  VITE_MEDIA_BASE_URL  - optional override for /media only
+//
+//Unset both = everything goes to the local Express at :3001.
 export default defineConfig(({ mode }) => {
-  const env       = loadEnv(mode, process.cwd(), "")
-  const base      = env.VITE_BASE_PATH || "/"
-  const apiTarget = (env.VITE_API_BASE_URL || "http://localhost:3001").replace(/\/$/, "")
-  console.log(`[vite] proxying /api + /media -> ${apiTarget}`)
+  const env  = loadEnv(mode, process.cwd(), "")
+  const base = env.VITE_BASE_PATH || "/"
+  const apiTarget   = (env.VITE_API_BASE_URL   || "http://localhost:3001").replace(/\/$/, "")
+  const mediaTarget = (env.VITE_MEDIA_BASE_URL || env.VITE_API_BASE_URL || "http://localhost:3001").replace(/\/$/, "")
+  console.log(`[vite] /api   -> ${apiTarget}`)
+  console.log(`[vite] /media -> ${mediaTarget}`)
 
   return {
     base,
@@ -25,8 +32,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        "/api":   { target: apiTarget, changeOrigin: true, secure: false },
-        "/media": { target: apiTarget, changeOrigin: true, secure: false },
+        "/api":   { target: apiTarget,   changeOrigin: true, secure: false },
+        "/media": { target: mediaTarget, changeOrigin: true, secure: false },
       },
     },
   }
