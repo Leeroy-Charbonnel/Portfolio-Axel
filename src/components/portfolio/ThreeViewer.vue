@@ -47,22 +47,37 @@ import { SMAAPass }       from "three/examples/jsm/postprocessing/SMAAPass.js"
 //Wireframe toggle swaps to wireframe mode (using the saved wireframe
 //settings) like Sketchfab's button used to do.
 
-interface NormalLight {
+//SHARED LIGHT - new shape: position + range common to both modes, per-mode
+//intensity + color. Editor saves this as `settings.lights[]`.
+interface SharedLight {
+  id:       string
+  type:     "point" | "directional"
+  x: number; y: number; z: number
+  tx?: number; ty?: number; tz?: number
+  range?:   number   //point-light only, three.js "distance" (0 = infinite)
+  normalIntensity: number
+  normalColor:     string
+  wfIntensity:     number
+  wfColor:         string
+}
+
+//LEGACY shapes - kept on read for back-compat with saves from before the
+//unification refactor. Migrated to SharedLight at load time.
+interface LegacyNormalLight {
   id:       string
   type:     "point" | "directional"
   intensity: number
   color:    string
-  range?:    number   //point-light only, three.js "distance" (0 = infinite)
+  range?:   number
   x: number; y: number; z: number
   tx?: number; ty?: number; tz?: number
 }
-
-interface WfLight {
+interface LegacyWfLight {
   id:       string
   type:     "point" | "directional"
   intensity: number
-  color?:    string   //per-light color (defaults to mode color if missing)
-  range?:    number   //point-light only
+  color?:    string
+  range?:    number
   x: number; y: number; z: number
   tx?: number; ty?: number; tz?: number
 }
@@ -94,11 +109,14 @@ interface StartView {
 interface ViewerSettings {
   startView?: StartView | null
   materials?: MaterialState[]
+  //NEW shape - one shared light list with per-mode intensity + color.
+  lights?: SharedLight[]
   normalMode?: {
     hdrId?:        string
     hdrUrl?:       string | null
     hdrIntensity?: number
-    lights?:       NormalLight[]
+    //LEGACY - back-compat only; new saves write the top-level `lights`.
+    lights?:       LegacyNormalLight[]
   }
   wireframeMode?: {
     hdrId?:           string
@@ -115,7 +133,7 @@ interface ViewerSettings {
       specularIntensity: number
     }
     emissiveMeshes?: EmissiveSpec[]
-    lights?:         WfLight[]
+    lights?:         LegacyWfLight[]
   }
 }
 
@@ -132,6 +150,42 @@ const props = withDefaults(defineProps<{
   isInView?:      boolean
 }>(), { wireframe: false, isInView: true })
 
+//===========================================================================
+//VIEWER CONSTANTS - centralised so the magic numbers stay in one place.
+//===========================================================================
+//Intro fly-in spherical offsets relative to the rest pose. radius x 2.5
+//pulls the camera far back; azimuth +PI/4 adds an eighth-turn arc; polar
+//-0.2 gives a subtle "above" hint. Duration is the full lerp time in ms.
+const FLY_IN_RADIUS_MULTIPLIER     = 2.5
+const FLY_IN_AZIMUTH_OFFSET_RAD    = Math.PI / 4
+const FLY_IN_POLAR_OFFSET_RAD      = 0.2
+const FLY_IN_MIN_POLAR_RAD         = 0.05
+const FLY_IN_DURATION_MS           = 2800
+//OrbitControls range - wide enough that a saved start view at any sane
+//radius doesn't get clamped when controls re-sync at the end of the fly-in.
+const ORBIT_MIN_DISTANCE           = 0.05
+const ORBIT_MAX_DISTANCE           = 200
+//Wireframe overlay - matches the editor's values so editor + production
+//render identically (polygonOffset pushes surface back, lines land just
+//in front without z-fighting; edge threshold filters triangulation diagonals).
+const POLYGON_OFFSET_FACTOR        = 1
+const POLYGON_OFFSET_UNITS         = 1
+const WIREFRAME_EDGE_THRESHOLD_DEG = 1
+const WIREFRAME_LINE_OPACITY       = 0.9
+const WIREFRAME_OVERLAY_RENDER_ORDER = 998
+//Shadow + ground
+const SHADOW_MAP_SIZE              = 1024
+const SHADOW_BIAS                  = -0.0002
+const SHADOW_NORMAL_BIAS           = 0.02
+const GROUND_SIZE                  = 40
+const GROUND_OPACITY               = 0.35
+//Renderer + camera defaults
+const CAMERA_FOV                   = 35
+const CAMERA_NEAR                  = 0.01
+const CAMERA_FAR                   = 1000
+const MAX_PIXEL_RATIO              = 1.5
+const RENDER_KEEPALIVE_MS_DEFAULT  = 300
+
 const canvas = ref<HTMLCanvasElement | null>(null)
 const isWireframe = ref(false)
 const isReady     = ref(false)
@@ -144,7 +198,7 @@ let controls: OrbitControls | null = null
 let pmrem:    PMREMGenerator | null = null
 let rafId:    number | null = null
 let renderUntil = 0
-function requestRender(ms = 300) { renderUntil = performance.now() + ms }
+function requestRender(ms = RENDER_KEEPALIVE_MS_DEFAULT) { renderUntil = performance.now() + ms }
 
 //Intro fly-in: Sketchfab-style orbital approach. We lerp in SPHERICAL
 //coordinates around the orbit target (radius + azimuth + polar angle),
@@ -174,9 +228,14 @@ const meshOriginalMaterials = new Map<string, MeshPhysicalMaterial>()
 const wfOverlays = new Map<string, LineSegments>()
 const wfEmissiveMaterials = new Map<string, MeshPhysicalMaterial>()
 
-//Live lights for each mode - swapped in/out by toggleWireframe
-const normalLightObjects: { light: PointLight | DirectionalLight; target?: import("three").Object3D }[] = []
-const wfLightObjects:     { light: PointLight | DirectionalLight; target?: import("three").Object3D }[] = []
+//Shared lights - one entry per spec, intensity + color are swapped per
+//mode by applyLightsForMode() instead of having two parallel arrays.
+type LiveLight = {
+  spec:    SharedLight
+  light:   PointLight | DirectionalLight
+  target?: import("three").Object3D
+}
+const liveLights: LiveLight[] = []
 
 let wfBaseMat: MeshPhysicalMaterial | null = null
 
@@ -224,52 +283,95 @@ function applyHdrFromUrl(url: string | null | undefined, intensity: number) {
 }
 
 //===========================================================================
-//Spawn a light (point or directional) per the saved spec. We keep the
-//Three objects in a parallel array so toggleWireframe can show/hide them.
-function spawnLight(spec: NormalLight | WfLight, forcedColor?: string): { light: PointLight | DirectionalLight; target?: import("three").Object3D } {
-  //Per-light color (saved by the editor) wins over the forcedColor
-  //fallback (mode color) so wireframe lights can be color-picked
-  //individually too, exactly like normal lights.
-  const colorHex = (spec as NormalLight | WfLight).color ?? forcedColor ?? "#ffffff"
+//Spawn ONE three.js light per SharedLight spec. Initial intensity+color
+//come from the active mode (normal at mount time, swapped by
+//applyLightsForMode() when wireframe is toggled).
+function spawnSharedLight(spec: SharedLight): LiveLight {
+  const initialMode: "normal" | "wireframe" = props.wireframe ? "wireframe" : "normal"
+  const colorHex   = initialMode === "wireframe" ? spec.wfColor : spec.normalColor
+  const intensity  = initialMode === "wireframe" ? spec.wfIntensity : spec.normalIntensity
   const col = new Color(colorHex)
   let light: PointLight | DirectionalLight
   if (spec.type === "point") {
-    //range (three.js "distance") = 0 means infinite range (default).
-    const range = (spec as NormalLight | WfLight).range ?? 0
-    light = new PointLight(col, spec.intensity, range, 2)
+    const range = spec.range ?? 0
+    //decay=2 matches three.js default (and the editor's)
+    light = new PointLight(col, intensity, range, 2)
     light.position.set(spec.x, spec.y, spec.z)
-    return { light }
-  } else {
-    light = new DirectionalLight(col, spec.intensity)
-    light.castShadow = true
-    light.shadow.mapSize.set(1024, 1024)
-    light.shadow.bias       = -0.0002
-    light.shadow.normalBias = 0.02
-    light.position.set(spec.x, spec.y, spec.z)
-    const target = light.target
-    target.position.set(spec.tx ?? 0, spec.ty ?? 0, spec.tz ?? 0)
-    target.updateMatrixWorld()
-    return { light, target }
+    return { spec, light }
+  }
+  light = new DirectionalLight(col, intensity)
+  light.castShadow = true
+  light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
+  light.shadow.bias       = SHADOW_BIAS
+  light.shadow.normalBias = SHADOW_NORMAL_BIAS
+  light.position.set(spec.x, spec.y, spec.z)
+  const target = light.target
+  target.position.set(spec.tx ?? 0, spec.ty ?? 0, spec.tz ?? 0)
+  target.updateMatrixWorld()
+  return { spec, light, target }
+}
+
+//Apply the current mode's intensity + color from each LiveLight.spec
+//onto the actual three.js light. Called on wireframe enter/leave so the
+//SAME light fixture changes character between the two modes.
+function applyLightsForMode(mode: "normal" | "wireframe") {
+  for (const item of liveLights) {
+    const intensity = mode === "wireframe" ? item.spec.wfIntensity : item.spec.normalIntensity
+    const colorHex  = mode === "wireframe" ? item.spec.wfColor     : item.spec.normalColor
+    item.light.intensity = intensity
+    item.light.color.set(colorHex)
   }
 }
 
+//Migrate legacy per-mode arrays (saves from before the unification) into
+//the new SharedLight shape. Matches by id; missing ids get index-based
+//keys so unrelated lights don't collapse together.
+function migrateLegacyLights(
+  normalSpecs: LegacyNormalLight[] | undefined,
+  wfSpecs:     LegacyWfLight[]     | undefined,
+  wfModeColor: string,
+): SharedLight[] {
+  const byKey = new Map<string, { normal?: LegacyNormalLight; wf?: LegacyWfLight }>()
+  ;(normalSpecs ?? []).forEach((n, i) => byKey.set(n.id ?? `_n${i}`, { normal: n }))
+  ;(wfSpecs ?? []).forEach((w, i) => {
+    const key = w.id ?? `_w${i}`
+    const merged = byKey.get(key) ?? {}
+    merged.wf = w
+    byKey.set(key, merged)
+  })
+  const out: SharedLight[] = []
+  for (const { normal, wf } of byKey.values()) {
+    const seed = normal ?? wf
+    if (!seed) continue
+    out.push({
+      id:    seed.id,
+      type:  seed.type,
+      x:     seed.x, y: seed.y, z: seed.z,
+      tx:    seed.tx, ty: seed.ty, tz: seed.tz,
+      range: seed.range,
+      normalIntensity: normal?.intensity ?? wf?.intensity ?? 1,
+      normalColor:     normal?.color ?? "#ffffff",
+      wfIntensity:     wf?.intensity ?? normal?.intensity ?? 1,
+      wfColor:         wf?.color ?? wfModeColor,
+    })
+  }
+  return out
+}
+
 //Resize every directional light's shadow frustum so it covers the scene
-//bounding sphere. Called once after the .glb loads and the model is
-//framed/centered.
+//bounding sphere. Called once after the .glb loads.
 function tuneShadowCameras(sphereRadius: number) {
   const size = Math.max(sphereRadius * 3, 1)
-  for (const arr of [normalLightObjects, wfLightObjects]) {
-    for (const item of arr) {
-      const dl = item.light as DirectionalLight
-      if (!(dl as any).isDirectionalLight) continue
-      dl.shadow.camera.left   = -size
-      dl.shadow.camera.right  =  size
-      dl.shadow.camera.top    =  size
-      dl.shadow.camera.bottom = -size
-      dl.shadow.camera.near   = 0.1
-      dl.shadow.camera.far    = size * 5
-      dl.shadow.camera.updateProjectionMatrix()
-    }
+  for (const item of liveLights) {
+    const dl = item.light as DirectionalLight
+    if (!(dl as { isDirectionalLight?: boolean }).isDirectionalLight) continue
+    dl.shadow.camera.left   = -size
+    dl.shadow.camera.right  =  size
+    dl.shadow.camera.top    =  size
+    dl.shadow.camera.bottom = -size
+    dl.shadow.camera.near   = 0.1
+    dl.shadow.camera.far    = size * 5
+    dl.shadow.camera.updateProjectionMatrix()
   }
 }
 
@@ -333,8 +435,8 @@ function ensureWfBaseMat() {
     envMapIntensity:   matSpec?.envMapIntensity             ?? 1,
     specularIntensity: matSpec?.specularIntensity           ?? 1,
     polygonOffset:       true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits:  1,
+    polygonOffsetFactor: POLYGON_OFFSET_FACTOR,
+    polygonOffsetUnits:  POLYGON_OFFSET_UNITS,
   })
 }
 
@@ -346,15 +448,15 @@ function syncWireframeOverlays(on: boolean, color: string, emissiveUuidSet: Set<
     for (const sm of sceneMeshes) {
       if (wfOverlays.has(sm.mesh.uuid)) continue
       if (emissiveUuidSet.has(sm.mesh.uuid)) continue
-      const edgesGeo = new EdgesGeometry(sm.mesh.geometry, 1)
+      const edgesGeo = new EdgesGeometry(sm.mesh.geometry, WIREFRAME_EDGE_THRESHOLD_DEG)
       const overlayMat = new LineBasicMaterial({
         color:       new Color(color),
         transparent: true,
-        opacity:     0.9,
+        opacity:     WIREFRAME_LINE_OPACITY,
         depthWrite:  false,
       })
       const overlay = new LineSegments(edgesGeo, overlayMat)
-      overlay.renderOrder = 998
+      overlay.renderOrder = WIREFRAME_OVERLAY_RENDER_ORDER
       sm.mesh.add(overlay)
       wfOverlays.set(sm.mesh.uuid, overlay)
     }
@@ -429,8 +531,8 @@ function enterWireframe() {
 
   syncWireframeOverlays(wf?.overlayOn ?? true, wf?.overlayColor ?? "#000000", emissiveSet)
 
-  for (const l of normalLightObjects) { l.light.visible = false }
-  for (const l of wfLightObjects)     { l.light.visible = true  }
+  //Shared lights stay on - we just swap their intensity + color pair.
+  applyLightsForMode("wireframe")
 
   applyHdrFromUrl(wf?.hdrUrl, wf?.hdrIntensity ?? 1)
 }
@@ -442,8 +544,7 @@ function leaveWireframe() {
     if (orig) sm.mesh.material = orig
   }
   syncWireframeOverlays(false, "", new Set())
-  for (const l of normalLightObjects) { l.light.visible = true  }
-  for (const l of wfLightObjects)     { l.light.visible = false }
+  applyLightsForMode("normal")
   const n = props.settings?.normalMode
   applyHdrFromUrl(n?.hdrUrl, n?.hdrIntensity ?? 1)
 }
@@ -457,11 +558,11 @@ onMounted(() => {
   scene = new Scene()
   scene.background = null
 
-  camera = new PerspectiveCamera(35, w / h, 0.01, 1000)
+  camera = new PerspectiveCamera(CAMERA_FOV, w / h, CAMERA_NEAR, CAMERA_FAR)
   camera.position.set(2, 1.5, 3)
 
   renderer = new WebGLRenderer({ canvas: c, antialias: false, alpha: true, powerPreference: "high-performance" })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO))
   renderer.setSize(w, h, false)
   renderer.toneMapping            = NeutralToneMapping
   renderer.toneMappingExposure    = 1
@@ -473,7 +574,7 @@ onMounted(() => {
   pmrem.compileEquirectangularShader()
   applyHdrFromUrl(props.settings?.normalMode?.hdrUrl, props.settings?.normalMode?.hdrIntensity ?? 1)
 
-  const ground = new Mesh(new PlaneGeometry(40, 40), new ShadowMaterial({ opacity: 0.35 }))
+  const ground = new Mesh(new PlaneGeometry(GROUND_SIZE, GROUND_SIZE), new ShadowMaterial({ opacity: GROUND_OPACITY }))
   ground.rotation.x = -Math.PI / 2
   ground.receiveShadow = true
   scene.add(ground)
@@ -481,10 +582,10 @@ onMounted(() => {
   controls = new OrbitControls(camera, c)
   controls.enableDamping = true
   controls.dampingFactor = 0.08
-  //Wide range so a saved start view at a large or tight radius isn't
-  //clamped when OrbitControls re-syncs at the end of the intro fly-in.
-  controls.minDistance = 0.05
-  controls.maxDistance = 200
+  //Wide range so a saved start view at any radius isn't clamped when
+  //OrbitControls re-syncs at the end of the intro fly-in (see consts).
+  controls.minDistance = ORBIT_MIN_DISTANCE
+  controls.maxDistance = ORBIT_MAX_DISTANCE
   controls.addEventListener("change", () => requestRender(500))
 
   const renderTarget = new WebGLRenderTarget(w, h, { type: HalfFloatType, samples: 4 })
@@ -543,25 +644,20 @@ onMounted(() => {
       //apply saved material overrides
       if (props.settings?.materials) applyMaterialOverrides(props.settings.materials)
 
-      //spawn normal + wireframe lights
-      const n = props.settings?.normalMode
-      if (n?.lights) {
-        for (const spec of n.lights) {
-          const entry = spawnLight(spec)
-          scene!.add(entry.light)
-          if (entry.target) scene!.add(entry.target)
-          normalLightObjects.push(entry)
-        }
-      }
-      const wf = props.settings?.wireframeMode
-      if (wf?.lights) {
-        for (const spec of wf.lights) {
-          const entry = spawnLight(spec, wf.color ?? "#14b8a6")
-          entry.light.visible = false
-          scene!.add(entry.light)
-          if (entry.target) scene!.add(entry.target)
-          wfLightObjects.push(entry)
-        }
+      //SPAWN LIGHTS - prefer the new shared shape, fall back to legacy
+      //per-mode arrays for back-compat with pre-unification saves.
+      const sharedSpecs: SharedLight[] = props.settings?.lights && props.settings.lights.length > 0
+        ? props.settings.lights
+        : migrateLegacyLights(
+            props.settings?.normalMode?.lights,
+            props.settings?.wireframeMode?.lights,
+            props.settings?.wireframeMode?.color ?? "#14b8a6",
+          )
+      for (const spec of sharedSpecs) {
+        const entry = spawnSharedLight(spec)
+        scene!.add(entry.light)
+        if (entry.target) scene!.add(entry.target)
+        liveLights.push(entry)
       }
 
       scene!.add(gltf.scene)
@@ -602,9 +698,9 @@ onMounted(() => {
         restPos.clone().sub(restTarget),
       )
       const fromSph = new Spherical(
-        restSph.radius * 2.5,
-        Math.max(0.05, restSph.phi - 0.2),  //barely above
-        restSph.theta + Math.PI / 4,         //eighth turn around the model
+        restSph.radius * FLY_IN_RADIUS_MULTIPLIER,
+        Math.max(FLY_IN_MIN_POLAR_RAD, restSph.phi - FLY_IN_POLAR_OFFSET_RAD),
+        restSph.theta + FLY_IN_AZIMUTH_OFFSET_RAD,
       )
 
       //Park camera at the fly-start so the first paint shows the offset
@@ -624,7 +720,7 @@ onMounted(() => {
         fromSph,
         toSph:   restSph,
         target:  restTarget.clone(),
-        duration: 2800,
+        duration: FLY_IN_DURATION_MS,
       }
       if (props.isInView && !introPlayed) startIntro()
 

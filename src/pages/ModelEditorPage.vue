@@ -88,6 +88,66 @@ const TABS: { key: Tab; label: string }[] = [
 const tab = ref<Tab>("materials")
 
 //===========================================================================
+//EDITOR CONSTANTS - centralized so the magic numbers don't drift across
+//handlers. Tweak here, not in the call sites.
+//===========================================================================
+//Editor canvas aspect - must match MainProject's viewer aspect so the
+//author frames the shot WYSIWYG. Production viewer renders at the same
+//aspect (see main-project__stage style).
+const TARGET_ASPECT = 16 / 9
+//Camera animation timings (ms). axisSnap is short to keep view-change
+//responsive; goToStart is medium for visible motion; selectGizmo is
+//short so attaching to a light feels instant.
+const AXIS_SNAP_DURATION_MS    = 500
+const GO_TO_START_DURATION_MS  = 800
+const GIZMO_SELECT_DURATION_MS = 500
+//Light defaults
+const POINT_LIGHT_INTENSITY        = 2
+const DIRECTIONAL_LIGHT_INTENSITY  = 1.5
+const POINT_LIGHT_DECAY            = 2
+const POINT_LIGHT_RANGE_DEFAULT    = 0   //0 = infinite
+const SHADOW_MAP_SIZE              = 1024
+const SHADOW_BIAS                  = -0.0002
+const SHADOW_NORMAL_BIAS           = 0.02
+//Shadow camera default frustum (before tuneShadowCameras takes over with
+//bounding-sphere sizing on glb load)
+const SHADOW_DEFAULT_HALF_EXTENT   = 5
+const SHADOW_DEFAULT_NEAR          = 0.1
+const SHADOW_DEFAULT_FAR           = 25
+//Gizmo helper visuals
+const LIGHT_GIZMO_RADIUS           = 0.14
+const WIREFRAME_LINE_OPACITY       = 0.9
+const WIREFRAME_OVERLAY_RENDER_ORDER = 998
+const LIGHT_GIZMO_RENDER_ORDER     = 999
+//Wireframe overlay threshold - edges between adjacent faces below this
+//angle (deg) are filtered. Keeps mesh "hard" edges only.
+const WIREFRAME_EDGE_THRESHOLD_DEG = 1
+//Wireframe material polygonOffset - matches ThreeViewer so editor and
+//production render lines at the same z-depth (no z-fighting / no x-ray).
+const POLYGON_OFFSET_FACTOR        = 1
+const POLYGON_OFFSET_UNITS         = 1
+//Ground plane (shadow catcher) - same setup as ThreeViewer.
+const GROUND_SIZE                  = 40
+const GROUND_OPACITY               = 0.35
+//Camera defaults
+const CAMERA_FOV                   = 35
+const CAMERA_NEAR                  = 0.01
+const CAMERA_FAR                   = 1000
+//Renderer
+const MAX_PIXEL_RATIO              = 1.5
+//OrbitControls range. Generous so a saved start view at any radius is fine.
+const ORBIT_MIN_DISTANCE           = 0.5
+const ORBIT_MAX_DISTANCE           = 20
+//Directional-link line opacity
+const DIRECTIONAL_LINK_OPACITY     = 0.4
+//PointerUp click vs drag (px)
+const POINTER_DRAG_THRESHOLD = 5
+//Auto-deactivate render after this many ms of idle, to save battery.
+const RENDER_KEEPALIVE_MS_DEFAULT = 300
+//Per-light hover swatch tint (mesh pick color too)
+const PICK_COLOR = 0xff7a00
+
+//===========================================================================
 //MATERIALS - one entry per unique material in the loaded glb
 //===========================================================================
 type MaterialEntry = {
@@ -176,6 +236,11 @@ let currentEnvSource: Texture | null = null
 type LightType = "point" | "directional"
 type LightMode = "normal" | "wireframe"
 
+//SHARED LIGHT - position + range + type are common to both modes; only
+//intensity + color differ per mode. The author places a light once and
+//tunes how each mode renders it independently. The live three.js light
+//object's intensity / color are swapped in/out by applyLightsForMode()
+//whenever we enter or leave wireframe mode.
 type LightEntry = {
   id:        string
   type:      LightType
@@ -183,18 +248,18 @@ type LightEntry = {
   sourceGiz: Mesh   //small sphere at the source position (gizmo target)
   target?:   Mesh   //small sphere at the target position (directional only)
   link?:     Line   //thin line between source and target (directional only)
-  intensity: number
   x: number; y: number; z: number          //source position
   tx?: number; ty?: number; tz?: number    //target position (directional only)
-  color:     string                        //hex, used in NORMAL mode only
   range?:    number                        //point-light only (three.js "distance", 0 = infinite)
+  normalIntensity: number
+  normalColor:     string
+  wfIntensity:     number
+  wfColor:         string
 }
 
-const normalLights = ref<LightEntry[]>([])
-const wfLights     = ref<LightEntry[]>([])
+const lights = ref<LightEntry[]>([])
 
 const selectedLightId = ref<string | null>(null)
-const selectedTargetForId = ref<string | null>(null)
 
 //===========================================================================
 //WIREFRAME MODE
@@ -230,7 +295,8 @@ const sectionOpen = ref({
   wfMode:       false,
   wfHdr:        false,
   wfMaterial:   false,
-  wfLights:     false,
+  //wfLights section was removed - lights live in the Lights tab as a
+  //single shared list (per-mode intensity+color via sub-blocks)
   wfEmissive:   false,
 })
 
@@ -240,8 +306,10 @@ const sectionOpen = ref({
 //   wfBaseMat     : plain gray, edited from the Wireframe tab
 //   wfEmissiveMat : same base but with emissive = mode color
 //   wfPickMat     : same base but with emissive = orange (selection)
-//Wireframe material params are PERSISTED at the module level so they'd
-//survive across project switches. The UI shows a warning about this.
+//These params + the live materials live for the lifetime of the page
+//(same component instance across in-app /edit-3d/:id route changes -
+//Vue Router reuses the component), so a tweak in one project is what
+//the next project starts with. The UI shows a warning about this.
 type WfMaterialParams = {
   color:             string
   metalness:         number
@@ -266,8 +334,6 @@ let wfPickMat: MeshPhysicalMaterial | null = null
 //of flat faces are excluded.
 const wfOverlays = new Map<string, LineSegments>()
 const meshMatSnapshots = new Map<string, MeshPhysicalMaterial>()
-
-const PICK_COLOR = 0xff7a00
 
 //===========================================================================
 //SCENE REFS
@@ -347,8 +413,7 @@ function makeCameraAnim(opts: {
   }
 }
 
-//Click vs drag discrimination
-const POINTER_DRAG_THRESHOLD = 5
+//Click vs drag discrimination - see POINTER_DRAG_THRESHOLD up top.
 let pointerDownX = 0
 let pointerDownY = 0
 let pointerDownAt = 0
@@ -357,18 +422,17 @@ let pointerDownAt = 0
 let canvasVisible = true
 let tabVisible    = true
 
-function requestRender(ms = 300) { renderUntil = performance.now() + ms }
+function requestRender(ms = RENDER_KEEPALIVE_MS_DEFAULT) {
+  renderUntil = performance.now() + ms
+}
 
 //===========================================================================
 //ONMOUNTED
 //===========================================================================
-//Editor canvas is constrained to the SAME 16:9 aspect as the production
-//viewer (MainProject.vue uses --mp-viewer-aspect: 16/9). Without this,
-//the author frames a shot in a portrait-ish editor viewport then the
-//visitor sees the model at a wider aspect on the site, which reads as
-//"more zoomed out". Returning the size as a 16:9 box that fits inside
-//the container makes the editor WYSIWYG.
-const TARGET_ASPECT = 16 / 9
+//Editor canvas is constrained to the SAME aspect as the production viewer
+//(see TARGET_ASPECT constant at the top) so the author frames the shot
+//WYSIWYG. Returns the size as an aspect-locked box that fits inside the
+//container.
 function fitCanvasSize(containerW: number, containerH: number): { w: number; h: number } {
   if (containerW / containerH > TARGET_ASPECT) {
     return { w: Math.floor(containerH * TARGET_ASPECT), h: containerH }
@@ -389,7 +453,7 @@ onMounted(() => {
   scene = new Scene()
   scene.background = null
 
-  const camera = new PerspectiveCamera(35, w / h, 0.01, 1000)
+  const camera = new PerspectiveCamera(CAMERA_FOV, w / h, CAMERA_NEAR, CAMERA_FAR)
   camera.position.set(2, 1.5, 3)
   perspectiveCamera = camera
   cameraRef = camera
@@ -408,7 +472,7 @@ onMounted(() => {
     alpha: true,
     powerPreference: "high-performance",
   })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO))
   renderer.setSize(w, h, false)
   renderer.toneMapping            = NeutralToneMapping
   renderer.toneMappingExposure    = 1
@@ -422,7 +486,7 @@ onMounted(() => {
   scene.environmentIntensity = normalHdrIntensity.value
 
   //GROUND PLANE (shadow catcher)
-  const ground = new Mesh(new PlaneGeometry(40, 40), new ShadowMaterial({ opacity: 0.35 }))
+  const ground = new Mesh(new PlaneGeometry(GROUND_SIZE, GROUND_SIZE), new ShadowMaterial({ opacity: GROUND_OPACITY }))
   ground.rotation.x = -Math.PI / 2
   ground.receiveShadow = true
   scene.add(ground)
@@ -431,8 +495,8 @@ onMounted(() => {
   controls = new OrbitControls(camera, c)
   controls.enableDamping = true
   controls.dampingFactor = 0.08
-  controls.minDistance = 0.5
-  controls.maxDistance = 20
+  controls.minDistance = ORBIT_MIN_DISTANCE
+  controls.maxDistance = ORBIT_MAX_DISTANCE
   controls.addEventListener("change", () => requestRender(500))
 
   //TRANSFORM CONTROLS (single instance, switchable target)
@@ -583,7 +647,7 @@ onMounted(() => {
       if (xhr.lengthComputable) status.value = `Loading ${Math.round((xhr.loaded / xhr.total) * 100)}%`
     },
     (err) => {
-      console.error("[three-test] GLTF load failed:", err)
+      console.error("[model-editor] GLTF load failed:", err)
       status.value = `Load failed: ${err instanceof Error ? err.message : String(err)}`
     },
     )
@@ -681,18 +745,16 @@ function onTabVisibility() {
 //either misses the model (frustum too small) or wastes resolution.
 function tuneShadowCameras(sphereRadius: number) {
   const size = Math.max(sphereRadius * 3, 1)
-  for (const list of [normalLights, wfLights]) {
-    for (const e of list.value) {
-      if (e.type !== "directional") continue
-      const dl = e.light as DirectionalLight
-      dl.shadow.camera.left   = -size
-      dl.shadow.camera.right  =  size
-      dl.shadow.camera.top    =  size
-      dl.shadow.camera.bottom = -size
-      dl.shadow.camera.near   = 0.1
-      dl.shadow.camera.far    = size * 5
-      dl.shadow.camera.updateProjectionMatrix()
-    }
+  for (const e of lights.value) {
+    if (e.type !== "directional") continue
+    const dl = e.light as DirectionalLight
+    dl.shadow.camera.left   = -size
+    dl.shadow.camera.right  =  size
+    dl.shadow.camera.top    =  size
+    dl.shadow.camera.bottom = -size
+    dl.shadow.camera.near   = 0.1
+    dl.shadow.camera.far    = size * 5
+    dl.shadow.camera.updateProjectionMatrix()
   }
 }
 
@@ -739,9 +801,23 @@ type SavedSettings = {
     envMapIntensity?: number
     specularIntensity?: number
   }>
+  //NEW shape - one shared list with per-mode intensity + color
+  lights?: Array<{
+    id?: string
+    type: "point" | "directional"
+    x: number; y: number; z: number
+    tx?: number; ty?: number; tz?: number
+    range?: number
+    normalIntensity: number
+    normalColor:     string
+    wfIntensity:     number
+    wfColor:         string
+  }>
   normalMode?: {
     hdrId?: string
     hdrIntensity?: number
+    //LEGACY - kept on read to migrate old saves; new saves write the
+    //top-level `lights` array instead.
     lights?: Array<{ id?: string; type: "point" | "directional"; intensity: number; color: string; range?: number; x: number; y: number; z: number; tx?: number; ty?: number; tz?: number }>
   }
   wireframeMode?: {
@@ -810,13 +886,43 @@ function applyPendingHydration() {
     }
   }
 
-  //LIGHTS - spawn each saved entry as a new light, then override its
-  //position / intensity. We bypass addLight's auto-select behavior so
-  //hydration doesn't pop a gizmo on every restored light.
+  //LIGHTS - spawn each saved entry. Supports both the new shared shape
+  //(top-level `lights` array with per-mode intensity+color) and the
+  //legacy normalMode.lights + wireframeMode.lights pair, which we merge
+  //by id. addLight's auto-select is bypassed during hydration.
   hydratingLights = true
   try {
-    for (const spec of (s.normalMode?.lights ?? [])) hydrateLightInto("normal", spec)
-    for (const spec of (s.wireframeMode?.lights ?? [])) hydrateLightInto("wireframe", spec)
+    if (s.lights && s.lights.length > 0) {
+      for (const spec of s.lights) hydrateSharedLight(spec)
+    } else {
+      //LEGACY MIGRATION: zip the two old arrays by id (or by index when
+      //ids are missing) into the new shared shape.
+      const normalSpecs = s.normalMode?.lights ?? []
+      const wfSpecs     = s.wireframeMode?.lights ?? []
+      const byId = new Map<string, { normal?: typeof normalSpecs[number]; wf?: typeof wfSpecs[number] }>()
+      normalSpecs.forEach((n, i) => byId.set(n.id ?? `_n${i}`, { normal: n }))
+      wfSpecs.forEach((w, i) => {
+        const key = w.id ?? `_w${i}`
+        const merged = byId.get(key) ?? {}
+        merged.wf = w
+        byId.set(key, merged)
+      })
+      for (const { normal, wf } of byId.values()) {
+        const seed = normal ?? wf
+        if (!seed) continue
+        hydrateSharedLight({
+          id:    seed.id,
+          type:  seed.type,
+          x:     seed.x, y: seed.y, z: seed.z,
+          tx:    seed.tx, ty: seed.ty, tz: seed.tz,
+          range: seed.range,
+          normalIntensity: normal?.intensity ?? wf?.intensity ?? 1,
+          normalColor:     normal?.color ?? "#ffffff",
+          wfIntensity:     wf?.intensity ?? normal?.intensity ?? 1,
+          wfColor:         wf?.color ?? wireframeColor.value,
+        })
+      }
+    }
   } finally {
     hydratingLights = false
   }
@@ -839,16 +945,25 @@ function applyPendingHydration() {
   requestRender(800)
 }
 
-//Per-mode light hydration that overrides addLight's auto-pick behavior
+//Shared-light hydration. Spawns the entry, copies the saved position +
+//range + per-mode intensity/color, then applies whichever pair matches
+//the current mode so the scene re-renders correctly on load.
 let hydratingLights = false
 
-function hydrateLightInto(mode: LightMode, spec: { id?: string; type: "point" | "directional"; intensity: number; color?: string; range?: number; x: number; y: number; z: number; tx?: number; ty?: number; tz?: number }) {
-  addLight(mode, spec.type)
-  const list = mode === "normal" ? normalLights : wfLights
-  const entry = list.value[list.value.length - 1]
+function hydrateSharedLight(spec: {
+  id?: string
+  type: "point" | "directional"
+  x: number; y: number; z: number
+  tx?: number; ty?: number; tz?: number
+  range?: number
+  normalIntensity: number
+  normalColor:     string
+  wfIntensity:     number
+  wfColor:         string
+}) {
+  addLight(spec.type)
+  const entry = lights.value[lights.value.length - 1]
   if (!entry) return
-  entry.intensity = spec.intensity
-  entry.light.intensity = spec.intensity
   entry.x = spec.x; entry.y = spec.y; entry.z = spec.z
   entry.light.position.set(spec.x, spec.y, spec.z)
   entry.sourceGiz.position.copy(entry.light.position)
@@ -856,22 +971,24 @@ function hydrateLightInto(mode: LightMode, spec: { id?: string; type: "point" | 
     entry.range = spec.range
     ;(entry.light as PointLight).distance = spec.range
   }
-  //restore per-light color for both modes - wf lights now have their own
-  //hex (was forced to mode color in the past)
-  if (spec.color) {
-    entry.color = spec.color
-    const col = new Color(spec.color)
-    entry.light.color.copy(col)
-    ;(entry.sourceGiz.material as MeshBasicMaterial).color.copy(col)
-    if (entry.target) (entry.target.material as MeshBasicMaterial).color.copy(col)
-    if (entry.link)   (entry.link.material   as LineBasicMaterial).color.copy(col)
-  }
+  entry.normalIntensity = spec.normalIntensity
+  entry.normalColor     = spec.normalColor
+  entry.wfIntensity     = spec.wfIntensity
+  entry.wfColor         = spec.wfColor
   if (entry.type === "directional" && entry.target) {
     entry.tx = spec.tx ?? 0; entry.ty = spec.ty ?? 0; entry.tz = spec.tz ?? 0
     entry.target.position.set(entry.tx, entry.ty, entry.tz)
     ;(entry.light as DirectionalLight).target.updateMatrixWorld()
     updateLinkGeometry(entry)
   }
+  //apply mode-appropriate intensity+color now that the entry is live
+  const mode = activeMode()
+  const col = new Color(lightColor(entry, mode))
+  entry.light.intensity = lightIntensity(entry, mode)
+  entry.light.color.copy(col)
+  ;(entry.sourceGiz.material as MeshBasicMaterial).color.copy(col)
+  if (entry.target) (entry.target.material as MeshBasicMaterial).color.copy(col)
+  if (entry.link)   (entry.link.material   as LineBasicMaterial).color.copy(col)
 }
 
 async function uploadGlb() {
@@ -972,7 +1089,7 @@ function previewFromTexture(map: import("three").Texture | null | undefined, siz
     ctx.drawImage(map.image as CanvasImageSource, 0, 0, size, size)
     return c.toDataURL("image/png")
   } catch (e) {
-    console.warn("[three-test] texture preview failed:", e)
+    console.warn("[model-editor] texture preview failed:", e)
     return null
   }
 }
@@ -1098,7 +1215,7 @@ function applyHdrFromEntry(entry: HdrEntry, intensity: number) {
     (err) => {
       const msg = err instanceof Error ? err.message : String(err)
       hdrError.value = `${entry.name}: ${msg}`
-      console.error("[three-test] HDR load failed:", entry.name, err)
+      console.error("[model-editor] HDR load failed:", entry.name, err)
     },
   )
 }
@@ -1160,7 +1277,7 @@ function ensureHdrThumbnail(entry: HdrEntry) {
       requestRender()
     },
     undefined,
-    (err) => { console.warn("[three-test] HDR thumbnail failed:", entry.name, err) },
+    (err) => { console.warn("[model-editor] HDR thumbnail failed:", entry.name, err) },
   )
 }
 function onHdrPick() {
@@ -1215,7 +1332,7 @@ async function loadExistingHdris() {
     //previews even before any of them is selected
     for (const entry of hdris.value) ensureHdrThumbnail(entry)
   } catch (e) {
-    console.warn("[three-test] could not list existing HDRs:", e)
+    console.warn("[model-editor] could not list existing HDRs:", e)
   }
 }
 
@@ -1246,36 +1363,71 @@ function uniqueId(): string {
   return Math.random().toString(36).slice(2, 10)
 }
 
-function addLight(mode: LightMode, type: LightType) {
+//Mode-aware accessors so handlers + template can read/write the right
+//pair (intensity / color) without branching at every call site.
+function lightIntensity(e: LightEntry, mode: LightMode): number {
+  return mode === "normal" ? e.normalIntensity : e.wfIntensity
+}
+function lightColor(e: LightEntry, mode: LightMode): string {
+  return mode === "normal" ? e.normalColor : e.wfColor
+}
+function activeMode(): LightMode {
+  return wireframeMode.value ? "wireframe" : "normal"
+}
+
+//Push the current mode's intensity + color from each LightEntry onto the
+//actual three.js Light object + the gizmo materials. Called on mode
+//switch (enter/leave wireframe) and after live edits.
+function applyLightsForMode() {
+  const mode = activeMode()
+  for (const e of lights.value) {
+    const intensity = lightIntensity(e, mode)
+    const colorHex  = lightColor(e, mode)
+    e.light.intensity = intensity
+    const col = new Color(colorHex)
+    e.light.color.copy(col)
+    ;(e.sourceGiz.material as MeshBasicMaterial).color.copy(col)
+    if (e.target) (e.target.material as MeshBasicMaterial).color.copy(col)
+    if (e.link)   (e.link.material   as LineBasicMaterial).color.copy(col)
+  }
+  requestRender()
+}
+
+function addLight(type: LightType) {
   if (!scene) return
   const id = uniqueId()
-  const color = mode === "wireframe" ? wireframeColor.value : "#ffffff"
-  const colorObj = new Color(color)
+  //Defaults: normal mode = white, wireframe mode = the global mode color
+  const normalColor = "#ffffff"
+  const wfColor     = wireframeColor.value
+  const startMode   = activeMode()
+  const startColor  = startMode === "normal" ? normalColor : wfColor
+  const startIntensity = type === "point" ? POINT_LIGHT_INTENSITY : DIRECTIONAL_LIGHT_INTENSITY
+  const colorObj    = new Color(startColor)
 
   let light: PointLight | DirectionalLight
   if (type === "point") {
     //distance = 0 means infinite range. The user can dial it down via
     //the per-light Range slider, which maps to PointLight.distance.
-    light = new PointLight(colorObj, 2, 0, 2)
+    light = new PointLight(colorObj, startIntensity, POINT_LIGHT_RANGE_DEFAULT, POINT_LIGHT_DECAY)
   } else {
-    light = new DirectionalLight(colorObj, 1.5)
+    light = new DirectionalLight(colorObj, startIntensity)
     light.castShadow = true
-    light.shadow.mapSize.set(1024, 1024)
-    light.shadow.bias       = -0.0002
-    light.shadow.normalBias = 0.02
+    light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
+    light.shadow.bias       = SHADOW_BIAS
+    light.shadow.normalBias = SHADOW_NORMAL_BIAS
     //frustum is tuned later from the bounding sphere via tuneShadowCameras()
-    light.shadow.camera.left   = -5
-    light.shadow.camera.right  =  5
-    light.shadow.camera.top    =  5
-    light.shadow.camera.bottom = -5
-    light.shadow.camera.near   = 0.1
-    light.shadow.camera.far    = 25
+    light.shadow.camera.left   = -SHADOW_DEFAULT_HALF_EXTENT
+    light.shadow.camera.right  =  SHADOW_DEFAULT_HALF_EXTENT
+    light.shadow.camera.top    =  SHADOW_DEFAULT_HALF_EXTENT
+    light.shadow.camera.bottom = -SHADOW_DEFAULT_HALF_EXTENT
+    light.shadow.camera.near   = SHADOW_DEFAULT_NEAR
+    light.shadow.camera.far    = SHADOW_DEFAULT_FAR
     light.shadow.camera.updateProjectionMatrix()
   }
   light.position.set(2, 2, 2)
   scene.add(light)
 
-  const sourceGiz = makeGizmoDiamond(color)
+  const sourceGiz = makeGizmoDiamond(startColor)
   sourceGiz.position.copy(light.position)
   scene.add(sourceGiz)
 
@@ -1283,15 +1435,17 @@ function addLight(mode: LightMode, type: LightType) {
     id, type,
     light:     markRaw(light),
     sourceGiz: markRaw(sourceGiz),
-    intensity: type === "point" ? 2 : 1.5,
     x: 2, y: 2, z: 2,
-    color,
-    range: type === "point" ? 0 : undefined,
+    range: type === "point" ? POINT_LIGHT_RANGE_DEFAULT : undefined,
+    normalIntensity: startIntensity,
+    normalColor,
+    wfIntensity:     startIntensity,
+    wfColor,
   }
 
   if (type === "directional") {
     const dl = light as DirectionalLight
-    const target = makeGizmoDiamond(color, true)
+    const target = makeGizmoDiamond(startColor, true)
     target.position.set(0, 0, 0)
     scene.add(target)
     dl.target = target
@@ -1304,27 +1458,26 @@ function addLight(mode: LightMode, type: LightType) {
       light.position.clone(),
       target.position.clone(),
     ])
-    const lineMat = new LineBasicMaterial({ color: colorObj, transparent: true, opacity: 0.4 })
+    const lineMat = new LineBasicMaterial({ color: colorObj, transparent: true, opacity: DIRECTIONAL_LINK_OPACITY })
     const link = new Line(lineGeo, lineMat)
     scene.add(link)
     entry.link = markRaw(link)
   }
 
-  const list = mode === "normal" ? normalLights : wfLights
-  list.value = [...list.value, entry]
+  lights.value = [...lights.value, entry]
 
-  //hide if not the active mode right now
-  const visible = mode === "normal" ? !wireframeMode.value : wireframeMode.value
-  setLightVisibility(entry, visible)
+  //Always-on lights now (no per-mode visibility, the SHARED light just
+  //changes intensity+color between modes). The actual on/off of helpers
+  //follows showLightGizmos like before.
+  setLightVisibility(entry, true)
 
   //auto-pick the new light's source gizmo - the user spawns a light to
   //place it, so we drop straight into manipulate mode (camera flies in,
   //transform handles appear). Skip during hydration (we're spawning
   //many at once and don't want a gizmo popping for each).
-  if (visible && !hydratingLights) {
-    const newIdx = list.value.length - 1
-    //defer one frame so the helper / target are in the scene graph first
-    queueMicrotask(() => selectGizmo(mode, newIdx, "source"))
+  if (!hydratingLights) {
+    const newIdx = lights.value.length - 1
+    queueMicrotask(() => selectGizmo(newIdx, "source"))
   }
 
   requestRender()
@@ -1334,7 +1487,7 @@ function addLight(mode: LightMode, type: LightType) {
 //in wireframe with depth-test off so it's always visible regardless of
 //camera angle or what's behind it.
 function makeGizmoDiamond(colorHex: string, isTarget = false): Mesh {
-  const geo = new OctahedronGeometry(0.14, 0)
+  const geo = new OctahedronGeometry(LIGHT_GIZMO_RADIUS, 0)
   const mat = new MeshBasicMaterial({
     color:       new Color(colorHex),
     wireframe:   true,
@@ -1344,17 +1497,16 @@ function makeGizmoDiamond(colorHex: string, isTarget = false): Mesh {
     depthWrite:  false,
   })
   const diamond = new Mesh(geo, mat)
-  diamond.renderOrder = 999
+  diamond.renderOrder = LIGHT_GIZMO_RENDER_ORDER
   return diamond
 }
 
-//Light itself is visible whenever its mode matches the current mode.
-//The gizmo helpers (sphere markers, target, link) follow that AND the
-//showLightGizmos toggle, so the user can hide the visual clutter for a
-//clean render without losing the actual lighting.
-function setLightVisibility(entry: LightEntry, inMode: boolean) {
-  entry.light.visible     = inMode
-  const helpers = inMode && showLightGizmos.value
+//Light is always on (shared between modes); gizmo helpers follow the
+//showLightGizmos toggle so the user can hide visual clutter for a clean
+//render without losing the actual lighting.
+function setLightVisibility(entry: LightEntry, on: boolean) {
+  entry.light.visible     = on
+  const helpers = on && showLightGizmos.value
   entry.sourceGiz.visible = helpers
   if (entry.target) entry.target.visible = helpers
   if (entry.link)   entry.link.visible   = helpers
@@ -1362,17 +1514,14 @@ function setLightVisibility(entry: LightEntry, inMode: boolean) {
 
 function onShowGizmosToggle(v: boolean) {
   showLightGizmos.value = v
-  for (const e of normalLights.value) setLightVisibility(e, !wireframeMode.value)
-  for (const e of wfLights.value)     setLightVisibility(e, wireframeMode.value)
-  //detach the transform gizmo too when hiding everything, otherwise we
-  //leave the colored arrows visible while the diamond marker is gone
+  for (const e of lights.value) setLightVisibility(e, true)
+  //detach the transform gizmo too when hiding everything
   if (!v && selectedLightId.value) detachLightGizmo()
   requestRender()
 }
 
-function removeLight(mode: LightMode, idx: number) {
-  const list = mode === "normal" ? normalLights : wfLights
-  const entry = list.value[idx]; if (!entry) return
+function removeLight(idx: number) {
+  const entry = lights.value[idx]; if (!entry) return
   detachLightGizmoIf(entry.id)
   if (entry.light.parent)     entry.light.parent.remove(entry.light)
   if (entry.sourceGiz.parent) entry.sourceGiz.parent.remove(entry.sourceGiz)
@@ -1385,46 +1534,42 @@ function removeLight(mode: LightMode, idx: number) {
   entry.target?.geometry.dispose()
   entry.link?.geometry.dispose()
   if (entry.link?.material instanceof LineBasicMaterial) entry.link.material.dispose()
-  list.value = list.value.filter((_, i) => i !== idx)
+  lights.value = lights.value.filter((_, i) => i !== idx)
   requestRender()
 }
 
 function onLightIntensity(mode: LightMode, idx: number, v: number) {
-  const list = mode === "normal" ? normalLights : wfLights
-  const e = list.value[idx]; if (!e) return
-  e.intensity = v
-  e.light.intensity = v
+  const e = lights.value[idx]; if (!e) return
+  if (mode === "normal") e.normalIntensity = v
+  else                   e.wfIntensity     = v
+  if (mode === activeMode()) e.light.intensity = v
   requestRender()
 }
 
 //Point-light range: maps directly to PointLight.distance. 0 = infinite,
 //otherwise the light falls off to 0 at that radius. UI slider goes up
-//to 30 (covers typical scene sizes) - 0 still represents infinite.
-function onLightRange(mode: LightMode, idx: number, v: number) {
-  const list = mode === "normal" ? normalLights : wfLights
-  const e = list.value[idx]; if (!e || e.type !== "point") return
+//to 30 (covers typical scene sizes). Shared between modes.
+function onLightRange(idx: number, v: number) {
+  const e = lights.value[idx]; if (!e || e.type !== "point") return
   e.range = v
   ;(e.light as PointLight).distance = v
   requestRender()
 }
 
-//Hover on a light row in the panel tints its gizmo orange (same color
-//as the picked-mesh emissive) so the user can locate the light in the
-//scene without selecting / attaching the transform handles. Restores
-//the per-light color on leave.
-function onLightHover(mode: LightMode, idx: number, on: boolean) {
-  const list = mode === "normal" ? normalLights : wfLights
-  const e = list.value[idx]; if (!e) return
-  const col = on ? new Color(PICK_COLOR) : new Color(e.color)
+//Hover on a light row in the panel tints its gizmo orange so the user
+//can locate the light in the scene without attaching the transform
+//handles. Restores the active-mode color on leave.
+function onLightHover(idx: number, on: boolean) {
+  const e = lights.value[idx]; if (!e) return
+  const col = on ? new Color(PICK_COLOR) : new Color(lightColor(e, activeMode()))
   ;(e.sourceGiz.material as MeshBasicMaterial).color.copy(col)
   if (e.target) (e.target.material as MeshBasicMaterial).color.copy(col)
   if (e.link)   (e.link.material   as LineBasicMaterial).color.copy(col)
   requestRender()
 }
 
-function onLightPosition(mode: LightMode, idx: number, axis: "x" | "y" | "z", v: number) {
-  const list = mode === "normal" ? normalLights : wfLights
-  const e = list.value[idx]; if (!e) return
+function onLightPosition(idx: number, axis: "x" | "y" | "z", v: number) {
+  const e = lights.value[idx]; if (!e) return
   e[axis] = v
   e.light.position.set(e.x, e.y, e.z)
   e.sourceGiz.position.copy(e.light.position)
@@ -1432,9 +1577,8 @@ function onLightPosition(mode: LightMode, idx: number, axis: "x" | "y" | "z", v:
   requestRender()
 }
 
-function onLightTargetPosition(mode: LightMode, idx: number, axis: "x" | "y" | "z", v: number) {
-  const list = mode === "normal" ? normalLights : wfLights
-  const e = list.value[idx]; if (!e || !e.target) return
+function onLightTargetPosition(idx: number, axis: "x" | "y" | "z", v: number) {
+  const e = lights.value[idx]; if (!e || !e.target) return
   const key = (axis === "x" ? "tx" : axis === "y" ? "ty" : "tz") as "tx" | "ty" | "tz"
   e[key] = v
   e.target.position.set(e.tx!, e.ty!, e.tz!)
@@ -1444,14 +1588,16 @@ function onLightTargetPosition(mode: LightMode, idx: number, axis: "x" | "y" | "
 }
 
 function onLightColorChange(mode: LightMode, idx: number, hex: string) {
-  const list = mode === "normal" ? normalLights : wfLights
-  const e = list.value[idx]; if (!e) return
-  e.color = hex
-  const col = new Color(hex)
-  e.light.color.copy(col)
-  ;(e.sourceGiz.material as MeshBasicMaterial).color.copy(col)
-  if (e.target) (e.target.material as MeshBasicMaterial).color.copy(col)
-  if (e.link)   (e.link.material   as LineBasicMaterial).color.copy(col)
+  const e = lights.value[idx]; if (!e) return
+  if (mode === "normal") e.normalColor = hex
+  else                   e.wfColor     = hex
+  if (mode === activeMode()) {
+    const col = new Color(hex)
+    e.light.color.copy(col)
+    ;(e.sourceGiz.material as MeshBasicMaterial).color.copy(col)
+    if (e.target) (e.target.material as MeshBasicMaterial).color.copy(col)
+    if (e.link)   (e.link.material   as LineBasicMaterial).color.copy(col)
+  }
   requestRender()
 }
 
@@ -1466,31 +1612,27 @@ function updateLinkGeometry(e: LightEntry) {
 //===========================================================================
 //GIZMO SELECT / DESELECT
 //===========================================================================
+//Encoded as `${kind}:${entryId}` - kind is `src` for the light source
+//or `tgt` for the target gizmo (directional only). Mode is no longer in
+//the id because lights are shared between modes now.
 function entryAndGizmoFor(id: string): { entry: LightEntry; target: "source" | "target" } | null {
-  const parts = id.split(":")
-  if (parts.length !== 3) return null
-  const [mode, , uuid] = parts
-  const targetKind = parts[1]
-  const list = (mode === "normal" ? normalLights : wfLights).value
-  const entry = list.find((l) => l.id === uuid); if (!entry) return null
-  return { entry, target: targetKind === "tgt" ? "target" : "source" }
+  const [kind, uuid] = id.split(":")
+  if (!kind || !uuid) return null
+  const entry = lights.value.find((l) => l.id === uuid); if (!entry) return null
+  return { entry, target: kind === "tgt" ? "target" : "source" }
 }
 
-function selectGizmo(mode: LightMode, idx: number, which: "source" | "target") {
+function selectGizmo(idx: number, which: "source" | "target") {
   if (!transformCtrls) return
-  const list = mode === "normal" ? normalLights : wfLights
-  const entry = list.value[idx]; if (!entry) return
+  const entry = lights.value[idx]; if (!entry) return
 
-  const id = `${mode}:${which === "target" ? "tgt" : "src"}:${entry.id}`
+  const id = `${which === "target" ? "tgt" : "src"}:${entry.id}`
   if (selectedLightId.value === id) { detachLightGizmo(); return }
 
   selectedLightId.value = id
 
-  if (which === "target" && entry.target) {
-    transformCtrls.attach(entry.target)
-  } else {
-    transformCtrls.attach(entry.light)
-  }
+  if (which === "target" && entry.target) transformCtrls.attach(entry.target)
+  else                                    transformCtrls.attach(entry.light)
 
   //smoothly move the camera so the gizmo is in frame
   if (cameraRef && controls) {
@@ -1500,9 +1642,9 @@ function selectGizmo(mode: LightMode, idx: number, which: "source" | "target") {
     cameraAnim = makeCameraAnim({
       toPos:    focus.clone().add(offset),
       toTarget: focus,
-      duration: 500,
+      duration: GIZMO_SELECT_DURATION_MS,
     })
-    requestRender(800)
+    requestRender(GIZMO_SELECT_DURATION_MS + 300)
   }
   requestRender()
 }
@@ -1553,8 +1695,8 @@ function ensureWfMaterials() {
     envMapIntensity:   wfMatParams.value.envMapIntensity,
     specularIntensity: wfMatParams.value.specularIntensity,
     polygonOffset:       true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits:  1,
+    polygonOffsetFactor: POLYGON_OFFSET_FACTOR,
+    polygonOffsetUnits:  POLYGON_OFFSET_UNITS,
   })
   wfPickMat = new MeshPhysicalMaterial({
     color:             new Color(wfMatParams.value.color),
@@ -1565,8 +1707,8 @@ function ensureWfMaterials() {
     emissive:          new Color(PICK_COLOR),
     emissiveIntensity: 1.5,
     polygonOffset:       true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits:  1,
+    polygonOffsetFactor: POLYGON_OFFSET_FACTOR,
+    polygonOffsetUnits:  POLYGON_OFFSET_UNITS,
   })
 }
 
@@ -1628,8 +1770,10 @@ function enableWireframeMode() {
     setMaterialFor(sm.mesh)
   }
   syncWireframeOverlays()
-  for (const e of normalLights.value) setLightVisibility(e, false)
-  for (const e of wfLights.value)     setLightVisibility(e, true)
+  //Lights are SHARED between modes - we just swap their intensity+color
+  //pair to the wireframe set (or leave them alone if the entry has no wf
+  //overrides). Position/range stay the same.
+  applyLightsForMode()
   syncEnvForCurrentMode()
   requestRender(800)
 }
@@ -1642,8 +1786,7 @@ function disableWireframeMode() {
   }
   meshMatSnapshots.clear()
   removeWireframeOverlays()
-  for (const e of wfLights.value)     setLightVisibility(e, false)
-  for (const e of normalLights.value) setLightVisibility(e, true)
+  applyLightsForMode()
   syncEnvForCurrentMode()
   //clear any in-progress pick
   pickedMeshIdx.value = null
@@ -1654,9 +1797,9 @@ function ensureOverlayForMesh(mesh: Mesh) {
   if (!scene) return
   if (wfOverlays.has(mesh.uuid)) return
   if (emissiveList.value.some((e) => e.uuid === mesh.uuid)) return   //emissive picks stay clean, no wireframe
-  //threshold = 1 degree keeps "hard" edges only - triangulation
-  //diagonals (coplanar faces, angle = 0) are filtered out
-  const edgesGeo = new EdgesGeometry(mesh.geometry, 1)
+  //threshold keeps "hard" edges only - triangulation diagonals (coplanar
+  //faces, angle = 0) are filtered out. See WIREFRAME_EDGE_THRESHOLD_DEG.
+  const edgesGeo = new EdgesGeometry(mesh.geometry, WIREFRAME_EDGE_THRESHOLD_DEG)
   //depthTest stays ON so the lines respect occlusion (no X-ray bleed
   //across other meshes). The wf base / pick materials carry a
   //polygonOffset that pushes the surface back, so the overlay lines
@@ -1664,11 +1807,11 @@ function ensureOverlayForMesh(mesh: Mesh) {
   const overlayMat = new LineBasicMaterial({
     color:       new Color(wireframeOverlayColor.value),
     transparent: true,
-    opacity:     0.9,
+    opacity:     WIREFRAME_LINE_OPACITY,
     depthWrite:  false,
   })
   const overlay = new LineSegments(edgesGeo, overlayMat)
-  overlay.renderOrder = 998
+  overlay.renderOrder = WIREFRAME_OVERLAY_RENDER_ORDER
   mesh.add(overlay)
   wfOverlays.set(mesh.uuid, overlay)
 }
@@ -1830,9 +1973,9 @@ function goToStartView() {
     toPos:    new Vector3(...startView.value.pos),
     toTarget: new Vector3(...startView.value.target),
     toUp:     new Vector3(0, 1, 0),
-    duration: 800,
+    duration: GO_TO_START_DURATION_MS,
   })
-  requestRender(1200)
+  requestRender(GO_TO_START_DURATION_MS + 400)
 }
 
 //CAMERA TOGGLE - swap between perspective and orthographic projections.
@@ -1913,7 +2056,7 @@ function snapToView(axis: string) {
   //Switch to orthographic for axis views - no perspective skew at the
   //poles, parallel edges stay parallel.
   switchCamera("ortho")
-  cameraAnim = makeCameraAnim({ toPos, toTarget: focus, toUp, duration: 500 })
+  cameraAnim = makeCameraAnim({ toPos, toTarget: focus, toUp, duration: AXIS_SNAP_DURATION_MS })
   requestRender(800)
 }
 
@@ -1958,13 +2101,11 @@ function onCanvasPointerUp(e: PointerEvent) {
 //animation + selection state behave exactly like the panel button.
 function tryPickLightGizmo(): boolean {
   if (!showLightGizmos.value) return false
-  const list  = wireframeMode.value ? wfLights.value : normalLights.value
-  const mode: LightMode = wireframeMode.value ? "wireframe" : "normal"
-  if (list.length === 0) return false
+  if (lights.value.length === 0) return false
 
   const gizmos: { mesh: Mesh; idx: number; which: "source" | "target" }[] = []
-  for (let i = 0; i < list.length; i++) {
-    const e = list[i]!
+  for (let i = 0; i < lights.value.length; i++) {
+    const e = lights.value[i]!
     gizmos.push({ mesh: e.sourceGiz, idx: i, which: "source" })
     if (e.target) gizmos.push({ mesh: e.target, idx: i, which: "target" })
   }
@@ -1972,7 +2113,7 @@ function tryPickLightGizmo(): boolean {
   if (hits.length === 0) return false
   const picked = gizmos.find((g) => g.mesh.uuid === hits[0]!.object.uuid)
   if (!picked) return false
-  selectGizmo(mode, picked.idx, picked.which)
+  selectGizmo(picked.idx, picked.which)
   return true
 }
 
@@ -2059,6 +2200,17 @@ async function onSave() {
       metalness: e.metalness, roughness: e.roughness,
       envMapIntensity: e.envMapIntensity, specularIntensity: e.specularIntensity,
     })),
+    //SHARED LIGHTS - one entry per light with both modes' intensity+color
+    lights: lights.value.map((l) => ({
+      id:    l.id,
+      type:  l.type,
+      x: l.x, y: l.y, z: l.z, tx: l.tx, ty: l.ty, tz: l.tz,
+      range: l.range,
+      normalIntensity: l.normalIntensity,
+      normalColor:     l.normalColor,
+      wfIntensity:     l.wfIntensity,
+      wfColor:         l.wfColor,
+    })),
     normalMode: {
       //hdrId is kept for debug / re-hydration in the editor; hdrUrl is
       //the resolved /media/<storedFilename> path embedded so ThreeViewer
@@ -2066,11 +2218,6 @@ async function onSave() {
       hdrId:  normalHdrId.value,
       hdrUrl: normalHdrId.value ? (hdris.value.find((h) => h.id === normalHdrId.value)?.url ?? null) : null,
       hdrIntensity: normalHdrIntensity.value,
-      lights: normalLights.value.map((l) => ({
-        id: l.id, type: l.type, intensity: l.intensity, color: l.color,
-        range: l.range,
-        x: l.x, y: l.y, z: l.z, tx: l.tx, ty: l.ty, tz: l.tz,
-      })),
     },
     wireframeMode: {
       hdrId:  wfHdrId.value,
@@ -2086,11 +2233,6 @@ async function onSave() {
         const sm = sceneMeshes.value.find((s) => s.mesh.uuid === e.uuid)
         return { name: sm?.name ?? "", intensity: e.intensity }
       }),
-      lights: wfLights.value.map((l) => ({
-        id: l.id, type: l.type, intensity: l.intensity, color: l.color,
-        range: l.range,
-        x: l.x, y: l.y, z: l.z, tx: l.tx, ty: l.ty, tz: l.tz,
-      })),
     },
   }
   await saveViewerSettings(payload)
@@ -2363,7 +2505,8 @@ async function onSave() {
             </div>
           </section>
 
-          <!--Lights accordion-->
+          <!--Lights accordion - SHARED between normal + wireframe. Each
+          light has one position + range, plus per-mode intensity + color.-->
           <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.lightsList }">
             <button type="button" class="editor__section-head" @click="sectionOpen.lightsList = !sectionOpen.lightsList">
               <span class="editor__section-title">Lights</span>
@@ -2373,43 +2516,78 @@ async function onSave() {
               <div class="editor__sub-head">
                 <span class="editor__group-title" style="padding: 0">Add light</span>
                 <div class="editor__sub-add-group">
-                  <button type="button" class="editor__sub-add" @click="addLight('normal', 'point')">+ Point</button>
-                  <button type="button" class="editor__sub-add" @click="addLight('normal', 'directional')">+ Directional</button>
+                  <button type="button" class="editor__sub-add" @click="addLight('point')">+ Point</button>
+                  <button type="button" class="editor__sub-add" @click="addLight('directional')">+ Directional</button>
                 </div>
               </div>
-            <p v-if="!normalLights.length" class="editor__empty">No lights — add one above</p>
-            <article
-              v-for="(e, i) in normalLights"
-              :key="e.id"
-              class="editor__mat editor__light-row"
-              :class="{ 'editor__mat--selected': selectedLightId?.startsWith(`normal:`) && selectedLightId?.endsWith(`:${e.id}`) }"
-              @mouseenter="onLightHover('normal', i, true)"
-              @mouseleave="onLightHover('normal', i, false)"
-            >
-              <div class="editor__mat-head editor__mat-head--static editor__light-head">
-                <input type="color" class="editor__color editor__light-swatch" :value="e.color" @input="(ev) => onLightColorChange('normal', i, (ev.target as HTMLInputElement).value)" />
-                <span class="editor__mat-title editor__light-name">{{ e.type === 'point' ? 'Point' : 'Directional' }} {{ i + 1 }}</span>
-                <button type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `normal:src:${e.id}` }" @click="selectGizmo('normal', i, 'source')" title="Source">S</button>
-                <button v-if="e.type === 'directional'" type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `normal:tgt:${e.id}` }" @click="selectGizmo('normal', i, 'target')" title="Target">T</button>
-                <button type="button" class="editor__sub-remove" @click="removeLight('normal', i)" :title="`Remove`">×</button>
-              </div>
-              <div class="editor__mat-body">
-                <div class="editor__row">
-                  <label class="editor__row-label">Intensity</label>
-                  <div class="editor__row-control">
-                    <input type="range" class="editor__slider" min="0" max="10" step="0.05" :value="e.intensity" @input="(ev) => onLightIntensity('normal', i, parseFloat((ev.target as HTMLInputElement).value))" />
-                    <span class="editor__readout">{{ e.intensity.toFixed(2) }}</span>
+              <p v-if="!lights.length" class="editor__empty">No lights — add one above</p>
+              <article
+                v-for="(e, i) in lights"
+                :key="e.id"
+                class="editor__mat editor__light-row"
+                :class="{ 'editor__mat--selected': selectedLightId?.endsWith(`:${e.id}`) }"
+                @mouseenter="onLightHover(i, true)"
+                @mouseleave="onLightHover(i, false)"
+              >
+                <div class="editor__mat-head editor__mat-head--static editor__light-head">
+                  <span
+                    class="editor__light-swatch-dot"
+                    :style="{ backgroundColor: wireframeMode ? e.wfColor : e.normalColor }"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="editor__mat-title editor__light-name">{{ e.type === 'point' ? 'Point' : 'Directional' }} {{ i + 1 }}</span>
+                  <button type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `src:${e.id}` }" @click="selectGizmo(i, 'source')" title="Source">S</button>
+                  <button v-if="e.type === 'directional'" type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `tgt:${e.id}` }" @click="selectGizmo(i, 'target')" title="Target">T</button>
+                  <button type="button" class="editor__sub-remove" @click="removeLight(i)" :title="`Remove`">×</button>
+                </div>
+                <div class="editor__mat-body">
+                  <!--Shared range (point only)-->
+                  <div v-if="e.type === 'point'" class="editor__row">
+                    <label class="editor__row-label" :title="`0 = infinite`">Range</label>
+                    <div class="editor__row-control">
+                      <input type="range" class="editor__slider" min="0" max="30" step="0.1" :value="e.range ?? 0" @input="(ev) => onLightRange(i, parseFloat((ev.target as HTMLInputElement).value))" />
+                      <span class="editor__readout">{{ (e.range ?? 0).toFixed(1) }}</span>
+                    </div>
+                  </div>
+
+                  <!--Per-mode intensity + color blocks-->
+                  <div class="editor__light-mode editor__light-mode--normal">
+                    <span class="editor__light-mode-label">Normal</span>
+                    <div class="editor__row">
+                      <label class="editor__row-label">Intensity</label>
+                      <div class="editor__row-control">
+                        <input type="range" class="editor__slider" min="0" max="10" step="0.05" :value="e.normalIntensity" @input="(ev) => onLightIntensity('normal', i, parseFloat((ev.target as HTMLInputElement).value))" />
+                        <span class="editor__readout">{{ e.normalIntensity.toFixed(2) }}</span>
+                      </div>
+                    </div>
+                    <div class="editor__row">
+                      <label class="editor__row-label">Color</label>
+                      <div class="editor__row-control">
+                        <input type="color" class="editor__color" :value="e.normalColor" @input="(ev) => onLightColorChange('normal', i, (ev.target as HTMLInputElement).value)" />
+                        <span class="editor__readout">{{ e.normalColor }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="editor__light-mode editor__light-mode--wf">
+                    <span class="editor__light-mode-label">Wireframe</span>
+                    <div class="editor__row">
+                      <label class="editor__row-label">Intensity</label>
+                      <div class="editor__row-control">
+                        <input type="range" class="editor__slider" min="0" max="10" step="0.05" :value="e.wfIntensity" @input="(ev) => onLightIntensity('wireframe', i, parseFloat((ev.target as HTMLInputElement).value))" />
+                        <span class="editor__readout">{{ e.wfIntensity.toFixed(2) }}</span>
+                      </div>
+                    </div>
+                    <div class="editor__row">
+                      <label class="editor__row-label">Color</label>
+                      <div class="editor__row-control">
+                        <input type="color" class="editor__color" :value="e.wfColor" @input="(ev) => onLightColorChange('wireframe', i, (ev.target as HTMLInputElement).value)" />
+                        <span class="editor__readout">{{ e.wfColor }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div v-if="e.type === 'point'" class="editor__row">
-                  <label class="editor__row-label" :title="`0 = infinite`">Range</label>
-                  <div class="editor__row-control">
-                    <input type="range" class="editor__slider" min="0" max="30" step="0.1" :value="e.range ?? 0" @input="(ev) => onLightRange('normal', i, parseFloat((ev.target as HTMLInputElement).value))" />
-                    <span class="editor__readout">{{ (e.range ?? 0).toFixed(1) }}</span>
-                  </div>
-                </div>
-              </div>
-            </article>
+              </article>
             </div>
           </section>
         </div>
@@ -2518,55 +2696,9 @@ async function onSave() {
             </div>
           </section>
 
-          <!--Lights section-->
-          <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfLights }">
-            <button type="button" class="editor__section-head" @click="sectionOpen.wfLights = !sectionOpen.wfLights">
-              <span class="editor__section-title">Lights</span>
-              <ChevronDown :size="14" class="editor__section-chevron" />
-            </button>
-            <div v-show="sectionOpen.wfLights" class="editor__section-body">
-              <div class="editor__sub-head">
-                <span class="editor__group-title" style="padding: 0">Add light</span>
-                <div class="editor__sub-add-group">
-                  <button type="button" class="editor__sub-add" @click="addLight('wireframe', 'point')">+ Point</button>
-                  <button type="button" class="editor__sub-add" @click="addLight('wireframe', 'directional')">+ Directional</button>
-                </div>
-              </div>
-              <p v-if="!wfLights.length" class="editor__empty">No lights — add one above</p>
-              <article
-                v-for="(e, i) in wfLights"
-                :key="e.id"
-                class="editor__mat editor__light-row"
-                :class="{ 'editor__mat--selected': selectedLightId?.startsWith(`wireframe:`) && selectedLightId?.endsWith(`:${e.id}`) }"
-                @mouseenter="onLightHover('wireframe', i, true)"
-                @mouseleave="onLightHover('wireframe', i, false)"
-              >
-                <div class="editor__mat-head editor__mat-head--static editor__light-head">
-                  <input type="color" class="editor__color editor__light-swatch" :value="e.color" @input="(ev) => onLightColorChange('wireframe', i, (ev.target as HTMLInputElement).value)" />
-                  <span class="editor__mat-title editor__light-name">{{ e.type === 'point' ? 'Point' : 'Directional' }} {{ i + 1 }}</span>
-                  <button type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `wireframe:src:${e.id}` }" @click="selectGizmo('wireframe', i, 'source')" title="Source">S</button>
-                  <button v-if="e.type === 'directional'" type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `wireframe:tgt:${e.id}` }" @click="selectGizmo('wireframe', i, 'target')" title="Target">T</button>
-                  <button type="button" class="editor__sub-remove" @click="removeLight('wireframe', i)" :title="`Remove`">×</button>
-                </div>
-                <div class="editor__mat-body">
-                  <div class="editor__row">
-                    <label class="editor__row-label">Intensity</label>
-                    <div class="editor__row-control">
-                      <input type="range" class="editor__slider" min="0" max="10" step="0.05" :value="e.intensity" @input="(ev) => onLightIntensity('wireframe', i, parseFloat((ev.target as HTMLInputElement).value))" />
-                      <span class="editor__readout">{{ e.intensity.toFixed(2) }}</span>
-                    </div>
-                  </div>
-                  <div v-if="e.type === 'point'" class="editor__row">
-                    <label class="editor__row-label" :title="`0 = infinite`">Range</label>
-                    <div class="editor__row-control">
-                      <input type="range" class="editor__slider" min="0" max="30" step="0.1" :value="e.range ?? 0" @input="(ev) => onLightRange('wireframe', i, parseFloat((ev.target as HTMLInputElement).value))" />
-                      <span class="editor__readout">{{ (e.range ?? 0).toFixed(1) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </section>
+          <!--Lights are shared between modes - manage them from the Lights
+          tab; the per-mode intensity / color live there as a dedicated
+          "Wireframe" sub-block on each light.-->
 
           <!--Emissive objects section-->
           <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfEmissive }">
@@ -2827,6 +2959,34 @@ visually shoves a single character off-center inside a square button.*/
 .editor__light-head { display: flex; align-items: center; gap: var(--spacing-xs); padding: var(--spacing-xs) 0; }
 .editor__light-swatch { width: 1.2rem; height: 1.2rem; }
 .editor__light-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/*Color dot indicates the ACTIVE mode's color on the shared light row.
+Reads from wfColor when wireframe mode is on, normalColor otherwise.*/
+.editor__light-swatch-dot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  flex-shrink: 0;
+}
+
+/*Per-mode block on a shared light - groups intensity + color so the
+author can see at a glance which set of values they're editing.*/
+.editor__light-mode {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-left: var(--border-width-md) solid var(--color-gray-medium);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+  margin-top: var(--spacing-xs);
+}
+.editor__light-mode--wf { border-left-color: var(--color-accent); }
+.editor__light-mode-label {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-text-tertiary);
+}
 
 .editor__row { display: flex; flex-direction: column; gap: var(--spacing-xxs); }
 .editor__row--inline { flex-direction: row; align-items: center; gap: var(--spacing-sm); }

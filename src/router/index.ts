@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from "vue-router"
 import HomePage           from "../pages/HomePage.vue"
 import SettingsPage       from "../pages/SettingsPage.vue"
 import SketchfabHowToPage from "../pages/SketchfabHowToPage.vue"
-import ThreeTestPage      from "../pages/ThreeTestPage.vue"
+import ModelEditorPage    from "../pages/ModelEditorPage.vue"
 import {
   LoginPage,
   PendingPage,
@@ -31,7 +31,7 @@ const router = createRouter({
 
     //Three.js model editor - per-project edit page. Replaces the Sketchfab
     //iframe with a local viewer when a .glb has been uploaded.
-    { path: "/edit-3d/:id(\\d+)", component: ThreeTestPage },
+    { path: "/edit-3d/:id(\\d+)", component: ModelEditorPage },
 
     //Auth pages from vue-shared-ui. Only reachable if AUTH_MODE != "public".
     { path: "/login",           component: LoginPage },

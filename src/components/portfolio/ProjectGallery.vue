@@ -320,6 +320,19 @@ one visual language.*/
   cursor: default;
 }
 
+/*Responsive grid - phones get 2 columns (not 1, there's room) so the
+gallery feels dense; tablets get 2; only very narrow / portrait phones
+collapse to a single column.*/
 @media (max-width: 1024px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 768px)  { .gallery-grid { grid-template-columns: 1fr; gap: var(--spacing-lg); } }
+@media (max-width: 480px)  {
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+  /*4-badge stats row would be cramped at this width - drop to 2x2*/
+  .gallery-item__stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-xs);
+  }
+}
 </style>
