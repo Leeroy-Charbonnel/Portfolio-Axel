@@ -457,9 +457,6 @@ function syncWireframeOverlays(on: boolean, color: string, emissiveUuidSet: Set<
       })
       const overlay = new LineSegments(edgesGeo, overlayMat)
       overlay.renderOrder = WIREFRAME_OVERLAY_RENDER_ORDER
-      //start hidden - visibility is driven by pointer hover so the lines
-      //only show when the visitor is actively interacting with the viewer
-      overlay.visible = isPointerOver.value
       sm.mesh.add(overlay)
       wfOverlays.set(sm.mesh.uuid, overlay)
     }
@@ -472,15 +469,6 @@ function syncWireframeOverlays(on: boolean, color: string, emissiveUuidSet: Set<
     wfOverlays.clear()
   }
 }
-
-//Pointer-over gate for the wireframe overlay - the user wants the lines
-//to disappear when the mouse leaves the viewer so the model reads as a
-//clean render at rest. Watcher below flips overlay.visible accordingly.
-const isPointerOver = ref(false)
-watch(isPointerOver, (over) => {
-  for (const overlay of wfOverlays.values()) overlay.visible = over
-  requestRender(300)
-})
 
 //Driven by props.wireframe (parent button). Watcher below kicks the
 //mode-switch when the prop flips - either at mount-time after the glb
@@ -590,13 +578,6 @@ onMounted(() => {
   ground.rotation.x = -Math.PI / 2
   ground.receiveShadow = true
   scene.add(ground)
-
-  //POINTER hover gate for the wireframe overlay - native listeners on
-  //the canvas itself; flips the reactive ref which the watcher reads.
-  const onPointerEnter = () => { isPointerOver.value = true }
-  const onPointerLeave = () => { isPointerOver.value = false }
-  c.addEventListener("pointerenter", onPointerEnter)
-  c.addEventListener("pointerleave", onPointerLeave)
 
   controls = new OrbitControls(camera, c)
   controls.enableDamping = true

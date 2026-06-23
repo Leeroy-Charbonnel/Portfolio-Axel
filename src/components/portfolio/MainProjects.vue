@@ -1,15 +1,26 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { useLanguage } from "../../composables/useLanguage"
+import { useIsPhone } from "../../composables/useIsPhone"
 import { usePortfolio } from "../../composables/usePortfolio"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import MainProject from "./MainProject.vue"
+import MainProjectPhone from "./MainProjectPhone.vue"
 import AddButton from "./AddButton.vue"
 import type { MainProjectDto } from "../../types/portfolio"
 
-defineProps<{ projects: MainProjectDto[] }>()
+const props = defineProps<{ projects: MainProjectDto[] }>()
 
 const { t } = useLanguage()
 const { createMainProject } = usePortfolio()
+const { isPhone } = useIsPhone()
+
+//Phone list height = last project's top (n-1 * 65vh) + stage height (90vh).
+const phoneListHeight = computed(() => {
+  const n = props.projects.length
+  if (n === 0) return "0vh"
+  return `calc((${n - 1}) * 65vh + 90vh)`
+})
 </script>
 
 <template>
@@ -25,7 +36,23 @@ const { createMainProject } = usePortfolio()
       <h2 class="section-title">{{ t("projectsTitle") }}</h2>
     </AnimatedReveal>
 
-    <div class="main-projects-section__list">
+    <!--PHONE LIST - absolute-positioned children, parent has explicit
+    height so scroll still reaches the last project.-->
+    <div
+      v-if="isPhone"
+      class="main-projects-section__phone-list"
+      :style="{ height: phoneListHeight }"
+    >
+      <MainProjectPhone
+        v-for="(project, idx) in projects"
+        :key="project.id"
+        :project="project"
+        :index="idx"
+      />
+    </div>
+
+    <!--DESKTOP LIST - normal block flow stacking.-->
+    <div v-else class="main-projects-section__list">
       <MainProject
         v-for="(project, idx) in projects"
         :key="project.id"
@@ -44,6 +71,12 @@ const { createMainProject } = usePortfolio()
 .main-projects-section { padding-top: var(--spacing-2xl); }
 
 .main-projects-section__list { margin-top: var(--spacing-3xl); }
+
+.main-projects-section__phone-list {
+  position: relative;
+  width: 100%;
+  margin-top: var(--spacing-xl);
+}
 
 .main-projects-section__add { margin-bottom: var(--spacing-3xl); }
 

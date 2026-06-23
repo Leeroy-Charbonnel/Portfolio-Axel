@@ -102,6 +102,10 @@ const layoutClass       = computed(() => `main-project--layout-${props.project.l
 const phoneSideClass    = computed(() => props.index % 2 === 0
   ? "main-project__article--phone-left"
   : "main-project__article--phone-right")
+//Forwarded to the AnimatedReveal root so the phone CSS can position each
+//project absolutely at `top: calc(index * 60vh)`. This is what forces
+//projects to literally overlap regardless of any flex / margin cascade.
+const phoneIndexStyle   = computed(() => ({ "--phone-index": String(props.index) }))
 
 //ICON used for each layout choice in the picker (visually communicates the arrangement)
 const LAYOUT_ICONS: Record<MainProjectLayout, typeof PanelLeft> = {
@@ -1032,7 +1036,10 @@ French S/A/F/T). Title attribute carries the full name as a tooltip.*/
   flex-shrink: 0;
 }
 
-.main-project__stat :deep(span),
+/*EXCLUDE the badge: this rule was matching the .main-project__stat-icon
+span and forcing min-width:5ch + text-align:right + display:inline-block
+on it - that's what was breaking the centering of S/A/F/T.*/
+.main-project__stat :deep(span:not(.main-project__stat-icon)),
 .main-project__stat-value {
   font-size: var(--mp-stat-value-size);
   font-weight: var(--font-weight-bold);

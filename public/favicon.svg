@@ -1,12 +1,6 @@
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img">
-  <title>Axel Offret - A</title>
-  <!--mask: triangle is white = visible, circle is black = cut out
-  (so the circle becomes transparent rather than the page bg colour).-->
-  <defs>
-    <mask id="cut">
-      <rect width="200" height="200" fill="#fff"/>
-      <circle cx="100" cy="116" r="50" fill="#000"/>
-    </mask>
-  </defs>
-  <path d="M100 40 L160 145 L40 145 Z" fill="#fff" stroke="#fff" stroke-width="34" stroke-linejoin="round" mask="url(#cut)"/>
+  <title>Logo A triangle, gros cercle negatif</title>
+  <rect x="0" y="0" width="200" height="200" fill="#16140f"/>
+  <path d="M100 40 L160 145 L40 145 Z" fill="#fff" stroke="#fff" stroke-width="34" stroke-linejoin="round"/>
+  <circle cx="100" cy="116" r="50" fill="#16140f"/>
 </svg>
