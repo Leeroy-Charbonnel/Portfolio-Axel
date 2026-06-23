@@ -5,16 +5,13 @@ import { fileURLToPath } from "node:url"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-//Function form so we can read .env / .env.local via loadEnv - process.env
-//doesn't carry those automatically at config-eval time.
+//defineConfig as a function so loadEnv can pull .env / .env.local. With
+//VITE_API_BASE_URL set, the client issues absolute fetches straight to
+//prod; the dev proxy below is only used when running against a local
+//Express (`bun dev`) - it forwards /api + /media to localhost:3001.
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "")
+  const env  = loadEnv(mode, process.cwd(), "")
   const base = env.VITE_BASE_PATH || "/"
-  //PROXY TARGET - if VITE_API_PROXY is set in .env / .env.local, forward
-  ///api + /media there. Trailing slash stripped so http-proxy doesn't
-  //build a "//media/foo" URL that express.static 404s on.
-  const apiTarget = (env.VITE_API_PROXY || "http://localhost:3001").replace(/\/$/, "")
-  console.log(`[vite] proxying /api + /media -> ${apiTarget}`)
 
   return {
     base,
@@ -26,8 +23,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        "/api":   { target: apiTarget, changeOrigin: true, secure: false },
-        "/media": { target: apiTarget, changeOrigin: true, secure: false },
+        "/api":   { target: "http://localhost:3001", changeOrigin: true, secure: false },
+        "/media": { target: "http://localhost:3001", changeOrigin: true, secure: false },
       },
     },
   }
