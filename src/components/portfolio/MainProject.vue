@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from "vue"
+import { computed, onMounted, onBeforeUnmount, ref, toRef, watch } from "vue"
 import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink, Box } from "lucide-vue-next"
 import { useRouter } from "vue-router"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
+import { useEffectiveViewerSettings } from "../../composables/useEffectiveViewerSettings"
 import { usePortfolio } from "../../composables/usePortfolio"
+import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
 import { pickImageFile, statLetter, statName } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import AnimatedCounter from "./AnimatedCounter.vue"
@@ -30,27 +32,9 @@ const { lang } = useLanguage()
 const { editMode } = useAdmin()
 const { data: portfolioData, uploadFile, updateMainProject, deleteMainProject, setMainProjectSoftware } = usePortfolio()
 
-//Merge the project's saved viewerSettings with the admin's GLOBAL editor
-//prefs (line color, mode color, shared material). The globals always win
-//over what was frozen into the project at save time, so a change in the
-//editor propagates to every project on the site instead of being stuck
-//on whichever project was last saved with it.
-const effectiveViewerSettings = computed(() => {
-  const raw = (props.project.viewerSettings as any) ?? null
-  const prefs = portfolioData.value?.editorPrefs
-  if (!prefs) return raw
-  const next = raw ? { ...raw, wireframeMode: { ...(raw.wireframeMode ?? {}) } } : { wireframeMode: {} }
-  if (prefs.wireframeLineColor) next.wireframeMode.overlayColor = prefs.wireframeLineColor
-  if (prefs.wireframeModeColor) next.wireframeMode.color        = prefs.wireframeModeColor
-  if (prefs.wireframeMaterial) {
-    try { next.wireframeMode.material = JSON.parse(prefs.wireframeMaterial) } catch { /*malformed - ignore*/ }
-  }
-  if (prefs.wireframeEdgeThreshold) {
-    const n = parseFloat(prefs.wireframeEdgeThreshold)
-    if (Number.isFinite(n)) next.wireframeMode.edgeThresholdDeg = n
-  }
-  return next
-})
+//Merge per-project viewerSettings with the admin's GLOBAL editor prefs.
+//Logic shared with MainProjectPhone via the composable.
+const effectiveViewerSettings = useEffectiveViewerSettings(toRef(props, "project"), portfolioData)
 const router = useRouter()
 
 function openModelEditor() {
@@ -73,16 +57,20 @@ async function toggleSoftware(softwareId: number) {
 const containerRef = ref<HTMLElement | null>(null)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
 
-const isInView                = ref(false)
-const sketchfabInitialized    = ref(false)
-const sketchfabLoaded         = ref(false)
-const sketchfabError          = ref(false)
-const isLoading               = ref(false)
-const isWireframe             = ref(false)
+const isInView    = ref(false)
+const isWireframe = ref(false)
 
-//Sketchfab handles (kept as plain refs - they are non-reactive mutable objects)
-let sketchfabClient: any = null
-let sketchfabAPI: any    = null
+//Sketchfab lifecycle is owned by the shared composable - same flow lives
+//in MainProjectPhone, so the behaviour stays identical between layouts.
+const sketchfab = useSketchfabViewer({
+  iframeRef,
+  modelId:  toRef(() => props.project.modelId),
+  isInView,
+  editMode,
+  logTag:   "MainProject",
+})
+const sketchfabError = sketchfab.error
+const isLoading      = sketchfab.isLoading
 
 const mainImageUrl      = computed(() => props.project.mainImageUrl)
 const wireframeImageUrl = computed(() => props.project.mainWireframeUrl ?? props.project.mainImageUrl)
@@ -106,10 +94,6 @@ const layoutClass       = computed(() => `main-project--layout-${props.project.l
 const phoneSideClass    = computed(() => props.index % 2 === 0
   ? "main-project__article--phone-left"
   : "main-project__article--phone-right")
-//Forwarded to the AnimatedReveal root so the phone CSS can position each
-//project absolutely at `top: calc(index * 60vh)`. This is what forces
-//projects to literally overlap regardless of any flex / margin cascade.
-const phoneIndexStyle   = computed(() => ({ "--phone-index": String(props.index) }))
 
 //ICON used for each layout choice in the picker (visually communicates the arrangement)
 const LAYOUT_ICONS: Record<MainProjectLayout, typeof PanelLeft> = {
@@ -143,87 +127,8 @@ onBeforeUnmount(() => {
   observer = null
 })
 
-watch(isInView, (val) => {
-  if (val && !sketchfabInitialized.value && !editMode.value) initSketchfab()
-})
-
-//Switching between edit and view mode tears down / re-mounts the iframe via
-//v-if. The Sketchfab API was bound to the previous iframe instance, so it
-//ends up dead after the toggle. Reset the state machine when going back
-//to view mode and re-init once the iframe is back in the DOM.
-watch(editMode, async (newVal) => {
-  if (newVal === false && props.project.modelId) {
-    sketchfabInitialized.value = false
-    sketchfabLoaded.value      = false
-    sketchfabError.value       = false
-    isLoading.value            = false
-    sketchfabAPI               = null
-    sketchfabClient            = null
-    isWireframe.value          = false
-    await nextTick()
-    if (isInView.value) initSketchfab()
-  }
-})
-
-function initSketchfab() {
-  if (!iframeRef.value || !isInView.value || sketchfabInitialized.value) return
-  if (!props.project.modelId) return
-  if (typeof window.Sketchfab !== "function") {
-    console.warn("[MainProject] Sketchfab viewer script not loaded yet")
-    sketchfabError.value = true
-    return
-  }
-
-  isLoading.value = true
-  sketchfabInitialized.value = true
-
-  try {
-    sketchfabClient = new window.Sketchfab(iframeRef.value)
-    sketchfabClient.init(props.project.modelId, {
-      success: (api: any) => {
-        sketchfabAPI = api
-        api.start()
-        sketchfabLoaded.value = true
-        isLoading.value = false
-      },
-      error: () => {
-        console.error("[MainProject] Sketchfab API initialization failed")
-        sketchfabError.value = true
-        isLoading.value = false
-      },
-      autostart:    1,
-      preload:      1,
-      //KILL every Sketchfab UI overlay - keep only the canvas. Cursor still
-      //orbits/pans the model, but no toolbar, no help text, no watermark,
-      //no fullscreen button, no settings, no annotations, no AR.
-      ui_animations:       0,
-      ui_controls:         0,
-      ui_general_controls: 0,
-      ui_help:             0,
-      ui_hint:             0,
-      ui_infos:            0,
-      ui_inspector:        0,
-      ui_settings:         0,
-      ui_sound:            0,
-      ui_start:            0,
-      ui_stop:             0,
-      ui_theatre:          0,
-      ui_vr:               0,
-      ui_watermark:        0,
-      ui_fullscreen:       0,
-      ui_annotations:      0,
-      ui_ar:               0,
-      ui_loading:          0,
-      //transparent background so the 3D model "floats" on the page bg
-      //instead of sitting in a visible iframe rectangle
-      transparent: 1,
-    })
-  } catch (err) {
-    console.error("[MainProject] Error initializing Sketchfab:", err)
-    sketchfabError.value = true
-    isLoading.value = false
-  }
-}
+//Wireframe state is local to this layout - the composable doesn't own it.
+watch(editMode, (newVal) => { if (newVal === false) isWireframe.value = false })
 
 //Wireframe button only swaps the still-image sources (main image +
 //thumbnails) to their `wireframeUrl` variants. It does NOT touch the
