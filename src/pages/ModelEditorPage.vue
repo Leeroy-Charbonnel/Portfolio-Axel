@@ -3021,7 +3021,7 @@ they pair visually with the ViewHelper cube.*/
 .editor__tab--active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
 
 .editor__panel-body { flex: 1 1 auto; overflow-y: auto; padding: var(--spacing-md) var(--spacing-lg); }
-.editor__group { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.editor__group { display: flex; flex-direction: column; gap: var(--spacing-xs); }
 .editor__group-title { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); color: var(--color-text-tertiary); padding-bottom: var(--spacing-xxs); }
 
 /*CARD - common look for every collapsible item in the panel (materials,
@@ -3033,7 +3033,7 @@ spacing between cards is tight (--spacing-xxs) so the panel feels dense.*/
   flex-direction: column;
   background-color: hsl(0 0% 100% / 0.04);
   border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
-  margin-bottom: var(--spacing-xxs);
+  margin-bottom: 1px;       /*just enough for the next card's border to read as a seam*/
   padding: 0 var(--spacing-sm);
   transition: background-color 0.15s ease;
 }
@@ -3070,7 +3070,7 @@ section contains item-cards inside, the two layers are visually distinct.*/
   flex-direction: column;
   background-color: hsl(0 0% 100% / 0.025);
   border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
-  margin-bottom: var(--spacing-xxs);
+  margin-bottom: 1px;
   padding: 0 var(--spacing-sm);
 }
 .editor__section:last-child { margin-bottom: 0; }
