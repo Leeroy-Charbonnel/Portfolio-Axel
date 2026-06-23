@@ -47,9 +47,14 @@ body {
 }
 
 /*===== PROJECT - 2-col x 6-row grid ====================================*/
+/*aspect-ratio gives the grid a defined height (proportional to width)
+so `repeat(6, 1fr)` can split into 6 EQUAL rows. 5/9 is tuned so each
+row ends up matching the thumbnail column width - so the thumbs come
+out square without any explicit height.*/
 .project {
   display: grid;
-  grid-template-rows: repeat(6, auto);
+  aspect-ratio: 5 / 9;
+  grid-template-rows: repeat(6, 1fr);
   gap: var(--row-gap) var(--col-gap);
   padding-top: 6%;
   padding-bottom: 4%;
@@ -90,7 +95,7 @@ body {
 /*THUMBS ---------------------------------------------------------------*/
 .project__thumb {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  height: 100%;
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--bg-elev);
