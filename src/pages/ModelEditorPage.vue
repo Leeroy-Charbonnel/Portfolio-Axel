@@ -307,10 +307,12 @@ const sectionOpen = ref({
 //   wfBaseMat     : plain gray, edited from the Wireframe tab
 //   wfEmissiveMat : same base but with emissive = mode color
 //   wfPickMat     : same base but with emissive = orange (selection)
-//These params + the live materials live for the lifetime of the page
-//(same component instance across in-app /edit-3d/:id route changes -
-//Vue Router reuses the component), so a tweak in one project is what
-//the next project starts with. The UI shows a warning about this.
+//
+//WF MATERIAL PARAMS are GLOBAL across every project - persisted in
+//localStorage so a tweak in project A is what project B sees on next
+//open. Per-project hydration intentionally ignores the value saved on
+//viewerSettings; the panel writes back the same global value to the
+//project payload only for back-compat with viewers that still read it.
 type WfMaterialParams = {
   color:             string
   metalness:         number
@@ -318,13 +320,24 @@ type WfMaterialParams = {
   envMapIntensity:   number
   specularIntensity: number
 }
-const wfMatParams = ref<WfMaterialParams>({
+const WF_MAT_PARAMS_KEY = "editor3d.wfMatParams"
+const WF_MAT_PARAMS_DEFAULT: WfMaterialParams = {
   color:             "#808080",
   metalness:         0,
   roughness:         0.5,
   envMapIntensity:   1,
   specularIntensity: 1,
-})
+}
+function loadWfMatParams(): WfMaterialParams {
+  if (typeof localStorage === "undefined") return { ...WF_MAT_PARAMS_DEFAULT }
+  try {
+    const raw = localStorage.getItem(WF_MAT_PARAMS_KEY)
+    if (!raw) return { ...WF_MAT_PARAMS_DEFAULT }
+    const parsed = JSON.parse(raw) as Partial<WfMaterialParams>
+    return { ...WF_MAT_PARAMS_DEFAULT, ...parsed }
+  } catch { return { ...WF_MAT_PARAMS_DEFAULT } }
+}
+const wfMatParams = ref<WfMaterialParams>(loadWfMatParams())
 
 let wfBaseMat: MeshPhysicalMaterial | null = null
 let wfPickMat: MeshPhysicalMaterial | null = null
@@ -845,9 +858,9 @@ function hydrateFromSavedSettings(payload: unknown) {
   if (s.wireframeMode?.hdrIntensity !== undefined)  wfHdrIntensity.value      = s.wireframeMode.hdrIntensity
   if (s.wireframeMode?.color)                       wireframeColor.value      = s.wireframeMode.color
   if (s.wireframeMode?.overlayOn !== undefined)     wireframeOverlayOn.value  = s.wireframeMode.overlayOn
-  //s.wireframeMode.overlayColor is INTENTIONALLY ignored on hydration:
-  //the line color is a global editor preference (see WF_LINE_COLOR_KEY).
-  if (s.wireframeMode?.material)                    wfMatParams.value = { ...s.wireframeMode.material }
+  //s.wireframeMode.overlayColor + s.wireframeMode.material are GLOBAL
+  //editor prefs (localStorage-backed). Ignore the per-project values
+  //during hydration so the global setting wins.
   //start view (camera pose) is the bridge between the editor and the
   //production viewer's intro animation. Just a 6-number snapshot.
   if (s.startView)                                  startView.value = s.startView
@@ -1884,6 +1897,9 @@ function onEmissiveItemIntensity(uuid: string, v: number) {
 
 function onWfMatParam<K extends keyof WfMaterialParams>(key: K, value: WfMaterialParams[K]) {
   wfMatParams.value[key] = value
+  //Persist the GLOBAL editor preference so every other project picks it
+  //up on next open (no per-project copy).
+  try { localStorage.setItem(WF_MAT_PARAMS_KEY, JSON.stringify(wfMatParams.value)) } catch { /*ignore quota*/ }
   syncWfMaterialsParams()
   requestRender()
 }
@@ -2955,10 +2971,24 @@ they pair visually with the ViewHelper cube.*/
 .editor__group { display: flex; flex-direction: column; gap: var(--spacing-md); }
 .editor__group-title { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); color: var(--color-text-tertiary); padding-bottom: var(--spacing-xxs); }
 
-.editor__mat { display: flex; flex-direction: column; border-bottom: var(--border-width-sm) solid var(--color-gray-medium); }
-.editor__mat:last-child { border-bottom: none; }
+/*CARD - common look for every collapsible item in the panel (materials,
+lights, accordion sections). Subtle fill + full border + small radius
+so items are clearly delimited instead of melting together. Full border
++ radius is allowed (project rule #2 only forbids single-side border
+with radius).*/
+.editor__mat {
+  display: flex;
+  flex-direction: column;
+  background-color: hsl(var(--background) / 0.5);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  margin-bottom: var(--spacing-sm);
+  padding: 0 var(--spacing-sm);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.editor__mat:hover { border-color: var(--color-text-tertiary); }
+.editor__mat:last-child { margin-bottom: 0; }
 .editor__mat-head { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-sm) 0; background: transparent; border: none; color: inherit; cursor: pointer; text-align: left; width: 100%; }
-.editor__mat-head--static { cursor: default; padding-top: var(--spacing-md); }
+.editor__mat-head--static { cursor: default; padding-top: var(--spacing-sm); }
 .editor__mat-head--static:hover .editor__mat-chevron { color: var(--color-text-tertiary); }
 
 .editor__mat-swatch { width: var(--spacing-lg); height: var(--spacing-lg); flex-shrink: 0; border: var(--border-width-sm) solid var(--color-gray-medium); }
@@ -2967,21 +2997,43 @@ they pair visually with the ViewHelper cube.*/
 .editor__mat-chevron { color: var(--color-text-tertiary); transition: transform 0.15s ease, color 0.15s ease; }
 .editor__mat-head:hover .editor__mat-chevron { color: var(--color-text-hover); }
 .editor__mat--open .editor__mat-chevron { transform: rotate(180deg); }
-.editor__mat-body { display: flex; flex-direction: column; gap: var(--spacing-xs); padding: 0 0 var(--spacing-sm) 0; }
-.editor__mat--selected { background-color: hsl(var(--primary) / 0.05); }
+.editor__mat-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) 0;
+  border-top: var(--border-width-sm) dashed var(--color-gray-medium);
+}
+.editor__mat--selected {
+  border-color: var(--color-accent);
+  background-color: hsl(var(--primary) / 0.08);
+}
 
 .editor__sub { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-md); border-top: var(--border-width-sm) solid var(--color-gray-medium); }
 
-/*ACCORDION sections for the Lights / Wireframe tabs - same visual style
-as material cards but the head is the full row toggle.*/
-.editor__section { display: flex; flex-direction: column; border-top: var(--border-width-sm) solid var(--color-gray-medium); }
-.editor__section:first-of-type { border-top: none; }
+/*ACCORDION sections for the Lights / Wireframe tabs - same card treatment
+as materials so the eye groups them as peers.*/
+.editor__section {
+  display: flex;
+  flex-direction: column;
+  background-color: hsl(var(--background) / 0.5);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  margin-bottom: var(--spacing-sm);
+  padding: 0 var(--spacing-sm);
+}
+.editor__section:last-child { margin-bottom: 0; }
 .editor__section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); padding: var(--spacing-sm) 0; background: transparent; border: none; color: inherit; cursor: pointer; text-align: left; width: 100%; }
 .editor__section-title { font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); color: var(--color-text-hover); }
 .editor__section-chevron { color: var(--color-text-tertiary); transition: transform 0.15s ease, color 0.15s ease; }
 .editor__section-head:hover .editor__section-chevron { color: var(--color-text-hover); }
 .editor__section--open .editor__section-chevron { transform: rotate(180deg); }
-.editor__section-body { display: flex; flex-direction: column; gap: var(--spacing-sm); padding: 0 0 var(--spacing-sm) 0; }
+.editor__section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+  border-top: var(--border-width-sm) dashed var(--color-gray-medium);
+}
 .editor__sub-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
 .editor__sub-add-group { display: inline-flex; gap: var(--spacing-xxs); }
 .editor__sub-add { padding: var(--spacing-xxs) var(--spacing-sm); background-color: transparent; border: var(--border-width-sm) solid var(--color-gray-medium); color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; }
@@ -3070,8 +3122,20 @@ author can see at a glance which set of values they're editing.*/
 .editor__drop--over { border-color: var(--color-accent); color: var(--color-accent); background-color: hsl(var(--primary) / 0.08); }
 .editor__drop--busy { opacity: 0.5; pointer-events: none; }
 
-.editor__hdr-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-xxs); }
-.editor__hdr-item { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); padding: var(--spacing-xs) var(--spacing-sm); background-color: transparent; border: var(--border-width-sm) solid var(--color-gray-medium); color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+.editor__hdr-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-xs); }
+.editor__hdr-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: hsl(var(--background) / 0.5);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  transition: border-color 0.15s ease;
+}
+.editor__hdr-item:hover { border-color: var(--color-text-tertiary); }
 .editor__hdr-thumb { display: inline-flex; align-items: center; justify-content: center; width: var(--spacing-xl); height: var(--spacing-xl); background-color: hsl(0 0% 0% / 0.4); border: var(--border-width-sm) solid var(--color-gray-medium); flex-shrink: 0; overflow: hidden; }
 .editor__hdr-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .editor__hdr-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace; }
