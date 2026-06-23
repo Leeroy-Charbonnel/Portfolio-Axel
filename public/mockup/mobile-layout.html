@@ -5,14 +5,23 @@
 <title>Mobile staggered layout mockup</title>
 <style>
 /*STATIC MOCKUP - one page, four projects, no JS. Real images from
-public/mockup/projects/. No border-radius, no fixed pixel heights.
+public/mockup/projects/. CSS Grid layout per project, 2 columns x 6 rows.
 
-Layout per project: two-column flex row.
-  - Thumbs column  (30% width): vertical thumb stack + description below
-  - Viewer column  (rest): header (number + title) + viewer
+  col 1 (thumbs side)            col 2 (viewer side)
+  +-----------------+            +--------------------+
+  | thumb 1         | row 1      | title              |
+  | thumb 2         | row 2      | viewer             |
+  | thumb 3         | row 3      | viewer             |
+  | desc            | row 4      | viewer             |
+  | desc            | row 5      | viewer             |
+  | desc            | row 6      | viewer             |
+  +-----------------+            +--------------------+
 
-Sides alternate per project via flex-direction. Thumbs translate UP so
-they poke into the previous project's viewer area for the cascade.*/
+The two columns swap per project (project--left vs project--right) via
+grid-template-areas. Thumbnail 1 is translated UP so it pokes into the
+previous project's viewer area for the cascade.
+
+No fixed pixel heights, no border-radius.*/
 
 :root {
   --bg-main:     #000;
@@ -24,10 +33,9 @@ they poke into the previous project's viewer area for the cascade.*/
   --text-muted:  hsl(0 0% 50%);
   --accent:      hsl(184 65% 51%);
 
-  --thumbs-width:  30%;
-  --thumbs-gap:    5%;
-  --col-gap:       4%;
-  --viewer-aspect: 4 / 5;
+  --thumbs-col-width: 30%;
+  --row-gap:          4%;
+  --col-gap:          4%;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; color: var(--text-main); }
@@ -38,33 +46,48 @@ body {
   padding: 12px;
 }
 
-/*===== PROJECT - two columns, alternating per project ====================*/
+/*===== PROJECT - 2-col x 6-row grid ====================================*/
 .project {
-  position: relative;
-  display: flex;
-  gap: var(--col-gap);
-  padding-top: 8%;     /*headroom for the thumbs poke-up*/
+  display: grid;
+  grid-template-rows: repeat(6, auto);
+  gap: var(--row-gap) var(--col-gap);
+  padding-top: 6%;
   padding-bottom: 4%;
 }
-.project--left  { flex-direction: row; }
-.project--right { flex-direction: row-reverse; }
 
-/*--- THUMBS column (thumbs + desc) -------------------------------------*/
-.project__thumbs-col {
-  flex: 0 0 var(--thumbs-width);
-  display: flex;
-  flex-direction: column;
-  gap: var(--thumbs-gap);
-  /*Pull the entire column UP so the top thumb crosses INTO the previous
-  project's viewer. Cascade!*/
-  transform: translateY(-15%);
+/*Default = thumbs LEFT.*/
+.project--left {
+  grid-template-columns: var(--thumbs-col-width) 1fr;
+  grid-template-areas:
+    "thumb1 title"
+    "thumb2 viewer"
+    "thumb3 viewer"
+    "desc   viewer"
+    "desc   viewer"
+    "desc   viewer";
 }
 
-.project__thumbs {
-  display: flex;
-  flex-direction: column;
-  gap: var(--thumbs-gap);
+/*Inverted = thumbs RIGHT.*/
+.project--right {
+  grid-template-columns: 1fr var(--thumbs-col-width);
+  grid-template-areas:
+    "title  thumb1"
+    "viewer thumb2"
+    "viewer thumb3"
+    "viewer desc"
+    "viewer desc"
+    "viewer desc";
 }
+
+/*--- Grid placements ---*/
+.project__thumb--1 { grid-area: thumb1; }
+.project__thumb--2 { grid-area: thumb2; }
+.project__thumb--3 { grid-area: thumb3; }
+.project__desc     { grid-area: desc; }
+.project__title    { grid-area: title; }
+.project__viewer   { grid-area: viewer; }
+
+/*THUMBS ---------------------------------------------------------------*/
 .project__thumb {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -78,54 +101,52 @@ body {
   height: 100%;
   object-fit: cover;
 }
-
-/*Description sits inside the thumbs column, aligned with the thumb edges.*/
-.project__desc {
-  color: var(--text-main);
-  font-size: 12px;
-  line-height: 1.55;
-  padding-top: var(--thumbs-gap);
+/*Thumb 1 pokes UP into the previous project so the boundary cascades.*/
+.project__thumb--1 {
+  transform: translateY(-30%);
 }
 
-/*--- VIEWER column (header + viewer) -----------------------------------*/
-.project__viewer-col {
-  flex: 1 1 auto;
-  min-width: 0;
+/*TITLE ---------------------------------------------------------------*/
+.project__title {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.project__header {
-  display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
+  align-self: end;
+  padding-bottom: 4px;
 }
-.project__number {
+.project__title-number {
   font-weight: 900;
   font-size: 17px;
   color: transparent;
   -webkit-text-stroke: 1px var(--border);
   line-height: 1;
 }
-.project__title {
+.project__title-text {
   color: var(--text-strong);
   font-weight: 700;
   font-size: 15px;
   letter-spacing: -0.01em;
 }
 
+/*VIEWER ---------------------------------------------------------------*/
 .project__viewer {
-  aspect-ratio: var(--viewer-aspect);
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--bg-surface);
+  min-height: 0;
 }
 .project__viewer img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/*DESCRIPTION ---------------------------------------------------------*/
+.project__desc {
+  color: var(--text-main);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 h1 {
@@ -143,93 +164,69 @@ h1 {
 
 <!--PROJECT 1 - thumbs LEFT, viewer RIGHT-->
 <div class="project project--left">
-  <div class="project__thumbs-col">
-    <div class="project__thumbs">
-      <div class="project__thumb"><img src="projects/project-1/thumbnail1.png" alt=""></div>
-      <div class="project__thumb"><img src="projects/project-1/thumbnail2.png" alt=""></div>
-      <div class="project__thumb"><img src="projects/project-1/thumbnail3.png" alt=""></div>
-    </div>
-    <p class="project__desc">
-      Furniture range for a Parisian loft. Oak frames, steel legs, leather webbing.
-    </p>
+  <div class="project__thumb project__thumb--1"><img src="projects/project-1/thumbnail1.png" alt=""></div>
+  <div class="project__thumb project__thumb--2"><img src="projects/project-1/thumbnail2.png" alt=""></div>
+  <div class="project__thumb project__thumb--3"><img src="projects/project-1/thumbnail3.png" alt=""></div>
+  <p class="project__desc">
+    Furniture range for a Parisian loft. Oak frames, steel legs, leather webbing.
+  </p>
+  <div class="project__title">
+    <span class="project__title-number">01</span>
+    <span class="project__title-text">Parisian loft furniture</span>
   </div>
-  <div class="project__viewer-col">
-    <header class="project__header">
-      <span class="project__number">01</span>
-      <span class="project__title">Parisian loft furniture</span>
-    </header>
-    <div class="project__viewer">
-      <img src="projects/project-1/main.png" alt="">
-    </div>
+  <div class="project__viewer">
+    <img src="projects/project-1/main.png" alt="">
   </div>
 </div>
 
-<!--PROJECT 2 - thumbs RIGHT, viewer LEFT-->
+<!--PROJECT 2 - thumbs RIGHT, viewer LEFT (inverted)-->
 <div class="project project--right">
-  <div class="project__thumbs-col">
-    <div class="project__thumbs">
-      <div class="project__thumb"><img src="projects/project-2/thumbnail1.png" alt=""></div>
-      <div class="project__thumb"><img src="projects/project-2/thumbnail2.png" alt=""></div>
-      <div class="project__thumb"><img src="projects/project-2/thumbnail3.png" alt=""></div>
-    </div>
-    <p class="project__desc">
-      Bamboo lamp + cylinder seat. Woven shade, hand-painted brass patina.
-    </p>
+  <div class="project__thumb project__thumb--1"><img src="projects/project-2/thumbnail1.png" alt=""></div>
+  <div class="project__thumb project__thumb--2"><img src="projects/project-2/thumbnail2.png" alt=""></div>
+  <div class="project__thumb project__thumb--3"><img src="projects/project-2/thumbnail3.png" alt=""></div>
+  <p class="project__desc">
+    Bamboo lamp + cylinder seat. Woven shade, hand-painted brass patina.
+  </p>
+  <div class="project__title">
+    <span class="project__title-number">02</span>
+    <span class="project__title-text">Bamboo lamp + seat</span>
   </div>
-  <div class="project__viewer-col">
-    <header class="project__header">
-      <span class="project__number">02</span>
-      <span class="project__title">Bamboo lamp + seat</span>
-    </header>
-    <div class="project__viewer">
-      <img src="projects/project-2/main.png" alt="">
-    </div>
+  <div class="project__viewer">
+    <img src="projects/project-2/main.png" alt="">
   </div>
 </div>
 
 <!--PROJECT 3 - thumbs LEFT-->
 <div class="project project--left">
-  <div class="project__thumbs-col">
-    <div class="project__thumbs">
-      <div class="project__thumb"><img src="projects/project-3/thumbnail1.png" alt=""></div>
-      <div class="project__thumb"><img src="projects/project-3/thumbnail2.png" alt=""></div>
-      <div class="project__thumb"><img src="projects/project-3/thumbnail3.png" alt=""></div>
-    </div>
-    <p class="project__desc">
-      High table + bar chairs. Co-working pitch, low-poly with painted wear.
-    </p>
+  <div class="project__thumb project__thumb--1"><img src="projects/project-3/thumbnail1.png" alt=""></div>
+  <div class="project__thumb project__thumb--2"><img src="projects/project-3/thumbnail2.png" alt=""></div>
+  <div class="project__thumb project__thumb--3"><img src="projects/project-3/thumbnail3.png" alt=""></div>
+  <p class="project__desc">
+    High table + bar chairs. Co-working pitch, low-poly with painted wear.
+  </p>
+  <div class="project__title">
+    <span class="project__title-number">03</span>
+    <span class="project__title-text">High table + bar chairs</span>
   </div>
-  <div class="project__viewer-col">
-    <header class="project__header">
-      <span class="project__number">03</span>
-      <span class="project__title">High table + bar chairs</span>
-    </header>
-    <div class="project__viewer">
-      <img src="projects/project-3/main.png" alt="">
-    </div>
+  <div class="project__viewer">
+    <img src="projects/project-3/main.png" alt="">
   </div>
 </div>
 
 <!--PROJECT 4 - thumbs RIGHT (reuses project 1 thumbs - asset only has main)-->
 <div class="project project--right">
-  <div class="project__thumbs-col">
-    <div class="project__thumbs">
-      <div class="project__thumb"><img src="projects/project-1/thumbnail1.png" alt=""></div>
-      <div class="project__thumb"><img src="projects/project-1/thumbnail2.png" alt=""></div>
-      <div class="project__thumb"><img src="projects/project-1/thumbnail3.png" alt=""></div>
-    </div>
-    <p class="project__desc">
-      Office desk + chair pairing. Modular for re-skin, ~9.6k tris.
-    </p>
+  <div class="project__thumb project__thumb--1"><img src="projects/project-1/thumbnail1.png" alt=""></div>
+  <div class="project__thumb project__thumb--2"><img src="projects/project-1/thumbnail2.png" alt=""></div>
+  <div class="project__thumb project__thumb--3"><img src="projects/project-1/thumbnail3.png" alt=""></div>
+  <p class="project__desc">
+    Office desk + chair pairing. Modular for re-skin, ~9.6k tris.
+  </p>
+  <div class="project__title">
+    <span class="project__title-number">04</span>
+    <span class="project__title-text">Office desk + chair</span>
   </div>
-  <div class="project__viewer-col">
-    <header class="project__header">
-      <span class="project__number">04</span>
-      <span class="project__title">Office desk + chair</span>
-    </header>
-    <div class="project__viewer">
-      <img src="projects/project-4/main.png" alt="">
-    </div>
+  <div class="project__viewer">
+    <img src="projects/project-4/main.png" alt="">
   </div>
 </div>
 
