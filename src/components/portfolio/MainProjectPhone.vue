@@ -64,8 +64,12 @@ const hasAnyWireframeImage = computed(() => {
   return props.project.thumbnails.some((t) => t.wireframeUrl)
 })
 
-//Feeds the CSS rule `top: calc(var(--phone-i) * 70vh)`.
+//Feeds the CSS rule `top: calc(var(--phone-i) * 65vh)`.
 const indexStyle = computed(() => ({ "--phone-i": String(props.index) }))
+//Alternate sides so even projects have thumbs LEFT, odd RIGHT - quinconce.
+const sideClass  = computed(() => props.index % 2 === 0
+  ? "mp-phone__main--thumbs-left"
+  : "mp-phone__main--thumbs-right")
 
 const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && !editMode.value))
 const showMainImage = computed(() => !showSketchfab.value || isLoading.value)
@@ -208,60 +212,61 @@ async function onDescriptionSave(newVal: string) {
       />
     </header>
 
-    <!--VIEWER - dominant block, ~46vh. Holds the 3D viewer, sketchfab
-    iframe or static image.-->
-    <div class="mp-phone__viewer">
-      <ThreeViewer
-        v-if="project.glbUrl && !editMode"
-        :glb-url="project.glbUrl"
-        :settings="effectiveViewerSettings"
-        :wireframe="isWireframe"
-        :is-in-view="isInView"
-        class="mp-phone__three"
-      />
-
-      <img
-        v-if="!project.glbUrl && showMainImage && mainImageUrl"
-        :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
-        :alt="project.title[lang]"
-        class="mp-phone__viewer-image"
-      />
-      <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
-        No image
+    <!--MAIN ROW - vertical thumb column on one side, viewer on the other.
+    Side decided by index parity.-->
+    <div class="mp-phone__main" :class="sideClass">
+      <div v-if="project.thumbnails.length" class="mp-phone__thumbs">
+        <div
+          v-for="(thumb, i) in project.thumbnails.slice(0, 3)"
+          :key="i"
+          class="mp-phone__thumb"
+        >
+          <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
+        </div>
       </div>
 
-      <iframe
-        v-if="!project.glbUrl && project.modelId && !editMode"
-        ref="iframeRef"
-        :title="`Sketchfab Model - ${project.title[lang]}`"
-        class="mp-phone__viewer-embed"
-        :class="{ 'mp-phone__viewer-embed--hidden': !showSketchfab || isLoading }"
-      ></iframe>
+      <div class="mp-phone__viewer">
+        <ThreeViewer
+          v-if="project.glbUrl && !editMode"
+          :glb-url="project.glbUrl"
+          :settings="effectiveViewerSettings"
+          :wireframe="isWireframe"
+          :is-in-view="isInView"
+          class="mp-phone__three"
+        />
 
-      <button
-        v-if="hasAnyWireframeImage"
-        type="button"
-        class="mp-phone__wf-btn"
-        :class="{ 'mp-phone__wf-btn--active': isWireframe }"
-        aria-label="Toggle wireframe"
-        @click="toggleWireframe"
-      >
-        <Grid :size="14" />
-      </button>
-    </div>
+        <img
+          v-if="!project.glbUrl && showMainImage && mainImageUrl"
+          :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
+          :alt="project.title[lang]"
+          class="mp-phone__viewer-image"
+        />
+        <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
+          No image
+        </div>
 
-    <!--THUMBS - horizontal strip below the viewer. Up to 3 squares.-->
-    <div v-if="project.thumbnails.length" class="mp-phone__thumbs">
-      <div
-        v-for="(thumb, i) in project.thumbnails.slice(0, 3)"
-        :key="i"
-        class="mp-phone__thumb"
-      >
-        <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
+        <iframe
+          v-if="!project.glbUrl && project.modelId && !editMode"
+          ref="iframeRef"
+          :title="`Sketchfab Model - ${project.title[lang]}`"
+          class="mp-phone__viewer-embed"
+          :class="{ 'mp-phone__viewer-embed--hidden': !showSketchfab || isLoading }"
+        ></iframe>
+
+        <button
+          v-if="hasAnyWireframeImage"
+          type="button"
+          class="mp-phone__wf-btn"
+          :class="{ 'mp-phone__wf-btn--active': isWireframe }"
+          aria-label="Toggle wireframe"
+          @click="toggleWireframe"
+        >
+          <Grid :size="14" />
+        </button>
       </div>
     </div>
 
-    <!--DESCRIPTION - paragraph below the thumbs.-->
+    <!--DESCRIPTION - paragraph below the main row.-->
     <EditableText
       tag="p"
       class="mp-phone__desc"
@@ -274,33 +279,28 @@ async function onDescriptionSave(newVal: string) {
 </template>
 
 <style scoped>
-/*PHONE CARD - vertical stack, absolute-positioned by index so projects
-overlap subtly (parent list has explicit height that contains them).
+/*PHONE CARD - absolute-positioned by index so projects overlap subtly
+(parent list has explicit height that contains them).
 
 Layout per project:
-  - header  (small, 7vh)
-  - viewer  (dominant, 46vh)
-  - thumbs  (horizontal row, 14vh)
-  - desc    (paragraph, ~10vh)
-  total content ~= 77vh; project box is 80vh tall.
+  - header        (number + title, 7vh)
+  - main row      (thumbs vertical column + viewer, 50vh)
+  - desc          (paragraph, ~13vh)
+  total card height = 70vh; next card starts at 60vh, so 10vh overlap.
 
-Stagger: each project starts 70vh after the previous, so adjacent
-projects share a 10vh overlap zone. Top + bottom of each card fade to
-transparent via mask-image so the overlap looks like a soft blur instead
-of one card cutting another.*/
+Sides alternate: even projects have thumbs LEFT / viewer RIGHT, odd are
+mirrored.*/
 .mp-phone {
   position: absolute;
-  top: calc(var(--phone-i, 0) * 70vh);
+  top: calc(var(--phone-i, 0) * 60vh);
   left: 0;
   right: 0;
-  height: 80vh;
+  height: 70vh;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
   padding: 0 var(--spacing-md);
   z-index: 1;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 8%, black 92%, transparent 100%);
-          mask-image: linear-gradient(to bottom, transparent 0, black 8%, black 92%, transparent 100%);
 }
 
 /*HEADER ----------------------------------------------------------------*/
@@ -329,11 +329,46 @@ of one card cutting another.*/
   color: var(--color-text-hover);
 }
 
-/*VIEWER ----------------------------------------------------------------*/
+/*MAIN ROW - thumbs + viewer side-by-side. Direction flips per project.-*/
+.mp-phone__main {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex: 0 0 50vh;
+  min-height: 0;
+}
+.mp-phone__main--thumbs-left  { flex-direction: row; }
+.mp-phone__main--thumbs-right { flex-direction: row-reverse; }
+
+/*THUMBS - vertical column, 3 stacked squares.--------------------------*/
+.mp-phone__thumbs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 0 0 22vw;
+  max-width: 100px;
+  height: 100%;
+}
+
+.mp-phone__thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+}
+.mp-phone__thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*VIEWER - fills the remaining horizontal space, full row height.-------*/
 .mp-phone__viewer {
   position: relative;
-  flex: 0 0 46vh;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -383,28 +418,6 @@ of one card cutting another.*/
   background-color: var(--color-accent);
   border-color: var(--color-accent);
   color: hsl(0 0% 0%);
-}
-
-/*THUMBS ----------------------------------------------------------------*/
-.mp-phone__thumbs {
-  display: flex;
-  gap: var(--spacing-xs);
-  height: 14vh;
-  flex-shrink: 0;
-}
-
-.mp-phone__thumb {
-  position: relative;
-  flex: 1 1 0;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-}
-.mp-phone__thumb img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 /*DESCRIPTION ----------------------------------------------------------*/
