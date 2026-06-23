@@ -5,16 +5,15 @@
 <title>Mobile staggered layout mockup</title>
 <style>
 /*STATIC MOCKUP - one page, four projects, no JS.
-Now using the real portfolio colors. Layout still alternates: project 1 thumbs
-LEFT / desc RIGHT, project 2 thumbs RIGHT / desc LEFT, and the next project's
-thumbs column is pulled UP so it overlaps the previous project's stats - the
-cascade ("quinconce").
+Real portfolio colors. Layout alternates: project 1 thumbs LEFT / desc RIGHT,
+project 2 thumbs RIGHT / desc LEFT, etc.
 
-Per project:
-  - thumbnails column (3 stacked) on ONE side
-  - viewer in the middle
-  - description floats over the viewer, on the OPPOSITE side (~50% wide)
-  - stats strip below the viewer*/
+Cascade ("quinconce") rules:
+  - stats NEVER overlap stats - each project occupies its own vertical slot
+  - thumbnails column of each project is translated UP 15% so it pokes into
+    the stats strip of the project ABOVE
+  - description is anchored to the BOTTOM half of the viewer and extends
+    PAST the project bottom so it spills onto the project BELOW*/
 
 :root {
   --bg-main:          #000;
@@ -37,18 +36,14 @@ body {
 
 .project {
   position: relative;
-  margin-bottom: 32px;
-}
-/*The cascade: every project after the first is pulled UP so its thumbs
-column pokes into the previous project's stats strip.*/
-.project + .project {
-  margin-top: -56px;
+  margin-bottom: 0;
 }
 
-/*--- THUMBS column - 3 vertical squares ---*/
+/*--- THUMBS column - 3 vertical squares, pulled UP 15% into previous stats ---*/
 .project__thumbs {
   position: absolute;
   top: 0;
+  transform: translateY(-15%);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -80,10 +75,12 @@ column pokes into the previous project's stats strip.*/
   text-transform: uppercase;
 }
 
-/*--- DESCRIPTION - 50% width over the viewer, OPPOSITE side of thumbs ---*/
+/*--- DESCRIPTION - 50% width, anchored to bottom half of viewer,
+extends BELOW the project so it spills onto the next project ---*/
 .project__desc {
   position: absolute;
-  top: 20px;
+  top: 140px;
+  bottom: -50px;
   width: 50%;
   padding: 12px 14px;
   background: hsl(0 0% 4% / 0.85);
@@ -94,6 +91,7 @@ column pokes into the previous project's stats strip.*/
   font-size: 11px;
   line-height: 1.5;
   z-index: 2;
+  overflow: hidden;
 }
 
 /*--- STATS strip - below the viewer, full width ---*/
