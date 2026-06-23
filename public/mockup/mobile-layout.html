@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mobile staggered layout mockup</title>
+<style>
+/*PURE STATIC MOCKUP - one page, three projects, no JS. The whole point
+is to flush out whether I read your spec correctly: thumbnails sit
+TOP-LEFT of every project; the viewer occupies the middle; description
+overlays the viewer's TOP-RIGHT half; stats sit below. The viewer +
+description + stats together form one "block" - but the thumbnails are
+LIFTED slightly so they overflow into the previous project's bottom
+strip, creating the cascade ("quinconce") you described.
+
+Colour key (ugly on purpose):
+  red    = thumbnails column
+  blue   = viewer
+  yellow = description overlay (50% width, right half of viewer)
+  green  = stats strip*/
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; color: #fff; }
+body { background: #111; padding: 16px; }
+
+.project {
+  position: relative;
+  margin-bottom: 60px;  /*generous gap, will be eaten by the next project's overhang*/
+  /*Containment: stats etc are pushed below by document flow; the next
+  project will start AFTER stats but its thumbnails are pulled UP via
+  margin-top:negative so they invade this project's tail.*/
+}
+.project + .project {
+  margin-top: -80px;    /*<- THIS is the cascade. The next project's
+                          thumbnails poke up into the previous stats.*/
+}
+
+/*--- THUMBNAILS - top-left, vertical stack ---*/
+.project__thumbs {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 80px;
+  z-index: 3;          /*above viewer + overlay so they're always clickable*/
+}
+.project__thumbs > div {
+  height: 80px;
+  background: #e74c3c;
+  border: 2px solid #c0392b;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+
+/*--- VIEWER - middle ---*/
+.project__viewer {
+  margin-left: 96px;   /*leaves room for thumbnails column (80px + 16 gap)*/
+  height: 240px;
+  background: #2980b9;
+  border: 2px solid #1c5984;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+/*--- DESCRIPTION - sits OVER the viewer, right half ---*/
+.project__desc {
+  position: absolute;
+  top: 24px;           /*offset a bit from the viewer top so it floats*/
+  right: 0;
+  width: 50%;          /*half of the viewer's effective width*/
+  padding: 12px;
+  background: rgba(241, 196, 15, 0.92);
+  color: #000;
+  font-size: 13px;
+  line-height: 1.35;
+  z-index: 2;
+}
+
+/*--- STATS - below the viewer, full width ---*/
+.project__stats {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  height: 36px;
+}
+.project__stats > div {
+  flex: 1;
+  background: #27ae60;
+  border: 2px solid #1e8449;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+h1 { padding: 8px 0 16px; font-size: 14px; opacity: 0.6; }
+</style>
+</head>
+<body>
+<h1>Mobile staggered layout — colored blocks only</h1>
+
+<div class="project">
+  <div class="project__thumbs">
+    <div>thumb 1</div>
+    <div>thumb 2</div>
+    <div>thumb 3</div>
+  </div>
+  <div class="project__viewer">VIEWER 1</div>
+  <div class="project__desc">Description P1 — sits over the viewer's right half. Lorem ipsum dolor sit amet.</div>
+  <div class="project__stats">
+    <div>V</div><div>E</div><div>F</div><div>T</div>
+  </div>
+</div>
+
+<div class="project">
+  <div class="project__thumbs">
+    <div>thumb 1</div>
+    <div>thumb 2</div>
+    <div>thumb 3</div>
+  </div>
+  <div class="project__viewer">VIEWER 2</div>
+  <div class="project__desc">Description P2 — and the thumbnails column above is pulled up so it pokes into P1's stats area.</div>
+  <div class="project__stats">
+    <div>V</div><div>E</div><div>F</div><div>T</div>
+  </div>
+</div>
+
+<div class="project">
+  <div class="project__thumbs">
+    <div>thumb 1</div>
+    <div>thumb 2</div>
+    <div>thumb 3</div>
+  </div>
+  <div class="project__viewer">VIEWER 3</div>
+  <div class="project__desc">Description P3.</div>
+  <div class="project__stats">
+    <div>V</div><div>E</div><div>F</div><div>T</div>
+  </div>
+</div>
+
+</body>
+</html>

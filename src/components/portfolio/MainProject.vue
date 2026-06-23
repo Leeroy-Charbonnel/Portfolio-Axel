@@ -1006,6 +1006,9 @@ French S/A/F/T). Title attribute carries the full name as a tooltip.*/
   font-weight: var(--font-weight-bold);
   font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
   letter-spacing: 0;
+  /*line-height:1 is what actually centers the glyph - inherited line-height
+  was pushing the baseline down so S/A/F/T sat slightly low inside the box.*/
+  line-height: 1;
   cursor: default;
   flex-shrink: 0;
 }
