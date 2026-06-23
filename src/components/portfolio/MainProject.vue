@@ -1120,33 +1120,57 @@ spills past the stage bottom into the next project.*/
 /*=== PHONE QUINCONCE - shared rules + the @media + simulate-phone wrappers ==*/
 @media (max-width: 480px) {
   /*Edge-to-edge in phone - kill the .container's 80% width and inner
-  padding so the cascade reads as a single column of bleed-through
-  imagery, not a tidy boxed list.*/
+  padding so the cascade reads as a single column with no gutter.
+  !important is intentional: .container is global, has same specificity
+  as our scoped rule, and it's the one bug we keep hitting.*/
   .main-project__article {
-    width: 100%;
-    max-width: 100%;
-    padding-left: 0;
-    padding-right: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
-  .main-project { padding: 0; margin-bottom: 0; }
-  .main-project__stage { aspect-ratio: auto; height: 95vw; min-height: 320px; }
 
-  .main-project__header { flex-wrap: wrap; align-items: baseline; padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
-  .main-project__layout-picker { position: static; margin-left: auto; align-self: flex-end; }
+  /*Negative margin-bottom is the load-bearing trick: each project pulls
+  the NEXT one up by 22vh, so projects literally overlap instead of
+  reading as separated blocks. The boundary becomes the zone where
+  current's bottom-side content sits on top of next's top-side content.*/
+  .main-project { padding: 0; margin-bottom: -22vh; }
 
-  /*Thumbs column - vertical strip pulled WAY UP so it crosses into the
-  previous project. Side decided by --phone-left / --right. The big
-  overflow + the no-margin between projects is what makes the page read
-  as a continuous scroll with blurry per-project boundaries.*/
-  .main-project__thumbnails {
+  /*Each project takes ~one screen so the overlap can show two projects
+  visible at the same time during scroll.*/
+  .main-project__stage { aspect-ratio: auto; height: 92vh; min-height: 0; }
+
+  /*Header floats over the stage so it doesn't add height that would
+  push the cascade off the screen.*/
+  .main-project__header {
+    position: absolute;
     top: 0;
+    left: 0;
+    right: 0;
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: 0;
+    border-bottom: none;
+    z-index: 8;
+    background: transparent;
+  }
+
+  /*Hide the layout picker, details (description / stats / software /
+  model-id) in phone. The cascade IS the project - extra rows below
+  just break the continuous-scroll illusion.*/
+  .main-project__layout-picker { display: none; }
+  .main-project__details       { display: none; }
+
+  /*Thumbs - vertical strip, flush to one edge. Side decided by the
+  phone-left / phone-right modifier.*/
+  .main-project__thumbnails {
+    top: 10vh;
     bottom: auto;
-    transform: translateY(-22%);
+    transform: none;
     flex-direction: column;
     width: 32vw;
     max-width: 140px;
     height: auto;
-    max-height: 110%;
+    max-height: 78vh;
     gap: var(--spacing-xs);
   }
   .main-project__article--phone-left  .main-project__thumbnails { left:  0; right: auto; }
@@ -1159,22 +1183,22 @@ spills past the stage bottom into the next project.*/
     aspect-ratio: 1 / 1;
   }
 
-  /*Viewer takes the side OPPOSITE the thumbs. Edge-to-edge so the column
-  reads as a staggered triptych without any side gutter.*/
+  /*Viewer fills the side OPPOSITE the thumbs - edge-to-edge so the
+  column reads as one big image, not a small framed picture.*/
   .main-project__article--phone-left  .main-project__viewer { left:  32vw; right: 0; }
   .main-project__article--phone-right .main-project__viewer { right: 32vw; left:  0; }
 
-  /*PHONE description overlay - absolute inside the stage, anchored to the
-  SAME side as the thumbs, hanging well past the stage bottom so it bleeds
-  into the next project's viewer for the "blurry boundary" cascade feel.*/
+  /*Phone description overlay - SAME side as thumbs, anchored low in the
+  stage with a soft blurred bg. Lives inside the overlap zone with the
+  next project, which is what makes the boundary feel blurry.*/
   .main-project__description--phone {
     display: block;
     position: absolute;
-    bottom: -18%;
+    bottom: 4vh;
     width: 55%;
     padding: var(--spacing-sm) var(--spacing-md);
-    background-color: hsl(var(--background) / 0.7);
-    backdrop-filter: blur(8px);
+    background-color: hsl(var(--background) / 0.65);
+    backdrop-filter: blur(10px);
     border: var(--border-width-sm) solid var(--color-gray-medium);
     color: var(--color-text);
     font-size: var(--font-size-sm);
@@ -1183,36 +1207,44 @@ spills past the stage bottom into the next project.*/
   }
   .main-project__article--phone-left  .main-project__description--phone { left:  0; right: auto; }
   .main-project__article--phone-right .main-project__description--phone { right: 0; left:  auto; }
-
-  /*Hide the desktop description + stats column in phone (the overlay
-  carries the description, stats are too noisy at this width).*/
-  .main-project__details-top { display: none; }
-  .main-project__software-name { display: none; }
-  .main-project__software-list { padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
 }
 
-/*simulate-phone mirror so the CssVarsPanel can preview the phone layout
-without resizing the actual window.*/
+/*simulate-phone mirror - CssVarsPanel preview without resizing the actual
+window. Must mirror the @media rules above 1:1, including !important on
+the .container overrides.*/
 html.simulate-phone .main-project__article {
-  width: 100%;
-  max-width: 100%;
-  padding-left: 0;
-  padding-right: 0;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
-html.simulate-phone .main-project { padding: 0; margin-bottom: 0; }
-html.simulate-phone .main-project__stage { aspect-ratio: auto; height: 95vw; min-height: 320px; }
-html.simulate-phone .main-project__header { flex-wrap: wrap; align-items: baseline; padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
-html.simulate-phone .main-project__layout-picker { position: static; margin-left: auto; align-self: flex-end; }
+html.simulate-phone .main-project { padding: 0; margin-bottom: -22vh; }
+html.simulate-phone .main-project__stage { aspect-ratio: auto; height: 92vh; min-height: 0; }
+
+html.simulate-phone .main-project__header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin: 0;
+  border-bottom: none;
+  z-index: 8;
+  background: transparent;
+}
+
+html.simulate-phone .main-project__layout-picker { display: none; }
+html.simulate-phone .main-project__details       { display: none; }
 
 html.simulate-phone .main-project__thumbnails {
-  top: 0;
+  top: 10vh;
   bottom: auto;
-  transform: translateY(-22%);
+  transform: none;
   flex-direction: column;
   width: 32vw;
   max-width: 140px;
   height: auto;
-  max-height: 110%;
+  max-height: 78vh;
   gap: var(--spacing-xs);
 }
 html.simulate-phone .main-project__article--phone-left  .main-project__thumbnails { left:  0; right: auto; }
@@ -1229,11 +1261,11 @@ html.simulate-phone .main-project__article--phone-right .main-project__viewer { 
 html.simulate-phone .main-project__description--phone {
   display: block;
   position: absolute;
-  bottom: -18%;
+  bottom: 4vh;
   width: 55%;
   padding: var(--spacing-sm) var(--spacing-md);
-  background-color: hsl(var(--background) / 0.7);
-  backdrop-filter: blur(8px);
+  background-color: hsl(var(--background) / 0.65);
+  backdrop-filter: blur(10px);
   border: var(--border-width-sm) solid var(--color-gray-medium);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -1242,8 +1274,4 @@ html.simulate-phone .main-project__description--phone {
 }
 html.simulate-phone .main-project__article--phone-left  .main-project__description--phone { left:  0; right: auto; }
 html.simulate-phone .main-project__article--phone-right .main-project__description--phone { right: 0; left:  auto; }
-
-html.simulate-phone .main-project__details-top { display: none; }
-html.simulate-phone .main-project__software-name { display: none; }
-html.simulate-phone .main-project__software-list { padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
 </style>
