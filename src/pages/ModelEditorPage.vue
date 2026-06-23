@@ -2,7 +2,7 @@
 import { computed, markRaw, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useSettings } from "vue-shared-ui"
-import { ArrowLeft, Box, ChevronDown, Crosshair, Eye, EyeOff, Home, MapPin, Monitor, Save, Smartphone, Square, Upload } from "lucide-vue-next"
+import { ArrowLeft, Box, ChevronDown, Circle, Crosshair, Eye, EyeOff, Home, Lightbulb, LightbulbOff, MapPin, Monitor, Save, Smartphone, Square, Sun, Upload } from "lucide-vue-next"
 import {
   Box3,
   BufferGeometry,
@@ -257,6 +257,10 @@ type LightEntry = {
   normalColor:     string
   wfIntensity:     number
   wfColor:         string
+  //per-light toggles - enabled flips light.visible, castShadow drives
+  //three.js shadow rendering on this individual lamp
+  enabled:    boolean
+  castShadow: boolean
 }
 
 const lights = ref<LightEntry[]>([])
@@ -885,6 +889,8 @@ type SavedSettings = {
     normalColor:     string
     wfIntensity:     number
     wfColor:         string
+    enabled?:    boolean
+    castShadow?: boolean
   }>
   normalMode?: {
     hdrId?: string
@@ -1033,6 +1039,8 @@ function hydrateSharedLight(spec: {
   normalColor:     string
   wfIntensity:     number
   wfColor:         string
+  enabled?:    boolean
+  castShadow?: boolean
 }) {
   addLight(spec.type)
   const entry = lights.value[lights.value.length - 1]
@@ -1048,6 +1056,10 @@ function hydrateSharedLight(spec: {
   entry.normalColor     = spec.normalColor
   entry.wfIntensity     = spec.wfIntensity
   entry.wfColor         = spec.wfColor
+  //per-light toggles - if absent on hydration (older saves) keep the
+  //defaults assigned by addLight()
+  if (spec.enabled    !== undefined) onLightEnabledChange(lights.value.length - 1, spec.enabled)
+  if (spec.castShadow !== undefined) onLightShadowChange (lights.value.length - 1, spec.castShadow)
   if (entry.type === "directional" && entry.target) {
     entry.tx = spec.tx ?? 0; entry.ty = spec.ty ?? 0; entry.tz = spec.tz ?? 0
     entry.target.position.set(entry.tx, entry.ty, entry.tz)
@@ -1514,6 +1526,8 @@ function addLight(type: LightType) {
     normalColor,
     wfIntensity:     startIntensity,
     wfColor,
+    enabled:    true,
+    castShadow: type === "directional",   //point lights default OFF (expensive)
   }
 
   if (type === "directional") {
@@ -1578,11 +1592,34 @@ function makeGizmoDiamond(colorHex: string, isTarget = false): Mesh {
 //showLightGizmos toggle so the user can hide visual clutter for a clean
 //render without losing the actual lighting.
 function setLightVisibility(entry: LightEntry, on: boolean) {
-  entry.light.visible     = on
+  //Per-light enabled flag is a hard mute - even when `on` is true the
+  //light stays off if the author disabled it.
+  entry.light.visible     = on && entry.enabled
   const helpers = on && showLightGizmos.value
   entry.sourceGiz.visible = helpers
   if (entry.target) entry.target.visible = helpers
   if (entry.link)   entry.link.visible   = helpers
+}
+
+function onLightEnabledChange(idx: number, enabled: boolean) {
+  const entry = lights.value[idx]; if (!entry) return
+  entry.enabled = enabled
+  entry.light.visible = enabled
+  requestRender()
+}
+
+function ensurePointShadowConfig(light: PointLight) {
+  light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
+  light.shadow.bias       = SHADOW_BIAS
+  light.shadow.normalBias = SHADOW_NORMAL_BIAS
+}
+
+function onLightShadowChange(idx: number, castShadow: boolean) {
+  const entry = lights.value[idx]; if (!entry) return
+  entry.castShadow = castShadow
+  if (castShadow && entry.type === "point") ensurePointShadowConfig(entry.light as PointLight)
+  entry.light.castShadow = castShadow
+  requestRender()
 }
 
 function onShowGizmosToggle(v: boolean) {
@@ -2429,6 +2466,8 @@ async function onSave() {
       normalColor:     l.normalColor,
       wfIntensity:     l.wfIntensity,
       wfColor:         l.wfColor,
+      enabled:         l.enabled,
+      castShadow:      l.castShadow,
     })),
     normalMode: {
       //hdrId is kept for debug / re-hydration in the editor; hdrUrl is
@@ -2796,6 +2835,27 @@ async function onSave() {
                     aria-hidden="true"
                   ></span>
                   <span class="editor__mat-title editor__light-name">{{ e.type === 'point' ? 'Point' : 'Directional' }} {{ i + 1 }}</span>
+                  <!--PER-LIGHT toggles: enabled (Lightbulb) + cast shadow (Sun).
+                  Both are checkbox-style mini-buttons aligned with the rest
+                  of the head row. State shown via --active.-->
+                  <button
+                    type="button"
+                    class="editor__sub-select editor__sub-select--mini"
+                    :class="{ 'editor__sub-select--active': e.enabled }"
+                    :title="e.enabled ? 'Disable light' : 'Enable light'"
+                    @click="onLightEnabledChange(i, !e.enabled)"
+                  >
+                    <component :is="e.enabled ? Lightbulb : LightbulbOff" :size="12" />
+                  </button>
+                  <button
+                    type="button"
+                    class="editor__sub-select editor__sub-select--mini"
+                    :class="{ 'editor__sub-select--active': e.castShadow }"
+                    :title="e.castShadow ? 'Shadow casting ON' : 'Shadow casting OFF'"
+                    @click="onLightShadowChange(i, !e.castShadow)"
+                  >
+                    <component :is="e.castShadow ? Sun : Circle" :size="12" />
+                  </button>
                   <button type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `src:${e.id}` }" @click="selectGizmo(i, 'source')" title="Source">S</button>
                   <button v-if="e.type === 'directional'" type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `tgt:${e.id}` }" @click="selectGizmo(i, 'target')" title="Target">T</button>
                   <button type="button" class="editor__sub-remove" @click="removeLight(i)" :title="`Remove`">×</button>
