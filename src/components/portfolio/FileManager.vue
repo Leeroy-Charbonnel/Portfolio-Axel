@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from "vue"
 import { Trash2, AlertTriangle, RefreshCw } from "lucide-vue-next"
 import { usePortfolio } from "../../composables/usePortfolio"
-import { toAbsoluteUrl } from "../../lib/api-base"
 
 //Admin-only file manager. Lists every row in the file table with a usage
 //count, lets the admin delete individual files (only when unused) and bulk-
@@ -63,7 +62,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const res = await fetch(toAbsoluteUrl("/api/files"), { credentials: "include" })
+    const res = await fetch("/api/files", { credentials: "include" })
     if (!res.ok) throw new Error(`GET /api/files -> ${res.status}`)
     files.value = await res.json()
   } catch (e) {
@@ -78,7 +77,7 @@ async function deleteOne(file: FileRow) {
   if (file.referenceCount > 0) return
   if (!window.confirm(`Delete ${file.originalFilename}?\n\nThis permanently removes the file from disk.`)) return
   try {
-    const res = await fetch(toAbsoluteUrl(`/api/files/${file.id}`), { method: "DELETE", credentials: "include" })
+    const res = await fetch(`/api/files/${file.id}`, { method: "DELETE", credentials: "include" })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
       throw new Error(body.error ?? `DELETE returned ${res.status}`)
@@ -92,7 +91,7 @@ async function deleteOne(file: FileRow) {
 async function deleteOrphans() {
   bulkInFlight.value = true
   try {
-    const res = await fetch(toAbsoluteUrl("/api/files/orphans"), { method: "DELETE", credentials: "include" })
+    const res = await fetch("/api/files/orphans", { method: "DELETE", credentials: "include" })
     if (!res.ok) throw new Error(`DELETE /api/files/orphans -> ${res.status}`)
     await load()
     showBulkConfirm.value = false
