@@ -45,12 +45,39 @@ app.all("/api/auth/{*path}", toNodeHandler(auth))
 
 app.use(express.json())
 
+//FILES FORWARD - dev workflow: local Express never writes to its own
+//disk, all file ops are tunneled to prod's volume. When FILES_FORWARD_URL
+//is set, file routes pipe the request through to prod with a shared
+//secret header; prod accepts that secret as a substitute for the user's
+//session cookie (which doesn't cross domains).
+//
+//Hard project rule: files live ONLY on prod's volume. There is no
+//"local file storage" branch in production; this tunnel is what makes
+//dev behave the same way (DB row created on prod, file written to
+//prod's volume).
+const FILES_FORWARD_URL    = (process.env.FILES_FORWARD_URL ?? "").replace(/\/$/, "")
+const FILES_FORWARD_SECRET = process.env.FILES_FORWARD_SECRET ?? ""
+
+function hasForwardSecret(req: express.Request): boolean {
+  if (!FILES_FORWARD_SECRET) return false
+  const header = req.headers["x-files-forward-secret"]
+  return typeof header === "string" && header === FILES_FORWARD_SECRET
+}
+
 //AUTH MIDDLEWARE
 async function requireAuth(
   req: express.Request,
   res: express.Response,
   next: express.NextFunction,
 ) {
+  //Forward-secret bypass: prod accepts forwarded requests from a trusted
+  //local Express (the user already passed local auth before the forward).
+  //user.id is left null so the file table FK stays valid (uploaded_by has
+  //onDelete: set null, so null is acceptable here).
+  if (hasForwardSecret(req)) {
+    ;(req as any).user = { id: null, role: "admin" } as unknown as SessionUser
+    return next()
+  }
   const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) })
   if (!session) {
     res.status(401).json({ error: "unauthorized" })
@@ -299,6 +326,40 @@ function inferKind(mimeType: string): "image" | "video" | "other" {
   return "other"
 }
 
+//Pipe an Express request through to FILES_FORWARD_URL and stream the
+//response back to the client. Used by POST /api/files, DELETE /api/files
+//and POST /api/software so local dev never touches its own disk. The
+//shared secret is added so prod's requireAuth recognises the call.
+async function forwardFileOp(req: express.Request, res: express.Response, targetPath: string): Promise<boolean> {
+  if (!FILES_FORWARD_URL) return false
+  try {
+    const targetUrl = FILES_FORWARD_URL + targetPath
+    const fwdHeaders: Record<string, string> = {
+      "x-files-forward-secret": FILES_FORWARD_SECRET,
+    }
+    if (req.headers["content-type"])   fwdHeaders["content-type"]   = req.headers["content-type"] as string
+    if (req.headers["content-length"]) fwdHeaders["content-length"] = req.headers["content-length"] as string
+
+    const hasBody = req.method !== "GET" && req.method !== "HEAD"
+    const upstream = await fetch(targetUrl, {
+      method:  req.method,
+      headers: fwdHeaders,
+      body:    hasBody ? (req as unknown as ReadableStream) : undefined,
+      //@ts-ignore - node fetch needs duplex for streaming bodies
+      duplex:  hasBody ? "half" : undefined,
+    })
+    res.status(upstream.status)
+    const ct = upstream.headers.get("content-type")
+    if (ct) res.setHeader("content-type", ct)
+    const buf = Buffer.from(await upstream.arrayBuffer())
+    res.send(buf)
+  } catch (e) {
+    console.error(`[files-forward] ${req.method} ${targetPath} failed:`, e)
+    res.status(502).json({ error: "file forward failed", detail: e instanceof Error ? e.message : String(e) })
+  }
+  return true
+}
+
 //GET /api/files - admin only. Returns every row in the file table with a
 //reference count: how many portfolio rows currently point at this file id.
 //References include direct fk columns AND thumbnail jsonb scans on main_project.
@@ -345,7 +406,8 @@ app.get("/api/files", requireAuth, requireAdmin, async (_req, res) => {
 //DELETE /api/files/orphans - admin only. Bulk-delete every row whose ref
 //count is 0. Returns the number actually removed. MUST be declared BEFORE
 //"/api/files/:id" so express doesn't match "orphans" as a uuid param.
-app.delete("/api/files/orphans", requireAuth, requireAdmin, async (_req, res) => {
+app.delete("/api/files/orphans", requireAuth, requireAdmin, async (req, res) => {
+  if (await forwardFileOp(req, res, "/api/files/orphans")) return
   const result = await db.execute(sql`
     SELECT f.id, f.stored_filename FROM file f WHERE
       NOT EXISTS (SELECT 1 FROM main_project    WHERE main_image_file_id     = f.id) AND
@@ -373,6 +435,7 @@ app.delete("/api/files/orphans", requireAuth, requireAdmin, async (_req, res) =>
 //ref count so the admin always knows before clicking.
 //Declared AFTER /orphans so express's matcher doesn't claim "orphans" as a uuid.
 app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
+  if (await forwardFileOp(req, res, `/api/files/${encodeURIComponent(String(req.params.id ?? ""))}`)) return
   const id = String(req.params.id ?? "")
   const [row] = await db.select().from(fileTable).where(eq(fileTable.id, id))
   if (!row) { res.status(404).json({ error: "not found" }); return }
@@ -409,25 +472,29 @@ app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
 })
 
 //POST /api/files - admin only. Returns the new file row + ready-to-use url
-app.post("/api/files", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
-  if (!req.file) {
-    res.status(400).json({ error: "no file uploaded" })
-    return
-  }
-  //the filename comes from our multer config above as `{uuid}.{ext}` so we
-  //can recover the uuid as the file id
-  const id = req.file.filename.split(".")[0]!
-  const stored = relativeStoredName(req.file)
-  const [row] = await db.insert(fileTable).values({
-    id,
-    originalFilename: req.file.originalname,
-    storedFilename:   stored,
-    mimeType:         req.file.mimetype,
-    sizeBytes:        req.file.size,
-    kind:             inferKind(req.file.mimetype),
-    uploadedBy:       (req as any).user.id,
-  }).returning()
-  res.json({ ...row, url: `/media/${row!.storedFilename}` })
+app.post("/api/files", requireAuth, requireAdmin, async (req, res, next) => {
+  if (await forwardFileOp(req, res, "/api/files")) return
+  upload.single("file")(req, res, async (err: unknown) => {
+    if (err) return next(err)
+    if (!req.file) {
+      res.status(400).json({ error: "no file uploaded" })
+      return
+    }
+    //filename = `{uuid}.{ext}` per our multer config so the file id is
+    //recoverable from it without a separate column.
+    const id = req.file.filename.split(".")[0]!
+    const stored = relativeStoredName(req.file)
+    const [row] = await db.insert(fileTable).values({
+      id,
+      originalFilename: req.file.originalname,
+      storedFilename:   stored,
+      mimeType:         req.file.mimetype,
+      sizeBytes:        req.file.size,
+      kind:             inferKind(req.file.mimetype),
+      uploadedBy:       (req as any).user.id,
+    }).returning()
+    res.json({ ...row, url: `/media/${row!.storedFilename}` })
+  })
 })
 
 
@@ -540,40 +607,44 @@ app.delete("/api/experience/:id", requireAuth, requireAdmin, async (req, res) =>
 //creating a software is a single round-trip instead of two (upload then link).
 //The logo lands in the file table the same way a regular /api/files upload
 //does, then we insert the software row referencing it.
-app.post("/api/software", requireAuth, requireAdmin, upload.single("logo"), async (req, res) => {
-  if (!req.file) { res.status(400).json({ error: "logo file is required" }); return }
-  const key = String(req.body?.key ?? "").trim()
-  const url = String(req.body?.url ?? "").trim()
-  if (!key) { res.status(400).json({ error: "key is required" }); return }
+app.post("/api/software", requireAuth, requireAdmin, async (req, res, next) => {
+  if (await forwardFileOp(req, res, "/api/software")) return
+  upload.single("logo")(req, res, async (err: unknown) => {
+    if (err) return next(err)
+    if (!req.file) { res.status(400).json({ error: "logo file is required" }); return }
+    const key = String(req.body?.key ?? "").trim()
+    const url = String(req.body?.url ?? "").trim()
+    if (!key) { res.status(400).json({ error: "key is required" }); return }
 
-  const fileId = req.file.filename.split(".")[0]!
-  const storedRel = relativeStoredName(req.file)
-  await db.insert(fileTable).values({
-    id:               fileId,
-    originalFilename: req.file.originalname,
-    storedFilename:   storedRel,
-    mimeType:         req.file.mimetype,
-    sizeBytes:        req.file.size,
-    kind:             inferKind(req.file.mimetype),
-    uploadedBy:       (req as any).user?.id ?? null,
+    const fileId = req.file.filename.split(".")[0]!
+    const storedRel = relativeStoredName(req.file)
+    await db.insert(fileTable).values({
+      id:               fileId,
+      originalFilename: req.file.originalname,
+      storedFilename:   storedRel,
+      mimeType:         req.file.mimetype,
+      sizeBytes:        req.file.size,
+      kind:             inferKind(req.file.mimetype),
+      uploadedBy:       (req as any).user?.id ?? null,
+    })
+
+    try {
+      const sortOrder = await nextSortOrder(software)
+      const [row] = await db.insert(software).values({
+        key,
+        logoFileId: fileId,
+        url:        url || "https://",
+        sortOrder,
+      }).returning()
+      res.json(row)
+    } catch (e) {
+      //software insert failed (unique key collision, etc.) - roll the orphaned
+      //file row + binary back so the upload doesn't accumulate dead bytes
+      try { unlinkSync(join(storageDir, storedRel)) } catch { /* ignore */ }
+      await db.delete(fileTable).where(eq(fileTable.id, fileId)).catch(() => {})
+      res.status(409).json({ error: e instanceof Error ? e.message : "software insert failed" })
+    }
   })
-
-  try {
-    const sortOrder = await nextSortOrder(software)
-    const [row] = await db.insert(software).values({
-      key,
-      logoFileId: fileId,
-      url:        url || "https://",
-      sortOrder,
-    }).returning()
-    res.json(row)
-  } catch (e) {
-    //software insert failed (unique key collision, etc.) - roll the orphaned
-    //file row + binary back so the upload doesn't accumulate dead bytes
-    try { unlinkSync(join(storageDir, storedRel)) } catch { /* ignore */ }
-    await db.delete(fileTable).where(eq(fileTable.id, fileId)).catch(() => {})
-    res.status(409).json({ error: e instanceof Error ? e.message : "software insert failed" })
-  }
 })
 
 app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
@@ -592,6 +663,7 @@ app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
 //drop the software row FIRST then the file. Junction rows in
 //main_project_software cascade automatically via their own ON DELETE.
 app.delete("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
+  if (await forwardFileOp(req, res, `/api/software/${encodeURIComponent(String(req.params.id ?? ""))}`)) return
   const id = parseInt(String(req.params.id ?? ""), 10)
   if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
   const [row] = await db.select().from(software).where(eq(software.id, id))
