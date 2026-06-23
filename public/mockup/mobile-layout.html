@@ -4,58 +4,80 @@
 <meta charset="utf-8">
 <title>Mobile staggered layout mockup</title>
 <style>
-/*PURE STATIC MOCKUP - one page, three projects, no JS. The whole point
-is to flush out whether I read your spec correctly: thumbnails sit
-TOP-LEFT of every project; the viewer occupies the middle; description
-overlays the viewer's TOP-RIGHT half; stats sit below. The viewer +
-description + stats together form one "block" - but the thumbnails are
-LIFTED slightly so they overflow into the previous project's bottom
-strip, creating the cascade ("quinconce") you described.
+/*PURE STATIC MOCKUP - one page, four projects, no JS.
+The page itself is locked to a 360px-wide PHONE FRAME centred on screen
+so you can see the layout without resizing your browser. The frame has
+a 360 x 720 aspect = a typical phone viewport.
+
+Layout per project:
+  - thumbnails column (3 stacked) on ONE side
+  - viewer in the middle
+  - description floats over the viewer, on the OPPOSITE side (~50% wide)
+  - stats strip below
+
+Each project ALTERNATES: project 1 thumbs LEFT / desc RIGHT,
+project 2 thumbs RIGHT / desc LEFT, etc. Next project's thumbs column
+is pulled UP so it overlaps the previous project's stats - the cascade
+("quinconce").
 
 Colour key (ugly on purpose):
   red    = thumbnails column
   blue   = viewer
-  yellow = description overlay (50% width, right half of viewer)
+  yellow = description overlay (50% width, opposite side of thumbs)
   green  = stats strip*/
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; color: #fff; }
-body { background: #111; padding: 16px; }
+body {
+  background: #222;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+/*PHONE FRAME - 360 x 720 portrait. Locked aspect; the inner page scrolls.*/
+.phone {
+  width: 360px;
+  height: 720px;
+  background: #111;
+  border: 4px solid #444;
+  border-radius: 24px;
+  overflow-y: auto;
+  padding: 12px;
+  position: relative;
+}
 
 .project {
   position: relative;
-  margin-bottom: 60px;  /*generous gap, will be eaten by the next project's overhang*/
-  /*Containment: stats etc are pushed below by document flow; the next
-  project will start AFTER stats but its thumbnails are pulled UP via
-  margin-top:negative so they invade this project's tail.*/
+  margin-bottom: 32px;
 }
+/*The cascade: every project after the first is pulled UP so its thumbs
+column pokes into the previous project's stats strip.*/
 .project + .project {
-  margin-top: -80px;    /*<- THIS is the cascade. The next project's
-                          thumbnails poke up into the previous stats.*/
+  margin-top: -56px;
 }
 
-/*--- THUMBNAILS - top-left, vertical stack ---*/
+/*--- THUMBS column - 3 vertical squares ---*/
 .project__thumbs {
   position: absolute;
   top: 0;
-  left: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 80px;
-  z-index: 3;          /*above viewer + overlay so they're always clickable*/
+  gap: 6px;
+  width: 64px;
+  z-index: 3;
 }
 .project__thumbs > div {
-  height: 80px;
+  height: 64px;
   background: #e74c3c;
   border: 2px solid #c0392b;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
 }
 
-/*--- VIEWER - middle ---*/
+/*--- VIEWER - the centre block ---*/
 .project__viewer {
-  margin-left: 96px;   /*leaves room for thumbnails column (80px + 16 gap)*/
-  height: 240px;
+  height: 200px;
   background: #2980b9;
   border: 2px solid #1c5984;
   display: flex; align-items: center; justify-content: center;
@@ -63,79 +85,155 @@ body { background: #111; padding: 16px; }
   z-index: 1;
 }
 
-/*--- DESCRIPTION - sits OVER the viewer, right half ---*/
+/*--- DESCRIPTION - 50% width over the viewer, OPPOSITE side of thumbs ---*/
 .project__desc {
   position: absolute;
-  top: 24px;           /*offset a bit from the viewer top so it floats*/
-  right: 0;
-  width: 50%;          /*half of the viewer's effective width*/
-  padding: 12px;
+  top: 16px;
+  width: 50%;
+  padding: 10px;
   background: rgba(241, 196, 15, 0.92);
   color: #000;
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 1.4;
   z-index: 2;
 }
 
-/*--- STATS - below the viewer, full width ---*/
+/*--- STATS strip - below the viewer, full width ---*/
 .project__stats {
   display: flex;
   gap: 4px;
-  margin-top: 8px;
-  height: 36px;
+  margin-top: 6px;
+  height: 32px;
 }
 .project__stats > div {
   flex: 1;
   background: #27ae60;
   border: 2px solid #1e8449;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: bold;
+  gap: 4px;
+}
+.project__stats > div .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: rgba(0,0,0,0.4);
+  font-size: 10px;
 }
 
-h1 { padding: 8px 0 16px; font-size: 14px; opacity: 0.6; }
+/*=== LAYOUT VARIANTS ===*/
+/*Thumbs LEFT, desc RIGHT (odd projects).*/
+.project--left .project__thumbs { left: 0; }
+.project--left .project__viewer { margin-left: 76px; margin-right: 0; }
+.project--left .project__desc   { right: 0; }
+
+/*Thumbs RIGHT, desc LEFT (even projects - mirror).*/
+.project--right .project__thumbs { right: 0; }
+.project--right .project__viewer { margin-right: 76px; margin-left: 0; }
+.project--right .project__desc   { left: 0; }
+
+h1 {
+  padding: 0 0 12px;
+  font-size: 12px;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
 </style>
 </head>
 <body>
-<h1>Mobile staggered layout — colored blocks only</h1>
 
-<div class="project">
+<div class="phone">
+<h1>Mobile staggered layout</h1>
+
+<!--PROJECT 1 - thumbs LEFT, desc RIGHT-->
+<div class="project project--left">
   <div class="project__thumbs">
     <div>thumb 1</div>
     <div>thumb 2</div>
     <div>thumb 3</div>
   </div>
   <div class="project__viewer">VIEWER 1</div>
-  <div class="project__desc">Description P1 — sits over the viewer's right half. Lorem ipsum dolor sit amet.</div>
+  <div class="project__desc">
+    Furniture range for a Parisian loft renovation. Solid oak frames,
+    powder-coated steel legs, leather webbing. Sketched on paper, built
+    as low-poly mock-ups in Blender, then surfaced in Substance Painter
+    for the final pass.
+  </div>
   <div class="project__stats">
-    <div>V</div><div>E</div><div>F</div><div>T</div>
+    <div><span class="badge">V</span>12.4k</div>
+    <div><span class="badge">E</span>34.1k</div>
+    <div><span class="badge">F</span>22.7k</div>
+    <div><span class="badge">T</span>22.7k</div>
   </div>
 </div>
 
-<div class="project">
+<!--PROJECT 2 - thumbs RIGHT, desc LEFT-->
+<div class="project project--right">
   <div class="project__thumbs">
     <div>thumb 1</div>
     <div>thumb 2</div>
     <div>thumb 3</div>
   </div>
   <div class="project__viewer">VIEWER 2</div>
-  <div class="project__desc">Description P2 — and the thumbnails column above is pulled up so it pokes into P1's stats area.</div>
+  <div class="project__desc">
+    Bamboo lamp + cylinder seat study. Procedural texturing for the woven
+    shade, hand-painted darker patina on the brass cap. Rendered in
+    Cycles with two area lights and an HDR backdrop.
+  </div>
   <div class="project__stats">
-    <div>V</div><div>E</div><div>F</div><div>T</div>
+    <div><span class="badge">V</span>8.9k</div>
+    <div><span class="badge">E</span>21.3k</div>
+    <div><span class="badge">F</span>14.8k</div>
+    <div><span class="badge">T</span>14.8k</div>
   </div>
 </div>
 
-<div class="project">
+<!--PROJECT 3 - thumbs LEFT, desc RIGHT-->
+<div class="project project--left">
   <div class="project__thumbs">
     <div>thumb 1</div>
     <div>thumb 2</div>
     <div>thumb 3</div>
   </div>
   <div class="project__viewer">VIEWER 3</div>
-  <div class="project__desc">Description P3.</div>
-  <div class="project__stats">
-    <div>V</div><div>E</div><div>F</div><div>T</div>
+  <div class="project__desc">
+    High table with paired bar chairs for a co-working space pitch.
+    Concept-art moodboard, low-poly silhouette pass, then a final
+    high-poly with hand-painted scratches around the foot rail.
   </div>
+  <div class="project__stats">
+    <div><span class="badge">V</span>18.2k</div>
+    <div><span class="badge">E</span>49.7k</div>
+    <div><span class="badge">F</span>33.0k</div>
+    <div><span class="badge">T</span>33.0k</div>
+  </div>
+</div>
+
+<!--PROJECT 4 - thumbs RIGHT, desc LEFT-->
+<div class="project project--right">
+  <div class="project__thumbs">
+    <div>thumb 1</div>
+    <div>thumb 2</div>
+    <div>thumb 3</div>
+  </div>
+  <div class="project__viewer">VIEWER 4</div>
+  <div class="project__desc">
+    Office desk + ergonomic chair pairing. Modular asset so the chair
+    can be re-skinned for different licences without re-baking the
+    desk's wood grain. Final retopo at ~9.6k tris.
+  </div>
+  <div class="project__stats">
+    <div><span class="badge">V</span>4.7k</div>
+    <div><span class="badge">E</span>12.0k</div>
+    <div><span class="badge">F</span>9.6k</div>
+    <div><span class="badge">T</span>9.6k</div>
+  </div>
+</div>
+
 </div>
 
 </body>
