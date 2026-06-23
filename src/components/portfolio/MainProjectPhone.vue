@@ -296,15 +296,15 @@ keeping thumbs square. No transforms, no border-radius, no fixed pixel
 heights.*/
 .mp-phone {
   display: grid;
-  aspect-ratio: 5 / 9;
+  aspect-ratio: var(--mp-phone-aspect, 5 / 9);
   grid-template-rows: repeat(6, 1fr);
-  gap: 4% 4%;
-  padding: 6% 0 4%;
+  gap: var(--mp-phone-gap, 4%);
+  padding: 6% 0 var(--mp-phone-margin-bottom, 4%);
 }
 
 /*Default = thumbs LEFT, viewer RIGHT.*/
 .mp-phone--left {
-  grid-template-columns: 30% 1fr;
+  grid-template-columns: var(--mp-phone-thumbs-col, 30%) 1fr;
   grid-template-areas:
     "thumb1 title"
     "thumb2 viewer"
@@ -316,7 +316,7 @@ heights.*/
 
 /*Inverted = thumbs RIGHT, viewer LEFT.*/
 .mp-phone--right {
-  grid-template-columns: 1fr 30%;
+  grid-template-columns: 1fr var(--mp-phone-thumbs-col, 30%);
   grid-template-areas:
     "title  thumb1"
     "viewer thumb2"
@@ -361,7 +361,7 @@ heights.*/
 .mp-phone__title-number {
   font-family: sans-serif;
   font-weight: 900;
-  font-size: var(--font-size-md);
+  font-size: var(--mp-phone-number-size, var(--font-size-md));
   color: transparent;
   -webkit-text-stroke: 1px var(--color-gray-medium);
   line-height: 1;
@@ -369,7 +369,7 @@ heights.*/
 .mp-phone__title-text {
   color: var(--color-text-hover);
   font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-md);
+  font-size: var(--mp-phone-title-size, var(--font-size-md));
   letter-spacing: var(--letter-spacing-tight);
   line-height: 1.1;
 }
@@ -434,8 +434,8 @@ heights.*/
 /*DESCRIPTION ----------------------------------------------------------*/
 .mp-phone__desc {
   color: var(--color-text);
-  font-size: var(--font-size-sm);
-  line-height: 1.55;
+  font-size: var(--mp-phone-desc-size, var(--font-size-sm));
+  line-height: var(--mp-phone-desc-lh, 1.55);
   margin: 0;
   min-height: 0;
   overflow: hidden;

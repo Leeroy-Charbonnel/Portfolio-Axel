@@ -87,6 +87,18 @@ const ROWS: CssVarRow[] = [
   { group: "Main Project", key: "css_var_mp_software_size",     cssVar: "--mp-software-size",     label: "Software pill size",     defaultValue: "0.8rem",  mobileDefault: "0.7rem",  type: "size", unit: "rem", min: 0.5, max: 1.5, step: 0.05 },
   { group: "Main Project", key: "css_var_mp_details_gap",       cssVar: "--mp-details-gap",       label: "Description-stats gap",  defaultValue: "4rem",    mobileDefault: "1rem",    type: "size", unit: "rem", min: 0, max: 10, step: 0.25 },
 
+  //MAIN PROJECT (PHONE) - per-mode knobs consumed only by MainProjectPhone.
+  //These are PHONE ONLY; the desktop column ignores them. Saves are still
+  //per-mode via the _mobile suffix so the author can have different
+  //phone-only values for everything below.
+  { group: "Main Project (Phone)", key: "css_var_mp_phone_thumbs_col",    cssVar: "--mp-phone-thumbs-col",    label: "Thumbs column width",  defaultValue: "30%",     mobileDefault: "30%",    type: "size", unit: "%",   min: 15, max: 50, step: 1 },
+  { group: "Main Project (Phone)", key: "css_var_mp_phone_gap",           cssVar: "--mp-phone-gap",           label: "Grid gap",             defaultValue: "4%",      mobileDefault: "4%",     type: "size", unit: "%",   min: 0, max: 12, step: 0.5 },
+  { group: "Main Project (Phone)", key: "css_var_mp_phone_margin_bottom", cssVar: "--mp-phone-margin-bottom", label: "Card bottom padding",  defaultValue: "4%",      mobileDefault: "4%",     type: "size", unit: "%",   min: 0, max: 20, step: 0.5 },
+  { group: "Main Project (Phone)", key: "css_var_mp_phone_title_size",    cssVar: "--mp-phone-title-size",    label: "Title size",           defaultValue: "1rem",    mobileDefault: "1rem",   type: "size", unit: "rem", min: 0.5, max: 2.5, step: 0.05 },
+  { group: "Main Project (Phone)", key: "css_var_mp_phone_number_size",   cssVar: "--mp-phone-number-size",   label: "Number size",          defaultValue: "1rem",    mobileDefault: "1rem",   type: "size", unit: "rem", min: 0.5, max: 3, step: 0.05 },
+  { group: "Main Project (Phone)", key: "css_var_mp_phone_desc_size",     cssVar: "--mp-phone-desc-size",     label: "Description size",     defaultValue: "0.85rem", mobileDefault: "0.85rem",type: "size", unit: "rem", min: 0.5, max: 1.5, step: 0.05 },
+  { group: "Main Project (Phone)", key: "css_var_mp_phone_desc_lh",       cssVar: "--mp-phone-desc-lh",       label: "Description line-height", defaultValue: "1.55", mobileDefault: "1.55",   type: "unitless",         min: 1, max: 3, step: 0.05 },
+
   //GALLERY - third section
   { group: "Gallery", key: "css_var_gallery_columns",         cssVar: "--gallery-columns",         label: "Columns",         defaultValue: "3",      mobileDefault: "2",       type: "int",                min: 1, max: 6, step: 1 },
   { group: "Gallery", key: "css_var_gallery_gap",             cssVar: "--gallery-gap",             label: "Grid gap",        defaultValue: "2rem",   mobileDefault: "0.75rem", type: "size", unit: "rem", min: 0, max: 6, step: 0.1 },
