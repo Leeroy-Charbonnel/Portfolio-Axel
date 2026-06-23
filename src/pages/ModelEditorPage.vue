@@ -3195,20 +3195,24 @@ we draw our own around the input element.*/
 .editor__drop--over { border-color: var(--color-accent); color: var(--color-accent); background-color: hsl(var(--primary) / 0.08); }
 .editor__drop--busy { opacity: 0.5; pointer-events: none; }
 
-.editor__hdr-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-xs); }
+/*HDR list - each row uses the same card visual as materials / lights /
+sections in the panel so the whole editor reads as one tight grid.*/
+.editor__hdr-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0; }
 .editor__hdr-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
-  background-color: hsl(var(--background) / 0.5);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
+  background-color: hsl(0 0% 100% / 0.04);
+  border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
+  margin-bottom: 1px;
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
-  transition: border-color 0.15s ease;
+  transition: background-color 0.15s ease;
 }
-.editor__hdr-item:hover { border-color: var(--color-text-tertiary); }
+.editor__hdr-item:hover { background-color: hsl(0 0% 100% / 0.07); }
+.editor__hdr-item:last-child { margin-bottom: 0; }
 .editor__hdr-thumb { display: inline-flex; align-items: center; justify-content: center; width: var(--spacing-xl); height: var(--spacing-xl); background-color: hsl(0 0% 0% / 0.4); border: var(--border-width-sm) solid var(--color-gray-medium); flex-shrink: 0; overflow: hidden; }
 .editor__hdr-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .editor__hdr-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace; }
