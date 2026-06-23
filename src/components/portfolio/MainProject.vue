@@ -1013,20 +1013,21 @@ the StatIcon SVG so a quick glance shows vert/edge/face counts.*/
 filled with --tag-bg, mono font for the single character (V/E/F/T or the
 French S/A/F/T). Title attribute carries the full name as a tooltip.*/
 .main-project__stat-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-content: center;
   width:  var(--mp-stat-badge-size);
   height: var(--mp-stat-badge-size);
   background-color: var(--tag-bg);
   color: var(--color-text-hover);
   font-size: calc(var(--mp-stat-badge-size) * 0.5);
   font-weight: var(--font-weight-bold);
-  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  font-family: sans-serif;
   letter-spacing: 0;
-  /*line-height:1 is what actually centers the glyph - inherited line-height
-  was pushing the baseline down so S/A/F/T sat slightly low inside the box.*/
-  line-height: 1;
+  /*line-height:0 collapses the line box so the glyph renders centered
+  on the grid track instead of being offset by the line box's ascent/
+  descent space - this is the trick that finally pins the capital
+  letter to the visual center of the badge.*/
+  line-height: 0;
   cursor: default;
   flex-shrink: 0;
 }
@@ -1300,4 +1301,64 @@ html.simulate-phone .main-project__description--phone {
 }
 html.simulate-phone .main-project__article--phone-left  .main-project__description--phone { left:  0; right: auto; }
 html.simulate-phone .main-project__article--phone-right .main-project__description--phone { right: 0; left:  auto; }
+</style>
+
+<style>
+/*UNSCOPED phone overlap - the scoped rules above were not winning over
+the global .container (in style.css) and .main-project base rules in
+some HMR / class-pass-through scenarios. Replicating the load-bearing
+rules unscoped with !important guarantees the cascade actually applies.*/
+@media (max-width: 480px) {
+  .main-projects-section__list .main-project {
+    margin-bottom: -35vh !important;
+    margin-top:    0       !important;
+    padding:       0       !important;
+    position:      relative;
+    z-index:       1;
+  }
+  .main-projects-section__list .main-project:nth-child(even) { z-index: 0; }
+  .main-projects-section__list .main-project:first-child     { margin-top: 0 !important; }
+  .main-projects-section__list .main-project:last-child      { margin-bottom: 0 !important; }
+
+  .main-projects-section__list .main-project .main-project__article {
+    width:        100% !important;
+    max-width:    100% !important;
+    padding:      0    !important;
+    margin:       0    !important;
+  }
+
+  .main-projects-section__list .main-project .main-project__stage {
+    aspect-ratio: auto !important;
+    height:       92vh !important;
+    min-height:   0    !important;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
+  }
+}
+
+html.simulate-phone .main-projects-section__list .main-project {
+  margin-bottom: -35vh !important;
+  margin-top:    0     !important;
+  padding:       0     !important;
+  position:      relative;
+  z-index:       1;
+}
+html.simulate-phone .main-projects-section__list .main-project:nth-child(even) { z-index: 0; }
+html.simulate-phone .main-projects-section__list .main-project:first-child     { margin-top: 0 !important; }
+html.simulate-phone .main-projects-section__list .main-project:last-child      { margin-bottom: 0 !important; }
+
+html.simulate-phone .main-projects-section__list .main-project .main-project__article {
+  width:        100% !important;
+  max-width:    100% !important;
+  padding:      0    !important;
+  margin:       0    !important;
+}
+
+html.simulate-phone .main-projects-section__list .main-project .main-project__stage {
+  aspect-ratio: auto !important;
+  height:       92vh !important;
+  min-height:   0    !important;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
+}
 </style>
