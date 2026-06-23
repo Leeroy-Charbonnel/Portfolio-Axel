@@ -75,12 +75,13 @@ whole document.*/
   flex: 1 0 auto;
 }
 
-/*Fixed language switch in the top-right corner (matches the original portfolio).*/
+/*Language switch lives at the top-right of the page and scrolls AWAY
+with the rest of the content - no point keeping it pinned in view.*/
 .portfolio-app__lang-switch {
-  position: fixed;
+  position: absolute;
   top:   var(--spacing-md);
   right: var(--spacing-md);
-  z-index: 100;
+  z-index: 10;
   color: var(--color-text);
   border: var(--border-width) solid var(--color-border-muted);
   padding: var(--spacing-sm) var(--spacing-md);

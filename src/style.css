@@ -296,11 +296,11 @@ via padding-right; the fixed-right UI (lang switch + admin gear) shifts in
 sync so nothing sits underneath the panel.*/
 html.css-panel-open                         { --panel-width: 28rem; }
 html.css-panel-open body                    { padding-right: var(--panel-width); }
-html.css-panel-open .portfolio-app__lang-switch { right: calc(var(--spacing-md) + var(--panel-width)); }
+/*lang switch is now position:absolute inside .portfolio-app so it
+follows the body's shrink automatically - no per-panel right offset.*/
 html.css-panel-open .admin-gear             { right: calc(var(--spacing-md) + var(--spacing-5xl) + var(--panel-width)); }
 
 body,
-.portfolio-app__lang-switch,
 .admin-gear {
   transition: padding-right 0.2s ease, right 0.2s ease;
 }
