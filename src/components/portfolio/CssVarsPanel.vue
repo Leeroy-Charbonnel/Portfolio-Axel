@@ -159,10 +159,13 @@ function persistPanelWidth(w: number) {
   }).catch((err) => console.warn("[css-panel] save width failed:", err))
 }
 
-//Width available for the page content next to the panel. When this drops
-//under SIMULATE_PHONE_WIDTH_PX we flip the document into simulate-phone
-//mode so component CSS that keys on .simulate-phone fires.
-const availableWidth = computed(() => Math.max(0, windowWidth.value - panelWidth.value))
+//Width available for the page content next to the panel. The panel only
+//actually displaces the page when it is OPEN - if it's closed, the page
+//gets the full window, so the panel width must not be subtracted then.
+//Without this gate, the site would boot in simulate-phone mode any time
+//the persisted panel width was wide enough to push the residual under
+//the 768px breakpoint, even though the panel was hidden.
+const availableWidth = computed(() => Math.max(0, windowWidth.value - (open.value ? panelWidth.value : 0)))
 const autoPhoneMode  = computed(() => availableWidth.value < SIMULATE_PHONE_WIDTH_PX)
 const phoneMode      = computed(() =>
   autoPhoneMode.value,

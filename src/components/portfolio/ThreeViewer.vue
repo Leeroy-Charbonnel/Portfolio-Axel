@@ -275,7 +275,10 @@ function applyEnvFromSource(source: Texture, intensity: number) {
 
 //Apply env from a direct URL saved on the viewerSettings (file extension
 //in the URL drives the loader choice). Falls back to procedural sky when
-//the URL is missing.
+//the URL is missing OR the file fails to load - we never want the
+//viewer to render with no environment because of a 404 / bad MIME on
+///media (which surfaced before as opaque "EXRLoader: not OpenEXR" errors
+//when the server returned HTML for a missing file).
 function applyHdrFromUrl(url: string | null | undefined, intensity: number) {
   if (!url) {
     applyEnvFromSource(makeSkyGradient(), intensity)
@@ -283,7 +286,15 @@ function applyHdrFromUrl(url: string | null | undefined, intensity: number) {
   }
   const isExr = /\.exr$/i.test(url)
   const loader = isExr ? new EXRLoader() : new HDRLoader()
-  loader.load(url, (source) => applyEnvFromSource(source, intensity))
+  loader.load(
+    url,
+    (source) => applyEnvFromSource(source, intensity),
+    undefined,
+    (err) => {
+      console.error(`[ThreeViewer] HDR load failed for ${url}:`, err)
+      applyEnvFromSource(makeSkyGradient(), intensity)
+    },
+  )
 }
 
 //===========================================================================
