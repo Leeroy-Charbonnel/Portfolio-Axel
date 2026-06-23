@@ -2,7 +2,7 @@
 import { computed, markRaw, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useSettings } from "vue-shared-ui"
-import { ArrowLeft, Box, ChevronDown, Eye, EyeOff, Home, House, MapPin, Save, Smartphone, Square, Upload } from "lucide-vue-next"
+import { ArrowLeft, Box, ChevronDown, Eye, EyeOff, Home, MapPin, Monitor, Save, Smartphone, Square, Upload } from "lucide-vue-next"
 import {
   Box3,
   BufferGeometry,
@@ -2507,48 +2507,55 @@ async function onSave() {
           <component :is="showLightGizmos ? Eye : EyeOff" :size="14" />
         </button>
 
-        <!--SAVE START cluster: capture the current camera pose as either
-        the desktop or phone start view.-->
-        <div class="editor__viewport-cluster">
-          <button
-            type="button"
-            class="editor__viewport-tool"
-            data-tooltip="Save current view as desktop start"
-            @click="saveStartView"
-          >
-            <MapPin :size="14" />
-          </button>
-          <button
-            type="button"
-            class="editor__viewport-tool"
-            data-tooltip="Save current view as phone start"
-            @click="saveStartViewMobile"
-          >
-            <Smartphone :size="14" />
-          </button>
-        </div>
+        <!--START POSE grid - two columns (desktop / phone) with a greyed
+        device icon as a column "label", then the two action buttons below
+        (save + go). Space between the columns separates the two devices.-->
+        <div class="editor__viewport-poses">
+          <div class="editor__viewport-pose-col">
+            <span class="editor__viewport-pose-label" aria-label="Desktop">
+              <Monitor :size="14" />
+            </span>
+            <button
+              type="button"
+              class="editor__viewport-tool"
+              data-tooltip="Save current view as desktop start"
+              @click="saveStartView"
+            >
+              <MapPin :size="14" />
+            </button>
+            <button
+              type="button"
+              class="editor__viewport-tool"
+              :disabled="!startView"
+              data-tooltip="Go to desktop start"
+              @click="goToStartView"
+            >
+              <Home :size="14" />
+            </button>
+          </div>
 
-        <!--GO TO START cluster: teleport the editor camera back to either
-        saved start view.-->
-        <div class="editor__viewport-cluster">
-          <button
-            type="button"
-            class="editor__viewport-tool"
-            :disabled="!startView"
-            data-tooltip="Go to desktop start"
-            @click="goToStartView"
-          >
-            <Home :size="14" />
-          </button>
-          <button
-            type="button"
-            class="editor__viewport-tool"
-            :disabled="!startViewMobile"
-            data-tooltip="Go to phone start"
-            @click="goToStartViewMobile"
-          >
-            <House :size="14" />
-          </button>
+          <div class="editor__viewport-pose-col">
+            <span class="editor__viewport-pose-label" aria-label="Phone">
+              <Smartphone :size="14" />
+            </span>
+            <button
+              type="button"
+              class="editor__viewport-tool"
+              data-tooltip="Save current view as phone start"
+              @click="saveStartViewMobile"
+            >
+              <MapPin :size="14" />
+            </button>
+            <button
+              type="button"
+              class="editor__viewport-tool"
+              :disabled="!startViewMobile"
+              data-tooltip="Go to phone start"
+              @click="goToStartViewMobile"
+            >
+              <Home :size="14" />
+            </button>
+          </div>
         </div>
 
         <!--Perspective / orthographic projection toggle. Ortho avoids the
@@ -3104,15 +3111,28 @@ they pair visually with the ViewHelper cube.*/
   display: flex; flex-direction: column; gap: var(--spacing-xxs);
   z-index: 5;
 }
-/*Cluster wraps two related buttons (e.g. save desktop + save phone start)
-in a single horizontal pill so the pair reads as one feature.*/
-.editor__viewport-cluster {
+/*START POSE grid - two columns (desktop / phone) side by side. Each
+column has a greyed device icon at the top acting as a label, then the
+save + go buttons stacked below it. Gap between the two columns is what
+separates the desktop column from the phone one.*/
+.editor__viewport-poses {
   display: flex;
   flex-direction: row;
-  gap: 0;
+  gap: var(--spacing-sm);
 }
-.editor__viewport-cluster > .editor__viewport-tool + .editor__viewport-tool {
-  border-left-width: 0;
+.editor__viewport-pose-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+.editor__viewport-pose-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width:  2rem;
+  height: 2rem;
+  color: var(--color-text-tertiary);
+  pointer-events: none;
 }
 .editor__viewport-tool {
   width: 2rem; height: 2rem;
