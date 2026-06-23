@@ -2507,49 +2507,49 @@ async function onSave() {
           <component :is="showLightGizmos ? Eye : EyeOff" :size="14" />
         </button>
 
-        <!--Capture the current camera pose as the DESKTOP start view-->
-        <button
-          type="button"
-          class="editor__viewport-tool"
-          data-tooltip="Save current view as desktop start"
-          @click="saveStartView"
-        >
-          <MapPin :size="14" />
-        </button>
+        <!--SAVE START cluster: capture the current camera pose as either
+        the desktop or phone start view.-->
+        <div class="editor__viewport-cluster">
+          <button
+            type="button"
+            class="editor__viewport-tool"
+            data-tooltip="Save current view as desktop start"
+            @click="saveStartView"
+          >
+            <MapPin :size="14" />
+          </button>
+          <button
+            type="button"
+            class="editor__viewport-tool"
+            data-tooltip="Save current view as phone start"
+            @click="saveStartViewMobile"
+          >
+            <Smartphone :size="14" />
+          </button>
+        </div>
 
-        <!--Capture the current camera pose as the PHONE start view. The
-        production viewer picks this one over the desktop start when the
-        visitor is on a phone-width screen.-->
-        <button
-          type="button"
-          class="editor__viewport-tool"
-          data-tooltip="Save current view as phone start"
-          @click="saveStartViewMobile"
-        >
-          <Smartphone :size="14" />
-        </button>
-
-        <!--Teleport the editor camera back to the desktop start view-->
-        <button
-          type="button"
-          class="editor__viewport-tool"
-          :disabled="!startView"
-          data-tooltip="Go to desktop start"
-          @click="goToStartView"
-        >
-          <Home :size="14" />
-        </button>
-
-        <!--Teleport the editor camera back to the phone start view-->
-        <button
-          type="button"
-          class="editor__viewport-tool"
-          :disabled="!startViewMobile"
-          data-tooltip="Go to phone start"
-          @click="goToStartViewMobile"
-        >
-          <House :size="14" />
-        </button>
+        <!--GO TO START cluster: teleport the editor camera back to either
+        saved start view.-->
+        <div class="editor__viewport-cluster">
+          <button
+            type="button"
+            class="editor__viewport-tool"
+            :disabled="!startView"
+            data-tooltip="Go to desktop start"
+            @click="goToStartView"
+          >
+            <Home :size="14" />
+          </button>
+          <button
+            type="button"
+            class="editor__viewport-tool"
+            :disabled="!startViewMobile"
+            data-tooltip="Go to phone start"
+            @click="goToStartViewMobile"
+          >
+            <House :size="14" />
+          </button>
+        </div>
 
         <!--Perspective / orthographic projection toggle. Ortho avoids the
         perspective skew at the poles - useful when snapping to top view.-->
@@ -3103,6 +3103,16 @@ they pair visually with the ViewHelper cube.*/
   bottom: calc(128px + var(--spacing-md));
   display: flex; flex-direction: column; gap: var(--spacing-xxs);
   z-index: 5;
+}
+/*Cluster wraps two related buttons (e.g. save desktop + save phone start)
+in a single horizontal pill so the pair reads as one feature.*/
+.editor__viewport-cluster {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+.editor__viewport-cluster > .editor__viewport-tool + .editor__viewport-tool {
+  border-left-width: 0;
 }
 .editor__viewport-tool {
   width: 2rem; height: 2rem;
