@@ -18,7 +18,7 @@ import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 //phone layout. The panel itself flips to "Phone" mode at the same time:
 //each row's value is stored under a SEPARATE key (`${key}_mobile`) so
 //the author can tune phone-only values without touching desktop.
-const PANEL_WIDTH_KEY        = "css-panel.width"
+const PANEL_WIDTH_KEY        = "css_panel_width"  //settings-table row
 const PANEL_WIDTH_DEFAULT_PX = 448  //matches the old fixed 28rem
 const PANEL_WIDTH_MIN_PX     = 280
 const SIMULATE_PHONE_WIDTH_PX = 768
@@ -124,20 +124,25 @@ const localMobile  = ref<Record<string, string>>({})
 //===========================================================================
 //RESIZABLE PANEL + AUTO PHONE-MODE
 //===========================================================================
-const panelWidth = ref<number>(loadPanelWidth())
+//Panel width is persisted in the settings table (DB) - never localStorage.
+//useSettings loads asynchronously so we start at the default and the
+//watch below sets the real value once `loaded` flips true.
+const panelWidth = ref<number>(PANEL_WIDTH_DEFAULT_PX)
 //User can force a mode via the header buttons; null = follow auto.
 const modeOverride = ref<"desktop" | "phone" | null>(null)
 const windowWidth = ref<number>(typeof window !== "undefined" ? window.innerWidth : 1920)
 
-function loadPanelWidth(): number {
-  if (typeof localStorage === "undefined") return PANEL_WIDTH_DEFAULT_PX
-  const raw = localStorage.getItem(PANEL_WIDTH_KEY)
-  const n = raw ? parseInt(raw, 10) : NaN
-  return Number.isFinite(n) && n >= PANEL_WIDTH_MIN_PX ? n : PANEL_WIDTH_DEFAULT_PX
+function clampPanelWidth(n: number): number {
+  if (!Number.isFinite(n)) return PANEL_WIDTH_DEFAULT_PX
+  return Math.max(PANEL_WIDTH_MIN_PX, Math.round(n))
 }
 
 function persistPanelWidth(w: number) {
-  try { localStorage.setItem(PANEL_WIDTH_KEY, String(Math.round(w))) } catch { /*ignore*/ }
+  void update(PANEL_WIDTH_KEY, String(clampPanelWidth(w)), {
+    type: "int",
+    group: "css-panel",
+    description: "Width of the CSS variables side panel (px).",
+  }).catch((err) => console.warn("[css-panel] save width failed:", err))
 }
 
 //Width available for the page content next to the panel. When this drops
@@ -376,7 +381,16 @@ watch(open, (val) => {
   syncPhoneClass()
 })
 
-watch(loaded, () => { if (loaded.value) loadSaved() })
+watch(loaded, () => {
+  if (!loaded.value) return
+  loadSaved()
+  //Restore the saved panel width too (settings table row, defaulting to
+  //the constant if the row doesn't exist yet).
+  const raw = getString(PANEL_WIDTH_KEY, String(PANEL_WIDTH_DEFAULT_PX))
+  const n   = parseInt(raw, 10)
+  panelWidth.value = clampPanelWidth(n)
+  if (open.value) document.documentElement.style.setProperty("--panel-width", `${panelWidth.value}px`)
+})
 
 //===========================================================================
 //RESIZE INTERACTION - drag the left edge of the panel

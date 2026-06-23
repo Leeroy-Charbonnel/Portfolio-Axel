@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router"
 import HomePage           from "../pages/HomePage.vue"
 import SettingsPage       from "../pages/SettingsPage.vue"
-import SketchfabHowToPage from "../pages/SketchfabHowToPage.vue"
 import ModelEditorPage    from "../pages/ModelEditorPage.vue"
 import {
   LoginPage,
@@ -24,10 +23,6 @@ const router = createRouter({
     //Settings page kept available so the user can tweak accent_color / theme
     //even in public mode. Drop the route if you don't want users on /settings.
     { path: "/settings",        component: SettingsPage },
-
-    //Static admin-only reference for preparing a Sketchfab model. No auth
-    //guard since the link only appears in the admin gear menu anyway.
-    { path: "/sketchfab-howto", component: SketchfabHowToPage },
 
     //Three.js model editor - per-project edit page. Replaces the Sketchfab
     //iframe with a local viewer when a .glb has been uploaded.

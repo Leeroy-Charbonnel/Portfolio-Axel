@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue"
 import { useRouter } from "vue-router"
-import { Settings as Gear, Pencil, SlidersHorizontal, Paintbrush, BookOpen, LogOut } from "lucide-vue-next"
+import { Settings as Gear, Pencil, SlidersHorizontal, Paintbrush, LogOut } from "lucide-vue-next"
 import { useAdmin } from "../../composables/useAdmin"
 import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 
@@ -42,11 +42,6 @@ function goSettings() {
   router.push("/settings")
 }
 
-function goSketchfabHowTo() {
-  close()
-  router.push("/sketchfab-howto")
-}
-
 function openCssPanel() {
   close()
   showCssPanel()
@@ -85,10 +80,6 @@ async function handleSignOut() {
         <button class="admin-gear__item" role="menuitem" @click="goSettings">
           <SlidersHorizontal :size="14" />
           <span>Settings</span>
-        </button>
-        <button class="admin-gear__item" role="menuitem" @click="goSketchfabHowTo">
-          <BookOpen :size="14" />
-          <span>Sketchfab how-to</span>
         </button>
         <div class="admin-gear__divider"></div>
         <button class="admin-gear__item admin-gear__item--danger" role="menuitem" @click="handleSignOut">

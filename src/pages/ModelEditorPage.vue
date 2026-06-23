@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, markRaw, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
+import { useSettings } from "vue-shared-ui"
 import { ArrowLeft, Box, ChevronDown, Eye, EyeOff, Home, MapPin, Save, Square, Upload } from "lucide-vue-next"
 import {
   Box3,
@@ -269,16 +270,16 @@ const wireframeColor     = ref("#14b8a6")  //teal - forced color of every wf lig
 const wireframeEmissive  = ref(2)
 const wireframeOverlayOn    = ref(true)
 
-//WIREFRAME LINE COLOR - shared across ALL projects in the editor, not
-//per-project. Stored in localStorage so the author picks the color once
-//and every project they open uses the same one. Each save still writes
-//the current value into the project's viewerSettings so production knows
-//which color to draw, but on editor hydration we IGNORE the project's
-//value and keep whatever the author last picked.
-const WF_LINE_COLOR_KEY = "editor3d.wireframeOverlayColor"
-const wireframeOverlayColor = ref(
-  (typeof localStorage !== "undefined" && localStorage.getItem(WF_LINE_COLOR_KEY)) || "#000000",
-)
+//SETTINGS-TABLE backed editor preferences. The settings table is the
+//canonical store (project rule #5: if a value lives in the DB, it does
+//NOT live in localStorage). Keys live under the editor3d_ namespace so
+//they show up grouped on the /settings page if the admin wants to see
+//them. update() is self-seeding, so first write also creates the row.
+const { getString, update: updateSetting, loaded: settingsLoaded } = useSettings()
+const WF_LINE_COLOR_KEY  = "editor3d_wireframe_line_color"
+const WF_MAT_PARAMS_KEY  = "editor3d_wireframe_material"
+
+const wireframeOverlayColor = ref(getString(WF_LINE_COLOR_KEY, "#000000"))
 const showLightGizmos       = ref(true)        //sphere/diamond helpers visibility
 
 //START VIEW - persisted camera pose used by the production viewer for the
@@ -308,11 +309,11 @@ const sectionOpen = ref({
 //   wfEmissiveMat : same base but with emissive = mode color
 //   wfPickMat     : same base but with emissive = orange (selection)
 //
-//WF MATERIAL PARAMS are GLOBAL across every project - persisted in
-//localStorage so a tweak in project A is what project B sees on next
-//open. Per-project hydration intentionally ignores the value saved on
-//viewerSettings; the panel writes back the same global value to the
-//project payload only for back-compat with viewers that still read it.
+//WF MATERIAL PARAMS are GLOBAL across every project - persisted in the
+//settings table (key WF_MAT_PARAMS_KEY, JSON-encoded). Per-project
+//hydration intentionally ignores s.wireframeMode.material; the global
+//setting wins. The current save still emits material into the project
+//payload for back-compat with viewers that read it directly.
 type WfMaterialParams = {
   color:             string
   metalness:         number
@@ -320,7 +321,6 @@ type WfMaterialParams = {
   envMapIntensity:   number
   specularIntensity: number
 }
-const WF_MAT_PARAMS_KEY = "editor3d.wfMatParams"
 const WF_MAT_PARAMS_DEFAULT: WfMaterialParams = {
   color:             "#808080",
   metalness:         0,
@@ -328,16 +328,14 @@ const WF_MAT_PARAMS_DEFAULT: WfMaterialParams = {
   envMapIntensity:   1,
   specularIntensity: 1,
 }
-function loadWfMatParams(): WfMaterialParams {
-  if (typeof localStorage === "undefined") return { ...WF_MAT_PARAMS_DEFAULT }
+function parseWfMatParams(raw: string): WfMaterialParams {
+  if (!raw) return { ...WF_MAT_PARAMS_DEFAULT }
   try {
-    const raw = localStorage.getItem(WF_MAT_PARAMS_KEY)
-    if (!raw) return { ...WF_MAT_PARAMS_DEFAULT }
     const parsed = JSON.parse(raw) as Partial<WfMaterialParams>
     return { ...WF_MAT_PARAMS_DEFAULT, ...parsed }
   } catch { return { ...WF_MAT_PARAMS_DEFAULT } }
 }
-const wfMatParams = ref<WfMaterialParams>(loadWfMatParams())
+const wfMatParams = ref<WfMaterialParams>(parseWfMatParams(getString(WF_MAT_PARAMS_KEY, "")))
 
 let wfBaseMat: MeshPhysicalMaterial | null = null
 let wfPickMat: MeshPhysicalMaterial | null = null
@@ -453,6 +451,25 @@ function fitCanvasSize(containerW: number, containerH: number): { w: number; h: 
   }
   return { w: containerW, h: Math.floor(containerW / TARGET_ASPECT) }
 }
+
+//useSettings loads asynchronously - on first paint getString() returns
+//the row default. Once the table arrives we re-read both global editor
+//prefs so the panel reflects whatever was persisted from a previous
+//session / a different project.
+watch(settingsLoaded, (loaded) => {
+  if (!loaded) return
+  wireframeOverlayColor.value = getString(WF_LINE_COLOR_KEY, "#000000")
+  wfMatParams.value = parseWfMatParams(getString(WF_MAT_PARAMS_KEY, ""))
+  //push the freshly-loaded values onto the live materials / overlays
+  if (wfBaseMat || wfPickMat) syncWfMaterialsParams()
+  for (const overlay of wfOverlays.values()) {
+    if (overlay.material instanceof LineBasicMaterial) {
+      overlay.material.color.set(wireframeOverlayColor.value)
+      overlay.material.needsUpdate = true
+    }
+  }
+  requestRender()
+})
 
 onMounted(() => {
   if (!canvas.value || !viewportBox.value) return
@@ -859,8 +876,8 @@ function hydrateFromSavedSettings(payload: unknown) {
   if (s.wireframeMode?.color)                       wireframeColor.value      = s.wireframeMode.color
   if (s.wireframeMode?.overlayOn !== undefined)     wireframeOverlayOn.value  = s.wireframeMode.overlayOn
   //s.wireframeMode.overlayColor + s.wireframeMode.material are GLOBAL
-  //editor prefs (localStorage-backed). Ignore the per-project values
-  //during hydration so the global setting wins.
+  //editor prefs (settings table). Ignore the per-project values during
+  //hydration so the DB-backed global wins.
   //start view (camera pose) is the bridge between the editor and the
   //production viewer's intro animation. Just a 6-number snapshot.
   if (s.startView)                                  startView.value = s.startView
@@ -1849,9 +1866,13 @@ function syncWireframeOverlays() {
 
 function onWireframeOverlayColor(hex: string) {
   wireframeOverlayColor.value = hex
-  //persist as the global editor preference so the next project the
-  //author opens defaults to the same line color
-  try { localStorage.setItem(WF_LINE_COLOR_KEY, hex) } catch { /*ignore quota errors*/ }
+  //Persist globally via the settings table - the next project the author
+  //opens picks the value up from the DB.
+  updateSetting(WF_LINE_COLOR_KEY, hex, {
+    type: "string",
+    group: "editor3d",
+    description: "Wireframe line color (shared across every project in the editor).",
+  }).catch((err: unknown) => console.warn("[model-editor] save line color failed:", err))
   for (const overlay of wfOverlays.values()) {
     if (overlay.material instanceof LineBasicMaterial) {
       overlay.material.color.set(hex)
@@ -1897,9 +1918,13 @@ function onEmissiveItemIntensity(uuid: string, v: number) {
 
 function onWfMatParam<K extends keyof WfMaterialParams>(key: K, value: WfMaterialParams[K]) {
   wfMatParams.value[key] = value
-  //Persist the GLOBAL editor preference so every other project picks it
-  //up on next open (no per-project copy).
-  try { localStorage.setItem(WF_MAT_PARAMS_KEY, JSON.stringify(wfMatParams.value)) } catch { /*ignore quota*/ }
+  //Persist globally via the settings table so every other project picks
+  //up the change on next open.
+  updateSetting(WF_MAT_PARAMS_KEY, JSON.stringify(wfMatParams.value), {
+    type: "string",
+    group: "editor3d",
+    description: "Wireframe shared material params (color, metalness, roughness, env, specular).",
+  }).catch((err: unknown) => console.warn("[model-editor] save wf material failed:", err))
   syncWfMaterialsParams()
   requestRender()
 }
