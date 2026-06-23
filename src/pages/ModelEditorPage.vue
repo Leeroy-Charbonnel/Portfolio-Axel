@@ -3114,14 +3114,12 @@ they pair visually with the ViewHelper cube.*/
   z-index: 5;
 }
 /*Horizontal cluster - two related single-purpose buttons that read as a
-pair (eg. light-gizmos toggle + projection toggle).*/
+pair (eg. light-gizmos toggle + projection toggle). Same gap as the gap
+between the two pose columns so the toolbar reads as one rhythm.*/
 .editor__viewport-cluster-row {
   display: flex;
   flex-direction: row;
-  gap: 0;
-}
-.editor__viewport-cluster-row > .editor__viewport-tool + .editor__viewport-tool {
-  border-left-width: 0;
+  gap: var(--spacing-sm);
 }
 
 /*START POSE grid - two columns (desktop / phone) side by side. Each
