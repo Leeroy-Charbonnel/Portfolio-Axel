@@ -41,11 +41,13 @@ const { data: portfolioData, updateMainProject } = usePortfolio()
 const effectiveViewerSettings = computed(() => {
   const raw = (props.project.viewerSettings as any) ?? null
   const prefs = portfolioData.value?.editorPrefs
-  if (!prefs) return raw
-  const next = raw ? { ...raw, wireframeMode: { ...(raw.wireframeMode ?? {}) } } : { wireframeMode: {} }
-  if (prefs.wireframeLineColor) next.wireframeMode.overlayColor = prefs.wireframeLineColor
-  if (prefs.wireframeModeColor) next.wireframeMode.color        = prefs.wireframeModeColor
-  if (prefs.wireframeMaterial) {
+  const next: any = raw ? { ...raw, wireframeMode: { ...(raw.wireframeMode ?? {}) } } : { wireframeMode: {} }
+  //Phone-specific start pose wins on this component; fall back to the
+  //desktop one if the author hasn't framed a mobile shot yet.
+  if (raw?.startViewMobile) next.startView = raw.startViewMobile
+  if (prefs?.wireframeLineColor) next.wireframeMode.overlayColor = prefs.wireframeLineColor
+  if (prefs?.wireframeModeColor) next.wireframeMode.color        = prefs.wireframeModeColor
+  if (prefs?.wireframeMaterial) {
     try { next.wireframeMode.material = JSON.parse(prefs.wireframeMaterial) } catch { /*malformed - ignore*/ }
   }
   return next
@@ -375,11 +377,14 @@ heights.*/
 }
 
 /*VIEWER ---------------------------------------------------------------*/
+/*Viewer container is FULLY transparent so the Three.js canvas (alpha:true
++ ShadowMaterial floor) reads as the model floating on the page bg with
+only the ground shadow visible. Border kept as a layout-edge cue.*/
 .mp-phone__viewer {
   position: relative;
   overflow: hidden;
   border: var(--border-width-sm) solid var(--color-gray-medium);
-  background: var(--color-background-secondary);
+  background: transparent;
   min-height: 0;
   min-width:  0;
 }

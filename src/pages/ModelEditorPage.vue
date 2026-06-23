@@ -2,7 +2,7 @@
 import { computed, markRaw, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useSettings } from "vue-shared-ui"
-import { ArrowLeft, Box, ChevronDown, Eye, EyeOff, Home, MapPin, Save, Square, Upload } from "lucide-vue-next"
+import { ArrowLeft, Box, ChevronDown, Eye, EyeOff, Home, House, MapPin, Save, Smartphone, Square, Upload } from "lucide-vue-next"
 import {
   Box3,
   BufferGeometry,
@@ -293,7 +293,11 @@ const showLightGizmos       = ref(true)        //sphere/diamond helpers visibili
 //current cameraRef.position + controls.target so the public viewer can
 //land precisely where the author framed the shot. Null = no preference,
 //the viewer falls back to its bounding-box framing.
-const startView = ref<{ pos: [number, number, number]; target: [number, number, number] } | null>(null)
+const startView       = ref<{ pos: [number, number, number]; target: [number, number, number] } | null>(null)
+//Mobile variant - production viewer uses this when the visitor is on a
+//phone-width device. Author can frame a tighter / different shot for
+//mobile so the model reads well at the narrower aspect.
+const startViewMobile = ref<{ pos: [number, number, number]; target: [number, number, number] } | null>(null)
 
 //ACCORDION expanded state for the panel sub-sections (Lights + Wireframe tabs)
 const sectionOpen = ref({
@@ -855,7 +859,8 @@ async function loadProjectAndModel() {
 //sceneMeshes.value. Simple knobs (HDR id, wireframe color, etc) are
 //applied immediately on project load; the rest is queued for later.
 type SavedSettings = {
-  startView?: { pos: [number, number, number]; target: [number, number, number] }
+  startView?:       { pos: [number, number, number]; target: [number, number, number] }
+  startViewMobile?: { pos: [number, number, number]; target: [number, number, number] }
   materials?: Array<{
     uuid?: string
     name?: string
@@ -915,7 +920,8 @@ function hydrateFromSavedSettings(payload: unknown) {
   //per-project values during hydration so the DB-backed global wins.
   //start view (camera pose) is the bridge between the editor and the
   //production viewer's intro animation. Just a 6-number snapshot.
-  if (s.startView)                                  startView.value = s.startView
+  if (s.startView)                                  startView.value       = s.startView
+  if (s.startViewMobile)                            startViewMobile.value = s.startViewMobile
   //everything else (materials, lights, emissive picks) needs the glb -
   //queue and apply in applyPendingHydration() after GLTFLoader is done
   pendingHydration = s
@@ -2055,27 +2061,27 @@ function checkViewHelperClick(e: PointerEvent): boolean {
 //on the exact same composition. Persists immediately so the button is
 //still wired up after a reload - relying on the bottom Save was too
 //easy to forget and led to "the start view button doesn't work" reports.
-async function saveStartView() {
-  if (!cameraRef || !controls) return
-  if (!Number.isFinite(projectId.value)) return
-  const sv = {
+function capturePose() {
+  if (!cameraRef || !controls) return null
+  return {
     pos:    [cameraRef.position.x, cameraRef.position.y, cameraRef.position.z] as [number, number, number],
     target: [controls.target.x,    controls.target.y,    controls.target.z]    as [number, number, number],
   }
-  startView.value = sv
-  status.value = "Start view captured (saving...)"
-  //partial save - hits the start-view endpoint so materials / lights / HDR
-  //stay untouched. The main Save button is the only way to persist those.
+}
+
+async function persistStartView(field: "startView" | "startViewMobile", sv: { pos: [number, number, number]; target: [number, number, number] }) {
+  if (!Number.isFinite(projectId.value)) return
+  status.value = `${field === "startView" ? "Desktop" : "Phone"} start captured (saving...)`
   isSaving.value = true; saveError.value = null
   try {
     const res = await fetch(`/api/main-project/${projectId.value}/viewer-settings/start-view`, {
       method:      "PUT",
       credentials: "include",
       headers:     { "Content-Type": "application/json" },
-      body:        JSON.stringify({ startView: sv }),
+      body:        JSON.stringify({ [field]: sv }),
     })
     if (!res.ok) throw new Error(`save ${res.status}`)
-    status.value = "Start view saved"
+    status.value = `${field === "startView" ? "Desktop" : "Phone"} start saved`
   } catch (e) {
     saveError.value = e instanceof Error ? e.message : String(e)
     status.value    = `Save failed: ${saveError.value}`
@@ -2084,6 +2090,29 @@ async function saveStartView() {
     isSaving.value = false
     setTimeout(() => { status.value = `Materials: ${materials.value.length}` }, 2000)
   }
+}
+
+async function saveStartView() {
+  const sv = capturePose(); if (!sv) return
+  startView.value = sv
+  await persistStartView("startView", sv)
+}
+
+async function saveStartViewMobile() {
+  const sv = capturePose(); if (!sv) return
+  startViewMobile.value = sv
+  await persistStartView("startViewMobile", sv)
+}
+
+function goToStartViewMobile() {
+  if (!cameraRef || !controls || !startViewMobile.value) return
+  cameraAnim = makeCameraAnim({
+    toPos:    new Vector3(...startViewMobile.value.pos),
+    toTarget: new Vector3(...startViewMobile.value.target),
+    toUp:     new Vector3(0, 1, 0),
+    duration: GO_TO_START_DURATION_MS,
+  })
+  requestRender(GO_TO_START_DURATION_MS + 400)
 }
 
 //Animate the editor camera to the saved start view so the author can
@@ -2380,7 +2409,8 @@ async function onSave() {
   const payload = {
     //null when no start view captured - production viewer falls back to
     //the bounding-box auto-frame in that case.
-    startView: startView.value,
+    startView:       startView.value,
+    startViewMobile: startViewMobile.value,
     materials: materials.value.map((e) => ({
       uuid: e.material.uuid, name: e.material.name,
       color: e.color, emissive: e.emissive, emissiveEnabled: e.emissiveEnabled,
@@ -2477,26 +2507,48 @@ async function onSave() {
           <component :is="showLightGizmos ? Eye : EyeOff" :size="14" />
         </button>
 
-        <!--Capture the current camera pose as the production viewer's
-        start view (visitors land on it after a brief fly-in)-->
+        <!--Capture the current camera pose as the DESKTOP start view-->
         <button
           type="button"
           class="editor__viewport-tool"
-          data-tooltip="Save current view as start position"
+          data-tooltip="Save current view as desktop start"
           @click="saveStartView"
         >
           <MapPin :size="14" />
         </button>
 
-        <!--Teleport the editor camera back to the saved start view-->
+        <!--Capture the current camera pose as the PHONE start view. The
+        production viewer picks this one over the desktop start when the
+        visitor is on a phone-width screen.-->
+        <button
+          type="button"
+          class="editor__viewport-tool"
+          data-tooltip="Save current view as phone start"
+          @click="saveStartViewMobile"
+        >
+          <Smartphone :size="14" />
+        </button>
+
+        <!--Teleport the editor camera back to the desktop start view-->
         <button
           type="button"
           class="editor__viewport-tool"
           :disabled="!startView"
-          data-tooltip="Go to saved start position"
+          data-tooltip="Go to desktop start"
           @click="goToStartView"
         >
           <Home :size="14" />
+        </button>
+
+        <!--Teleport the editor camera back to the phone start view-->
+        <button
+          type="button"
+          class="editor__viewport-tool"
+          :disabled="!startViewMobile"
+          data-tooltip="Go to phone start"
+          @click="goToStartViewMobile"
+        >
+          <House :size="14" />
         </button>
 
         <!--Perspective / orthographic projection toggle. Ortho avoids the
