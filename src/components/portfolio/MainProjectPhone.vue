@@ -50,6 +50,10 @@ const effectiveViewerSettings = computed(() => {
   if (prefs?.wireframeMaterial) {
     try { next.wireframeMode.material = JSON.parse(prefs.wireframeMaterial) } catch { /*malformed - ignore*/ }
   }
+  if (prefs?.wireframeEdgeThreshold) {
+    const n = parseFloat(prefs.wireframeEdgeThreshold)
+    if (Number.isFinite(n)) next.wireframeMode.edgeThresholdDeg = n
+  }
   return next
 })
 
@@ -356,9 +360,11 @@ heights.*/
 /*TITLE ---------------------------------------------------------------*/
 .mp-phone__title {
   display: flex;
-  align-items: end;
+  align-items: center;
+  justify-content: center;
   gap: var(--spacing-sm);
   padding-bottom: var(--spacing-xxs);
+  text-align: center;
 }
 .mp-phone__title-number {
   font-family: sans-serif;

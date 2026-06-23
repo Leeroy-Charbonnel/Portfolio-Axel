@@ -45,6 +45,10 @@ const effectiveViewerSettings = computed(() => {
   if (prefs.wireframeMaterial) {
     try { next.wireframeMode.material = JSON.parse(prefs.wireframeMaterial) } catch { /*malformed - ignore*/ }
   }
+  if (prefs.wireframeEdgeThreshold) {
+    const n = parseFloat(prefs.wireframeEdgeThreshold)
+    if (Number.isFinite(n)) next.wireframeMode.edgeThresholdDeg = n
+  }
   return next
 })
 const router = useRouter()

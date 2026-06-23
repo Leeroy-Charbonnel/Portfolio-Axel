@@ -288,8 +288,14 @@ const wireframeColor = ref(getString("editor3d_wireframe_mode_color", "#14b8a6")
 const WF_LINE_COLOR_KEY  = "editor3d_wireframe_line_color"
 const WF_MAT_PARAMS_KEY  = "editor3d_wireframe_material"
 const WF_MODE_COLOR_KEY  = "editor3d_wireframe_mode_color"
+//Edge-threshold degrees: EdgesGeometry drops every edge between faces
+//whose normals differ by LESS than this. Low values keep almost every
+//edge (so flat triangulation diagonals show through); high values keep
+//only sharp corners. Global pref so it applies to every project.
+const WF_EDGE_THRESHOLD_KEY = "editor3d_wireframe_edge_threshold"
 
 const wireframeOverlayColor = ref(getString(WF_LINE_COLOR_KEY, "#000000"))
+const wireframeEdgeThreshold = ref(parseFloat(getString(WF_EDGE_THRESHOLD_KEY, "1")) || 1)
 const showLightGizmos       = ref(true)        //sphere/diamond helpers visibility
 const showCenterCrosshair   = ref(false)       //semi-transparent + sign on screen center for framing
 
@@ -1928,7 +1934,7 @@ function ensureOverlayForMesh(mesh: Mesh) {
   if (pickedMeshIdx.value !== null && sceneMeshes.value[pickedMeshIdx.value]?.mesh.uuid === mesh.uuid) return
   //threshold keeps "hard" edges only - triangulation diagonals (coplanar
   //faces, angle = 0) are filtered out. See WIREFRAME_EDGE_THRESHOLD_DEG.
-  const edgesGeo = new EdgesGeometry(mesh.geometry, WIREFRAME_EDGE_THRESHOLD_DEG)
+  const edgesGeo = new EdgesGeometry(mesh.geometry, wireframeEdgeThreshold.value)
   //depthTest stays ON so the lines respect occlusion (no X-ray bleed
   //across other meshes). The wf base / pick materials carry a
   //polygonOffset that pushes the surface back, so the overlay lines
@@ -1971,6 +1977,18 @@ function onWireframeOverlayColor(hex: string) {
       overlay.material.needsUpdate = true
     }
   }
+  requestRender()
+}
+
+//Edge-threshold slider - the EdgesGeometry per overlay was baked at
+//mount-time with the OLD threshold; we need to nuke + rebuild so the
+//new angle takes effect on the next paint.
+function onWireframeEdgeThreshold(deg: number) {
+  if (!Number.isFinite(deg)) return
+  wireframeEdgeThreshold.value = deg
+  saveGlobalPref(WF_EDGE_THRESHOLD_KEY, String(deg), "Wireframe edge-threshold in degrees (shared across every project in the editor).")
+  removeWireframeOverlays()
+  syncWireframeOverlays()
   requestRender()
 }
 
@@ -2943,6 +2961,13 @@ async function onSave() {
                 <div class="editor__row-control">
                   <input type="color" class="editor__color" :value="wireframeOverlayColor" @input="(e) => onWireframeOverlayColor((e.target as HTMLInputElement).value)" />
                   <span class="editor__readout">{{ wireframeOverlayColor }}</span>
+                </div>
+              </div>
+              <div class="editor__row">
+                <label class="editor__row-label" :title="'Edges between faces whose normals differ by less than this angle are HIDDEN. Low = show every triangle edge, high = show only sharp corners.'">Edge threshold</label>
+                <div class="editor__row-control">
+                  <input type="range" class="editor__slider" min="0" max="60" step="0.5" :value="wireframeEdgeThreshold" @input="(e) => onWireframeEdgeThreshold(parseFloat((e.target as HTMLInputElement).value))" />
+                  <span class="editor__readout">{{ wireframeEdgeThreshold.toFixed(1) }}°</span>
                 </div>
               </div>
               <div class="editor__row">

@@ -125,6 +125,10 @@ interface ViewerSettings {
     color?:           string
     overlayOn?:       boolean
     overlayColor?:    string
+    //EdgesGeometry threshold (deg). Faces whose normals differ by LESS
+    //than this are merged so coplanar triangulation diagonals don't
+    //pollute the wireframe. Global editor pref - applies everywhere.
+    edgeThresholdDeg?: number
     material?: {
       color:             string
       metalness:         number
@@ -463,7 +467,8 @@ function syncWireframeOverlays(on: boolean, color: string, emissiveUuidSet: Set<
     for (const sm of sceneMeshes) {
       if (wfOverlays.has(sm.mesh.uuid)) continue
       if (emissiveUuidSet.has(sm.mesh.uuid)) continue
-      const edgesGeo = new EdgesGeometry(sm.mesh.geometry, WIREFRAME_EDGE_THRESHOLD_DEG)
+      const threshold = props.settings?.wireframeMode?.edgeThresholdDeg ?? WIREFRAME_EDGE_THRESHOLD_DEG
+      const edgesGeo = new EdgesGeometry(sm.mesh.geometry, threshold)
       const overlayMat = new LineBasicMaterial({
         color:       new Color(color),
         transparent: true,

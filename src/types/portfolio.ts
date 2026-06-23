@@ -103,9 +103,10 @@ export interface ProfileDto {
 //(ThreeViewer) layer these over the per-project values so a tweak in
 //one project propagates to every model on the site.
 export interface EditorPrefsDto {
-  wireframeLineColor: string | null
-  wireframeModeColor: string | null
-  wireframeMaterial:  string | null  //JSON-encoded WfMatParams
+  wireframeLineColor:     string | null
+  wireframeModeColor:     string | null
+  wireframeMaterial:      string | null  //JSON-encoded WfMatParams
+  wireframeEdgeThreshold: string | null  //degrees, stored as string in settings table
 }
 
 export interface PortfolioDto {

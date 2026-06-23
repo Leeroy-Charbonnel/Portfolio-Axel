@@ -995,9 +995,10 @@ app.get("/api/portfolio", async (_req, res) => {
     if (!(r.key in editorPrefMap)) editorPrefMap[r.key] = r.value
   }
   const editorPrefs = {
-    wireframeLineColor: editorPrefMap["editor3d_wireframe_line_color"] ?? null,
-    wireframeModeColor: editorPrefMap["editor3d_wireframe_mode_color"] ?? null,
-    wireframeMaterial:  editorPrefMap["editor3d_wireframe_material"]   ?? null,
+    wireframeLineColor:     editorPrefMap["editor3d_wireframe_line_color"]     ?? null,
+    wireframeModeColor:     editorPrefMap["editor3d_wireframe_mode_color"]     ?? null,
+    wireframeMaterial:      editorPrefMap["editor3d_wireframe_material"]       ?? null,
+    wireframeEdgeThreshold: editorPrefMap["editor3d_wireframe_edge_threshold"] ?? null,
   }
 
   res.json({
