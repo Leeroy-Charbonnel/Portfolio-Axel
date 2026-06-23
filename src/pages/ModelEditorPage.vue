@@ -2378,7 +2378,7 @@ async function onSave() {
           type="button"
           class="editor__viewport-tool"
           :class="{ 'editor__viewport-tool--off': !showLightGizmos }"
-          :title="showLightGizmos ? 'Hide light gizmos' : 'Show light gizmos'"
+          :data-tooltip="showLightGizmos ? 'Hide light gizmos' : 'Show light gizmos'"
           @click="onShowGizmosToggle(!showLightGizmos)"
         >
           <component :is="showLightGizmos ? Eye : EyeOff" :size="14" />
@@ -2389,7 +2389,7 @@ async function onSave() {
         <button
           type="button"
           class="editor__viewport-tool"
-          title="Save current view as start position"
+          data-tooltip="Save current view as start position"
           @click="saveStartView"
         >
           <MapPin :size="14" />
@@ -2400,7 +2400,7 @@ async function onSave() {
           type="button"
           class="editor__viewport-tool"
           :disabled="!startView"
-          title="Go to saved start position"
+          data-tooltip="Go to saved start position"
           @click="goToStartView"
         >
           <Home :size="14" />
@@ -2411,7 +2411,7 @@ async function onSave() {
         <button
           type="button"
           class="editor__viewport-tool"
-          :title="cameraMode === 'persp' ? 'Switch to orthographic' : 'Switch to perspective'"
+          :data-tooltip="cameraMode === 'persp' ? 'Switch to orthographic' : 'Switch to perspective'"
           @click="switchCamera(cameraMode === 'persp' ? 'ortho' : 'persp')"
         >
           <component :is="cameraMode === 'persp' ? Box : Square" :size="14" />
@@ -2558,10 +2558,6 @@ async function onSave() {
           <p v-if="hdrError" class="editor__error">{{ hdrError }}</p>
 
           <ul class="editor__hdr-list">
-            <li class="editor__hdr-item">
-              <span class="editor__hdr-thumb"><img v-if="proceduralThumbnail" :src="proceduralThumbnail" alt="" /></span>
-              <span class="editor__hdr-name">Procedural sky (default)</span>
-            </li>
             <li v-for="entry in hdris" :key="entry.id" class="editor__hdr-item">
               <span class="editor__hdr-thumb"><img v-if="entry.thumbnail" :src="entry.thumbnail" alt="" /></span>
               <span class="editor__hdr-name">{{ entry.name }}</span>
@@ -2974,6 +2970,29 @@ they pair visually with the ViewHelper cube.*/
 .editor__viewport-tool:disabled { opacity: 0.4; cursor: not-allowed; }
 .editor__viewport-tool--off { color: var(--color-text-tertiary); }
 
+/*Custom tooltip - reads from data-tooltip and floats to the LEFT of the
+button (the toolbar is anchored on the right of the canvas, so left is
+the only direction that always has room). Native title is unreliable
+on dark overlays; this is consistent across browsers.*/
+.editor__viewport-tool[data-tooltip] { position: relative; }
+.editor__viewport-tool[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: calc(100% + var(--spacing-xs));
+  top: 50%;
+  transform: translateY(-50%);
+  padding: var(--spacing-xxs) var(--spacing-sm);
+  background-color: hsl(0 0% 0% / 0.9);
+  color: var(--color-text-hover);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+}
+
 .editor__hud {
   position: absolute; bottom: var(--spacing-md); left: 50%;
   transform: translateX(-50%);
@@ -3195,9 +3214,10 @@ we draw our own around the input element.*/
 .editor__drop--over { border-color: var(--color-accent); color: var(--color-accent); background-color: hsl(var(--primary) / 0.08); }
 .editor__drop--busy { opacity: 0.5; pointer-events: none; }
 
-/*HDR list - each row uses the same card visual as materials / lights /
-sections in the panel so the whole editor reads as one tight grid.*/
-.editor__hdr-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0; }
+/*HDR list - each row uses the same card visual + the same spacing as
+material / light cards (1px margin-bottom seam + parent gap from the
+group, matching the .editor__group gap used by materials / lights).*/
+.editor__hdr-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-xs); margin: 0; }
 .editor__hdr-item {
   display: flex;
   align-items: center;
@@ -3206,14 +3226,25 @@ sections in the panel so the whole editor reads as one tight grid.*/
   padding: var(--spacing-xs) var(--spacing-sm);
   background-color: hsl(0 0% 100% / 0.04);
   border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
-  margin-bottom: 1px;
+  margin-bottom: 1px;       /*matches .editor__mat + .editor__section seam*/
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   transition: background-color 0.15s ease;
 }
 .editor__hdr-item:hover { background-color: hsl(0 0% 100% / 0.07); }
 .editor__hdr-item:last-child { margin-bottom: 0; }
-.editor__hdr-thumb { display: inline-flex; align-items: center; justify-content: center; width: var(--spacing-xl); height: var(--spacing-xl); background-color: hsl(0 0% 0% / 0.4); border: var(--border-width-sm) solid var(--color-gray-medium); flex-shrink: 0; overflow: hidden; }
+.editor__hdr-thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /*Match .editor__mat-swatch size so HDR rows and material rows align.*/
+  width:  var(--spacing-lg);
+  height: var(--spacing-lg);
+  background-color: hsl(0 0% 0% / 0.4);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  flex-shrink: 0;
+  overflow: hidden;
+}
 .editor__hdr-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .editor__hdr-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace; }
 
