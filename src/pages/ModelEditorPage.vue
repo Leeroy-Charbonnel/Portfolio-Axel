@@ -2124,6 +2124,22 @@ function onKeyDown(e: KeyboardEvent) {
     e.preventDefault()
     return
   }
+  //Delete / Backspace removes the currently selected light. Only fires
+  //when the focus is somewhere we don't want to swallow typing in (i.e.
+  //not on an input / textarea / contenteditable).
+  if (e.key === "Delete" || e.key === "Backspace") {
+    if (selectedLightId.value && !isTypingTarget(e.target)) {
+      const info = entryAndGizmoFor(selectedLightId.value)
+      if (info) {
+        const idx = lights.value.findIndex((l) => l.id === info.entry.id)
+        if (idx >= 0) {
+          removeLight(idx)
+          e.preventDefault()
+          return
+        }
+      }
+    }
+  }
   if (e.key === "Escape") {
     if (pickedMeshIdx.value !== null) {
       const sm = sceneMeshes.value[pickedMeshIdx.value]
@@ -2133,6 +2149,17 @@ function onKeyDown(e: KeyboardEvent) {
     }
     if (selectedLightId.value !== null) detachLightGizmo()
   }
+}
+
+//Skip the global delete shortcut when the user is editing text - the
+//range / color / number inputs in the panel use Backspace to clear digits.
+function isTypingTarget(t: EventTarget | null): boolean {
+  if (!t) return false
+  const el = t as HTMLElement
+  const tag = el.tagName?.toLowerCase()
+  if (tag === "input" || tag === "textarea" || tag === "select") return true
+  if (el.isContentEditable) return true
+  return false
 }
 
 function pickMeshForEmissive(idx: number) {
@@ -2533,7 +2560,7 @@ async function onSave() {
                 <div class="editor__mat-head editor__mat-head--static editor__light-head">
                   <span
                     class="editor__light-swatch-dot"
-                    :style="{ backgroundColor: wireframeMode ? e.wfColor : e.normalColor }"
+                    :style="{ backgroundColor: e.normalColor }"
                     aria-hidden="true"
                   ></span>
                   <span class="editor__mat-title editor__light-name">{{ e.type === 'point' ? 'Point' : 'Directional' }} {{ i + 1 }}</span>
@@ -2551,40 +2578,21 @@ async function onSave() {
                     </div>
                   </div>
 
-                  <!--Per-mode intensity + color blocks-->
-                  <div class="editor__light-mode editor__light-mode--normal">
-                    <span class="editor__light-mode-label">Normal</span>
-                    <div class="editor__row">
-                      <label class="editor__row-label">Intensity</label>
-                      <div class="editor__row-control">
-                        <input type="range" class="editor__slider" min="0" max="10" step="0.05" :value="e.normalIntensity" @input="(ev) => onLightIntensity('normal', i, parseFloat((ev.target as HTMLInputElement).value))" />
-                        <span class="editor__readout">{{ e.normalIntensity.toFixed(2) }}</span>
-                      </div>
-                    </div>
-                    <div class="editor__row">
-                      <label class="editor__row-label">Color</label>
-                      <div class="editor__row-control">
-                        <input type="color" class="editor__color" :value="e.normalColor" @input="(ev) => onLightColorChange('normal', i, (ev.target as HTMLInputElement).value)" />
-                        <span class="editor__readout">{{ e.normalColor }}</span>
-                      </div>
+                  <!--NORMAL-mode pair only. The Wireframe-mode pair lives
+                  in the Wireframe tab's dedicated "Lights (wireframe
+                  values)" section so the two views stay focused.-->
+                  <div class="editor__row">
+                    <label class="editor__row-label">Intensity</label>
+                    <div class="editor__row-control">
+                      <input type="range" class="editor__slider" min="0" max="10" step="0.05" :value="e.normalIntensity" @input="(ev) => onLightIntensity('normal', i, parseFloat((ev.target as HTMLInputElement).value))" />
+                      <span class="editor__readout">{{ e.normalIntensity.toFixed(2) }}</span>
                     </div>
                   </div>
-
-                  <div class="editor__light-mode editor__light-mode--wf">
-                    <span class="editor__light-mode-label">Wireframe</span>
-                    <div class="editor__row">
-                      <label class="editor__row-label">Intensity</label>
-                      <div class="editor__row-control">
-                        <input type="range" class="editor__slider" min="0" max="10" step="0.05" :value="e.wfIntensity" @input="(ev) => onLightIntensity('wireframe', i, parseFloat((ev.target as HTMLInputElement).value))" />
-                        <span class="editor__readout">{{ e.wfIntensity.toFixed(2) }}</span>
-                      </div>
-                    </div>
-                    <div class="editor__row">
-                      <label class="editor__row-label">Color</label>
-                      <div class="editor__row-control">
-                        <input type="color" class="editor__color" :value="e.wfColor" @input="(ev) => onLightColorChange('wireframe', i, (ev.target as HTMLInputElement).value)" />
-                        <span class="editor__readout">{{ e.wfColor }}</span>
-                      </div>
+                  <div class="editor__row">
+                    <label class="editor__row-label">Color</label>
+                    <div class="editor__row-control">
+                      <input type="color" class="editor__color" :value="e.normalColor" @input="(ev) => onLightColorChange('normal', i, (ev.target as HTMLInputElement).value)" />
+                      <span class="editor__readout">{{ e.normalColor }}</span>
                     </div>
                   </div>
                 </div>
