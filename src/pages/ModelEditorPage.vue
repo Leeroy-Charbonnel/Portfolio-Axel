@@ -35,6 +35,7 @@ import {
   Texture,
   UnsignedByteType,
   Vector2,
+  Matrix4,
   Quaternion,
   Vector3,
   WebGLRenderer,
@@ -372,6 +373,12 @@ let perspectiveCamera: PerspectiveCamera  | null = null
 let orthoCamera:       OrthographicCamera | null = null
 let renderPass:        RenderPass         | null = null
 let sceneRadius        = 1                         //updated on glb load, drives ortho frustum
+//Center of the glb's bounding sphere in WORLD coords AFTER the scene has
+//been recentered (gltf.scene.position adjustments). Used as the focus
+//point for axis view snaps so the model sits dead-center in the snapped
+//view (instead of below it, which was happening because controls.target
+//was at sphere.radius * 0.8 - 20% below the actual middle).
+let sceneCenter = new Vector3(0, 1, 0)
 let transformCtrls: TransformControls | null = null
 let viewHelper:     ViewHelper | null = null
 let rafId:          number | null = null
@@ -401,11 +408,13 @@ type CameraAnim = {
 }
 let cameraAnim: CameraAnim | null = null
 
-//Build a cameraAnim from a target pose. We need the toQuat (the camera
-//quaternion at the final pose) so the tick can slerp toward it - lookAt
-//on a throwaway PerspectiveCamera with the desired up + position + look
-//target gives us exactly that quaternion.
-const _animProbe = new PerspectiveCamera()
+//Build a cameraAnim from a target pose. To derive the camera's final
+//quaternion we use Matrix4.lookAt(eye, target, up) + setFromRotationMatrix
+//- this is the same approach the production library three-viewport-gizmo
+//uses, and it's more reliable than PerspectiveCamera.lookAt(...) because
+//Matrix4.lookAt's degenerate-case fallback is deterministic (it gives a
+//well-defined matrix that we can either keep or post-correct).
+const _animMatrix = new Matrix4()
 function makeCameraAnim(opts: {
   toPos: Vector3
   toTarget: Vector3
@@ -414,16 +423,18 @@ function makeCameraAnim(opts: {
 }): CameraAnim {
   const from = cameraRef!
   const toUp = opts.toUp ?? from.up.clone()
-  _animProbe.position.copy(opts.toPos)
-  _animProbe.up.copy(toUp)
-  _animProbe.lookAt(opts.toTarget)
+  //IMPORTANT: Matrix4.lookAt's signature in three.js is (eye, target, up)
+  //but it builds a rotation matrix for an object AT `eye` looking TOWARD
+  //`target` along its -Z axis. That's exactly the camera convention.
+  _animMatrix.lookAt(opts.toPos, opts.toTarget, toUp)
+  const toQuat = new Quaternion().setFromRotationMatrix(_animMatrix)
   return {
     fromPos:    from.position.clone(),
     toPos:      opts.toPos.clone(),
     fromTarget: controls!.target.clone(),
     toTarget:   opts.toTarget.clone(),
     fromQuat:   from.quaternion.clone(),
-    toQuat:     _animProbe.quaternion.clone(),
+    toQuat,
     endUp:      toUp.clone(),
     startTime:  performance.now(),
     duration:   opts.duration ?? 500,
@@ -660,13 +671,22 @@ onMounted(() => {
       gltf.scene.position.z -= center.z
       gltf.scene.position.y -= tempBox.min.y
 
+      //Recompute the bounding sphere AFTER the position adjustment so
+      //sceneCenter is in WORLD coords (not the glTF's local frame). The
+      //axis snap below uses this as the focus point so the model sits
+      //dead-center in every axis view.
+      const worldBox    = new Box3().setFromObject(gltf.scene)
+      const worldSphere = worldBox.getBoundingSphere(new Sphere())
+      sceneRadius = worldSphere.radius
+      sceneCenter.copy(worldSphere.center)
+
       const fov = camera.fov * (Math.PI / 180)
       const distance = sphere.radius / Math.sin(fov / 2) * 1.3
       camera.position.set(distance * 0.6, distance * 0.55 + sphere.radius, distance * 0.8)
       camera.near = sphere.radius / 100
       camera.far  = sphere.radius * 100
       camera.updateProjectionMatrix()
-      controls!.target.set(0, sphere.radius * 0.8, 0)
+      controls!.target.copy(sceneCenter)
       controls!.update()
 
       //replay any saved settings - applies material overrides, spawns
@@ -2122,8 +2142,16 @@ function snapToView(axis: string) {
   if (!cameraRef || !controls) return
   switchCamera("ortho")
 
-  const focus  = controls.target.clone()
-  const radius = cameraRef.position.distanceTo(focus)
+  //ALWAYS snap to the model's actual center (sceneCenter) - not the
+  //current controls.target. The target can drift away from the model
+  //center via panning or via the initial-framing offset (which puts
+  //the target at sphere.radius * 0.8 ~= 20% below center). Without
+  //this, axis snaps put the camera at the WRONG height and the user
+  //sees the model offset in the view ("je suis un peu en dessous").
+  const focus  = sceneCenter.clone()
+  //Keep the same distance the user was already at so zooming feels
+  //preserved across snaps.
+  const radius = Math.max(cameraRef.position.distanceTo(focus), sceneRadius * 1.2)
 
   const dir  = new Vector3()
   const toUp = new Vector3(0, 1, 0)
