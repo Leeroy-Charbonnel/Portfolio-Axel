@@ -372,10 +372,15 @@ function onColorInput(row: CssVarRow, hex: string) {
 }
 
 //Group rows preserving declaration order, with a flag telling us whether
-//"Randomize" applies (any non-color row in the group)
+//"Randomize" applies (any non-color row in the group).
+//Hide the "(Phone)" variant group when on desktop and the desktop variant
+//when in phone mode so the author only sees the rows that matter for the
+//active layout.
 const grouped = computed(() => {
   const out: { group: string; rows: CssVarRow[]; canRandomize: boolean }[] = []
   for (const row of ROWS) {
+    if (phoneMode.value  && row.group === "Main Project")         continue
+    if (!phoneMode.value && row.group === "Main Project (Phone)") continue
     const existing = out.find((g) => g.group === row.group)
     if (existing) existing.rows.push(row)
     else out.push({ group: row.group, rows: [row], canRandomize: false })
