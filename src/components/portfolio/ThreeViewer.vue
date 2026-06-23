@@ -769,8 +769,38 @@ onMounted(() => {
   tick()
 })
 
+//RESIZE - the renderer's drawing buffer was sized once at mount and
+//never updated, so any window resize stretched the same buffer over the
+//new CSS dimensions and the model rendered squashed. Observing the
+//canvas parent and resyncing renderer + composer + camera aspect keeps
+//the picture crisp at every viewport width.
+let resizeObserver: ResizeObserver | null = null
+function syncCanvasSize() {
+  if (!canvas.value || !renderer || !composer || !camera) return
+  const parent = canvas.value.parentElement
+  if (!parent) return
+  const w = parent.clientWidth
+  const h = parent.clientHeight
+  if (w === 0 || h === 0) return
+  camera.aspect = w / h
+  camera.updateProjectionMatrix()
+  renderer.setSize(w, h, false)
+  composer.setSize(w, h)
+  requestRender(500)
+}
+
+onMounted(() => {
+  if (!canvas.value) return
+  const parent = canvas.value.parentElement
+  if (!parent) return
+  resizeObserver = new ResizeObserver(syncCanvasSize)
+  resizeObserver.observe(parent)
+})
+
 onBeforeUnmount(() => {
   if (rafId !== null) cancelAnimationFrame(rafId)
+  resizeObserver?.disconnect()
+  resizeObserver = null
   controls?.dispose()
   composer?.dispose()
   renderer?.dispose()

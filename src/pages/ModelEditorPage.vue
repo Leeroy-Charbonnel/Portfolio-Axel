@@ -2057,12 +2057,33 @@ function checkViewHelperClick(e: PointerEvent): boolean {
 //easy to forget and led to "the start view button doesn't work" reports.
 async function saveStartView() {
   if (!cameraRef || !controls) return
-  startView.value = {
-    pos:    [cameraRef.position.x,    cameraRef.position.y,    cameraRef.position.z],
-    target: [controls.target.x,       controls.target.y,       controls.target.z],
+  if (!Number.isFinite(projectId.value)) return
+  const sv = {
+    pos:    [cameraRef.position.x, cameraRef.position.y, cameraRef.position.z] as [number, number, number],
+    target: [controls.target.x,    controls.target.y,    controls.target.z]    as [number, number, number],
   }
+  startView.value = sv
   status.value = "Start view captured (saving...)"
-  await onSave()
+  //partial save - hits the start-view endpoint so materials / lights / HDR
+  //stay untouched. The main Save button is the only way to persist those.
+  isSaving.value = true; saveError.value = null
+  try {
+    const res = await fetch(`/api/main-project/${projectId.value}/viewer-settings/start-view`, {
+      method:      "PUT",
+      credentials: "include",
+      headers:     { "Content-Type": "application/json" },
+      body:        JSON.stringify({ startView: sv }),
+    })
+    if (!res.ok) throw new Error(`save ${res.status}`)
+    status.value = "Start view saved"
+  } catch (e) {
+    saveError.value = e instanceof Error ? e.message : String(e)
+    status.value    = `Save failed: ${saveError.value}`
+    console.error("[edit-3d] start-view save failed:", e)
+  } finally {
+    isSaving.value = false
+    setTimeout(() => { status.value = `Materials: ${materials.value.length}` }, 2000)
+  }
 }
 
 //Animate the editor camera to the saved start view so the author can

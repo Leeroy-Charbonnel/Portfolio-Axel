@@ -624,6 +624,24 @@ app.put("/api/main-project/:id/viewer-settings", requireAuth, requireAdmin, asyn
   res.json({ ok: true })
 })
 
+//PARTIAL save - patches ONLY the startView field of viewerSettings without
+//touching materials / lights / HDR. Used by the "Save current view as start
+//position" button so the admin can re-frame the intro shot without also
+//overwriting any unsaved material edits sitting in the editor.
+app.put("/api/main-project/:id/viewer-settings/start-view", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseInt(String(req.params.id ?? ""), 10)
+  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const [row] = await db.select({ viewerSettings: mainProject.viewerSettings })
+    .from(mainProject).where(eq(mainProject.id, id))
+  if (!row) { res.status(404).json({ error: "not found" }); return }
+  const current = (row.viewerSettings as Record<string, unknown> | null) ?? {}
+  const next    = { ...current, startView: req.body?.startView ?? null }
+  await db.update(mainProject)
+    .set({ viewerSettings: next, updatedAt: new Date() })
+    .where(eq(mainProject.id, id))
+  res.json({ ok: true })
+})
+
 //GET single project - returns the editor everything it needs without
 //pulling the whole portfolio. Used by the /edit-3d page.
 app.get("/api/main-project/:id", async (req, res) => {

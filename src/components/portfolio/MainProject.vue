@@ -97,6 +97,11 @@ const hasAnyWireframeImage = computed(() => {
   return props.project.thumbnails.some((t) => t.wireframeUrl)
 })
 const layoutClass       = computed(() => `main-project--layout-${props.project.layout}`)
+//PHONE QUINCONCE - alternates the thumbs+desc side based on index so the
+//mobile column reads as a staggered cascade. Desktop ignores this class.
+const phoneSideClass    = computed(() => props.index % 2 === 0
+  ? "main-project__article--phone-left"
+  : "main-project__article--phone-right")
 
 //ICON used for each layout choice in the picker (visually communicates the arrangement)
 const LAYOUT_ICONS: Record<MainProjectLayout, typeof PanelLeft> = {
@@ -341,7 +346,7 @@ async function replaceThumbnailWireframe(idx: number) {
     :threshold="0.1"
     class="main-project"
   >
-    <article ref="containerRef" :class="['container', 'main-project__article', layoutClass]">
+    <article ref="containerRef" :class="['container', 'main-project__article', layoutClass, phoneSideClass]">
       <RemoveButton v-if="editMode" label="Delete project" @click="onDelete" />
 
       <!--Layout picker - absolute top-right of the article so overflow on the
@@ -476,6 +481,18 @@ async function replaceThumbnailWireframe(idx: number) {
             <ExternalLink :size="14" />
           </a>
         </div>
+
+        <!--PHONE-ONLY description overlay - hidden on desktop via CSS. Lives
+        inside the stage so it can be absolutely positioned over the viewer
+        and spill past the stage bottom for the quinconce cascade.-->
+        <EditableText
+          tag="p"
+          class="main-project__description main-project__description--phone"
+          :value="project.description[lang]"
+          :multiline="true"
+          placeholder="Project description..."
+          @save="onDescriptionSave"
+        />
       </div>
 
       <!--DETAILS - 2-col grid: description LEFT (wide), stats sidebar RIGHT.
@@ -617,6 +634,7 @@ Layout picker pins top-right of the article (absolute), never clips.
 }
 
 .main-project__number {
+  font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-size: var(--mp-number-size);
   font-weight: 900;
   line-height: 1;
@@ -1085,91 +1103,128 @@ Unselected entries fade slightly so the active set reads at a glance.*/
 .main-project__software img { filter: brightness(0.8); transition: filter 0.2s ease; }
 .main-project__software:hover img { filter: brightness(1); }
 
-/*RESPONSIVE - mobile keeps the same stage approach. Thumbnails shrink to
-fit the side column or move to a horizontal row at the bottom.*/
-@media (max-width: 900px) {
-  .main-project { padding: var(--spacing-xl) 0; margin-bottom: var(--spacing-5xl); }
-  .main-project__stage { aspect-ratio: 4 / 5; }
+/*PHONE-ONLY description overlay - hidden on desktop. The phone media
+query / simulate-phone block below flips display:block and positions it.*/
+.main-project__description--phone { display: none; }
 
-  .main-project--layout-thumbs-left  .main-project__thumbnails,
-  .main-project--layout-thumbs-right .main-project__thumbnails {
-    top: auto;
-    bottom: var(--spacing-md);
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    flex-direction: row;
-    width: auto;
-    max-width: calc(100% - var(--spacing-xl) * 2);
-    max-height: none;
-    height: var(--spacing-5xl);
-  }
-
-  .main-project--layout-thumbs-left  .main-project__thumbnail,
-  .main-project--layout-thumbs-right .main-project__thumbnail,
-  .main-project--layout-thumbs-bottom .main-project__thumbnail,
-  .main-project--layout-thumbs-left  .main-project__thumbnail-add,
-  .main-project--layout-thumbs-right .main-project__thumbnail-add,
-  .main-project--layout-thumbs-bottom .main-project__thumbnail-add {
-    width: auto;
-    height: 100%;
-    aspect-ratio: var(--thumb-aspect);
-  }
-
-  .main-project__layout-picker {
-    position: static;
-    margin-left: auto;
-    align-self: flex-end;
-  }
-  .main-project__header { flex-wrap: wrap; align-items: baseline; }
+/*RESPONSIVE - desktop fallbacks stay until we hit phone width. The phone
+breakpoint switches to the "quinconce" staggered layout: thumbnails +
+description share ONE side, viewer takes the opposite side, and the desc
+spills past the stage bottom into the next project.*/
+.main-project__layout-picker--mobile-static {
+  position: static;
+  margin-left: auto;
+  align-self: flex-end;
 }
 
-@media (max-width: 600px) {
-  /*Collapse the description + stats grid into a single stack on narrow
-  viewports - stats sit under the description in a horizontal row instead
-  of a sidebar column to save vertical space.*/
-  .main-project__details-top {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-lg);
+/*=== PHONE QUINCONCE - shared rules + the @media + simulate-phone wrappers ==*/
+@media (max-width: 480px) {
+  .main-project { padding: var(--spacing-xl) 0; margin-bottom: var(--spacing-5xl); }
+  .main-project__stage { aspect-ratio: auto; height: 80vw; min-height: 280px; }
+
+  .main-project__header { flex-wrap: wrap; align-items: baseline; }
+  .main-project__layout-picker { position: static; margin-left: auto; align-self: flex-end; }
+
+  /*Thumbs column - vertical strip pulled UP 15% so it pokes into the
+  bottom of the previous project. Side decided by --phone-left / --right.*/
+  .main-project__thumbnails {
+    top: 0;
+    bottom: auto;
+    transform: translateY(-15%);
+    flex-direction: column;
+    width: var(--mp-phone-side-width, 22vw);
+    max-width: 96px;
+    height: auto;
+    max-height: 100%;
+    gap: var(--spacing-xs);
   }
-  .main-project__stats {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: var(--spacing-lg);
-    min-width: 0;
+  .main-project__article--phone-left  .main-project__thumbnails { left:  var(--spacing-sm); right: auto; }
+  .main-project__article--phone-right .main-project__thumbnails { right: var(--spacing-sm); left:  auto; }
+
+  .main-project__thumbnail,
+  .main-project__thumbnail-add {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
   }
+
+  /*Viewer takes the side OPPOSITE the thumbs so the column reads as a
+  staggered triptych - thumbs aligned to one edge, viewer eating the rest.*/
+  .main-project__article--phone-left  .main-project__viewer { left:  calc(var(--mp-phone-side-width, 22vw) + var(--spacing-md)); right: 0; }
+  .main-project__article--phone-right .main-project__viewer { right: calc(var(--mp-phone-side-width, 22vw) + var(--spacing-md)); left:  0; }
+
+  /*PHONE description overlay - absolute inside the stage, anchored under
+  the thumbs column on the SAME side, spilling past the stage bottom so
+  the cascade reaches into the next project's viewer area.*/
+  .main-project__description--phone {
+    display: block;
+    position: absolute;
+    bottom: -10%;
+    width: 50%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: hsl(var(--background) / 0.85);
+    backdrop-filter: blur(6px);
+    border: var(--border-width-sm) solid var(--color-gray-medium);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    z-index: 12;
+  }
+  .main-project__article--phone-left  .main-project__description--phone { left:  0; right: auto; }
+  .main-project__article--phone-right .main-project__description--phone { right: 0; left:  auto; }
+
+  /*Hide the desktop description + stats column in phone (the overlay
+  carries the description, stats are too noisy at this width).*/
+  .main-project__details-top { display: none; }
   .main-project__software-name { display: none; }
 }
 
 /*simulate-phone mirror so the CssVarsPanel can preview the phone layout
 without resizing the actual window.*/
-html.simulate-phone .main-project {
-  padding: var(--spacing-xl) 0;
-  margin-bottom: var(--spacing-5xl);
+html.simulate-phone .main-project { padding: var(--spacing-xl) 0; margin-bottom: var(--spacing-5xl); }
+html.simulate-phone .main-project__stage { aspect-ratio: auto; height: 80vw; min-height: 280px; }
+html.simulate-phone .main-project__header { flex-wrap: wrap; align-items: baseline; }
+html.simulate-phone .main-project__layout-picker { position: static; margin-left: auto; align-self: flex-end; }
+
+html.simulate-phone .main-project__thumbnails {
+  top: 0;
+  bottom: auto;
+  transform: translateY(-15%);
+  flex-direction: column;
+  width: var(--mp-phone-side-width, 22vw);
+  max-width: 96px;
+  height: auto;
+  max-height: 100%;
+  gap: var(--spacing-xs);
 }
-html.simulate-phone .main-project__stage { aspect-ratio: 4 / 5; }
-html.simulate-phone .main-project__details-top {
-  grid-template-columns: 1fr;
-  gap: var(--spacing-lg);
+html.simulate-phone .main-project__article--phone-left  .main-project__thumbnails { left:  var(--spacing-sm); right: auto; }
+html.simulate-phone .main-project__article--phone-right .main-project__thumbnails { right: var(--spacing-sm); left:  auto; }
+html.simulate-phone .main-project__thumbnail,
+html.simulate-phone .main-project__thumbnail-add {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
 }
-html.simulate-phone .main-project__stats {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: var(--spacing-lg);
-  min-width: 0;
+html.simulate-phone .main-project__article--phone-left  .main-project__viewer { left:  calc(var(--mp-phone-side-width, 22vw) + var(--spacing-md)); right: 0; }
+html.simulate-phone .main-project__article--phone-right .main-project__viewer { right: calc(var(--mp-phone-side-width, 22vw) + var(--spacing-md)); left:  0; }
+
+html.simulate-phone .main-project__description--phone {
+  display: block;
+  position: absolute;
+  bottom: -10%;
+  width: 50%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: hsl(var(--background) / 0.85);
+  backdrop-filter: blur(6px);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  z-index: 12;
 }
+html.simulate-phone .main-project__article--phone-left  .main-project__description--phone { left:  0; right: auto; }
+html.simulate-phone .main-project__article--phone-right .main-project__description--phone { right: 0; left:  auto; }
+
+html.simulate-phone .main-project__details-top { display: none; }
 html.simulate-phone .main-project__software-name { display: none; }
-html.simulate-phone .main-project--layout-thumbs-left .main-project__thumbnails,
-html.simulate-phone .main-project--layout-thumbs-right .main-project__thumbnails {
-  top: auto;
-  bottom: var(--spacing-md);
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-  flex-direction: row;
-  width: auto;
-  max-width: calc(100% - var(--spacing-xl) * 2);
-  max-height: none;
-  height: var(--spacing-5xl);
-}
 </style>
