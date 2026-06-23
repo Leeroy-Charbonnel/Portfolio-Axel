@@ -2927,6 +2927,9 @@ they hug the canvas edges instead of the larger stage edges - keeps the
 controls visually inside the active viewport regardless of window size.*/
 .editor__viewport-box {
   position: relative;
+  /*Frame around the 3D canvas so its edges read as a distinct surface
+  against the editor background, not a transparent hole.*/
+  border: var(--border-width-sm) solid var(--color-gray-medium);
 }
 .editor__canvas { display: block; width: 100%; height: 100%; position: relative; z-index: 2; }
 
