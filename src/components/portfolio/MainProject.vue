@@ -634,7 +634,7 @@ Layout picker pins top-right of the article (absolute), never clips.
 }
 
 .main-project__number {
-  font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: sans-serif;
   font-size: var(--mp-number-size);
   font-weight: 900;
   line-height: 1;
@@ -1119,7 +1119,7 @@ spills past the stage bottom into the next project.*/
 
 /*=== PHONE QUINCONCE - shared rules + the @media + simulate-phone wrappers ==*/
 @media (max-width: 480px) {
-  .main-project { padding: var(--spacing-xl) 0; margin-bottom: var(--spacing-5xl); }
+  .main-project { padding: var(--spacing-md) 0; margin-bottom: var(--spacing-sm); }
   .main-project__stage { aspect-ratio: auto; height: 80vw; min-height: 280px; }
 
   .main-project__header { flex-wrap: wrap; align-items: baseline; }
@@ -1130,7 +1130,7 @@ spills past the stage bottom into the next project.*/
   .main-project__thumbnails {
     top: 0;
     bottom: auto;
-    transform: translateY(-15%);
+    transform: translateY(-8%);
     flex-direction: column;
     width: var(--mp-phone-side-width, 22vw);
     max-width: 96px;
@@ -1159,7 +1159,7 @@ spills past the stage bottom into the next project.*/
   .main-project__description--phone {
     display: block;
     position: absolute;
-    bottom: -10%;
+    bottom: -6%;
     width: 50%;
     padding: var(--spacing-sm) var(--spacing-md);
     background-color: hsl(var(--background) / 0.85);
@@ -1189,7 +1189,7 @@ html.simulate-phone .main-project__layout-picker { position: static; margin-left
 html.simulate-phone .main-project__thumbnails {
   top: 0;
   bottom: auto;
-  transform: translateY(-15%);
+  transform: translateY(-8%);
   flex-direction: column;
   width: var(--mp-phone-side-width, 22vw);
   max-width: 96px;
