@@ -54,7 +54,9 @@ const effectiveViewerSettings = computed(() => {
   return next
 })
 
-const containerRef = ref<HTMLElement | null>(null)
+//AnimatedReveal is a Vue component, not a DOM element - ref returns the
+//instance and we have to reach for its $el to feed IntersectionObserver.
+const containerRef = ref<{ $el: HTMLElement } | HTMLElement | null>(null)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
 
 const isInView             = ref(false)
@@ -89,7 +91,9 @@ const showMainImage = computed(() => !showSketchfab.value || isLoading.value)
 let observer: IntersectionObserver | null = null
 
 onMounted(() => {
-  if (!containerRef.value) return
+  const raw = containerRef.value as { $el?: HTMLElement } | HTMLElement | null
+  const el  = raw && "$el" in raw ? raw.$el : raw
+  if (!el) return
   observer = new IntersectionObserver(
     (entries) => {
       const entry = entries[0]
@@ -97,7 +101,7 @@ onMounted(() => {
     },
     { threshold: 0.15, rootMargin: "0px 0px 200px 0px" },
   )
-  observer.observe(containerRef.value)
+  observer.observe(el)
 })
 
 onBeforeUnmount(() => {
