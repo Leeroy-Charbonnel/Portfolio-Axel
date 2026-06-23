@@ -9,19 +9,10 @@ import EditableText from "./EditableText.vue"
 import ThreeViewer from "./ThreeViewer.vue"
 import type { MainProjectDto } from "../../types/portfolio"
 
-//PHONE-SPECIFIC main project card. Completely separate from the desktop
-//MainProject component - its only job is the staggered "quinconce" mobile
-//layout where projects literally overlap to read as one continuous scroll
-//instead of stacked blocks.
-//
-// - Absolute positioning per index forces the overlap regardless of any
-//   parent cascade. Stage = 90vh, projects start every 65vh, so the
-//   overlap zone between any two adjacent projects is 25vh.
-// - Sides alternate (left / right) based on index % 2 - thumbs + desc
-//   on one edge, viewer on the opposite edge.
-//
-//Edit-mode is kept minimal: title + description text only. Layout picker,
-//stats, software list, model-id are desktop-only concerns.
+//PHONE PROJECT CARD - clean, readable vertical stack. Each section gets
+//its own row, viewer dominates the middle, thumbs sit underneath as a
+//horizontal strip, description anchors at the bottom. Projects overlap
+//slightly via the parent list's absolute positioning per index.
 
 declare global {
   interface Window {
@@ -38,9 +29,6 @@ const { lang } = useLanguage()
 const { editMode } = useAdmin()
 const { data: portfolioData, updateMainProject } = usePortfolio()
 
-//Merge per-project viewer settings with the admin's GLOBAL editor prefs
-//(same logic as the desktop component - keeps wireframe line/material
-//tweaks live across every model on the site).
 const effectiveViewerSettings = computed(() => {
   const raw = (props.project.viewerSettings as any) ?? null
   const prefs = portfolioData.value?.editorPrefs
@@ -54,8 +42,6 @@ const effectiveViewerSettings = computed(() => {
   return next
 })
 
-//AnimatedReveal is a Vue component, not a DOM element - ref returns the
-//instance and we have to reach for its $el to feed IntersectionObserver.
 const containerRef = ref<{ $el: HTMLElement } | HTMLElement | null>(null)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
 
@@ -78,11 +64,7 @@ const hasAnyWireframeImage = computed(() => {
   return props.project.thumbnails.some((t) => t.wireframeUrl)
 })
 
-const sideClass = computed(() => props.index % 2 === 0
-  ? "main-project-phone--left"
-  : "main-project-phone--right")
-
-//Inline custom property feeds the CSS rule `top: calc(var(--phone-i) * 65vh)`.
+//Feeds the CSS rule `top: calc(var(--phone-i) * 70vh)`.
 const indexStyle = computed(() => ({ "--phone-i": String(props.index) }))
 
 const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && !editMode.value))
@@ -208,40 +190,43 @@ async function onDescriptionSave(newVal: string) {
   <AnimatedReveal
     ref="containerRef"
     direction="bottom"
-    :distance="60"
+    :distance="50"
     :duration="0.8"
     :threshold="0.1"
-    :class="['main-project-phone', sideClass]"
+    class="mp-phone"
     :style="indexStyle"
   >
-    <header class="main-project-phone__header">
-      <span class="main-project-phone__number">{{ String(index + 1).padStart(2, "0") }}</span>
+    <!--HEADER - number + title, small row at the top.-->
+    <header class="mp-phone__header">
+      <span class="mp-phone__number">{{ String(index + 1).padStart(2, "0") }}</span>
       <EditableText
         tag="h3"
-        class="main-project-phone__title"
+        class="mp-phone__title"
         :value="project.title[lang]"
         placeholder="Project title"
         @save="onTitleSave"
       />
     </header>
 
-    <div class="main-project-phone__stage">
+    <!--VIEWER - dominant block, ~46vh. Holds the 3D viewer, sketchfab
+    iframe or static image.-->
+    <div class="mp-phone__viewer">
       <ThreeViewer
         v-if="project.glbUrl && !editMode"
         :glb-url="project.glbUrl"
         :settings="effectiveViewerSettings"
         :wireframe="isWireframe"
         :is-in-view="isInView"
-        class="main-project-phone__three"
+        class="mp-phone__three"
       />
 
       <img
         v-if="!project.glbUrl && showMainImage && mainImageUrl"
         :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
         :alt="project.title[lang]"
-        class="main-project-phone__viewer-image"
+        class="mp-phone__viewer-image"
       />
-      <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="main-project-phone__viewer-empty">
+      <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
         No image
       </div>
 
@@ -249,83 +234,94 @@ async function onDescriptionSave(newVal: string) {
         v-if="!project.glbUrl && project.modelId && !editMode"
         ref="iframeRef"
         :title="`Sketchfab Model - ${project.title[lang]}`"
-        class="main-project-phone__viewer-embed"
-        :class="{ 'main-project-phone__viewer-embed--hidden': !showSketchfab || isLoading }"
+        class="mp-phone__viewer-embed"
+        :class="{ 'mp-phone__viewer-embed--hidden': !showSketchfab || isLoading }"
       ></iframe>
-
-      <!--Thumb column - 3 stacked squares on the alternating side-->
-      <div v-if="project.thumbnails.length" class="main-project-phone__thumbs">
-        <div
-          v-for="(thumb, i) in project.thumbnails.slice(0, 3)"
-          :key="i"
-          class="main-project-phone__thumb"
-        >
-          <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
-        </div>
-      </div>
-
-      <!--Description floats on the same side as the thumbs, anchored low.-->
-      <EditableText
-        tag="p"
-        class="main-project-phone__desc"
-        :value="project.description[lang]"
-        :multiline="true"
-        placeholder="Project description..."
-        @save="onDescriptionSave"
-      />
 
       <button
         v-if="hasAnyWireframeImage"
         type="button"
-        class="main-project-phone__wf-btn"
-        :class="{ 'main-project-phone__wf-btn--active': isWireframe }"
+        class="mp-phone__wf-btn"
+        :class="{ 'mp-phone__wf-btn--active': isWireframe }"
         aria-label="Toggle wireframe"
         @click="toggleWireframe"
       >
         <Grid :size="14" />
       </button>
     </div>
+
+    <!--THUMBS - horizontal strip below the viewer. Up to 3 squares.-->
+    <div v-if="project.thumbnails.length" class="mp-phone__thumbs">
+      <div
+        v-for="(thumb, i) in project.thumbnails.slice(0, 3)"
+        :key="i"
+        class="mp-phone__thumb"
+      >
+        <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
+      </div>
+    </div>
+
+    <!--DESCRIPTION - paragraph below the thumbs.-->
+    <EditableText
+      tag="p"
+      class="mp-phone__desc"
+      :value="project.description[lang]"
+      :multiline="true"
+      placeholder="Project description..."
+      @save="onDescriptionSave"
+    />
   </AnimatedReveal>
 </template>
 
 <style scoped>
-/*PHONE CARD - absolute-positioned by index so projects literally overlap.
-Stage is 90vh; each project starts 65vh after the previous, leaving a
-25vh overlap zone between any two adjacent projects. The parent list
-sets its own height so scrolling still works.*/
-.main-project-phone {
-  position: absolute;
-  top: calc(var(--phone-i, 0) * 65vh);
-  left: 0;
-  right: 0;
-  height: 90vh;
-  z-index: calc(10 - var(--phone-i, 0));
-  pointer-events: none;
-}
-.main-project-phone > * { pointer-events: auto; }
+/*PHONE CARD - vertical stack, absolute-positioned by index so projects
+overlap subtly (parent list has explicit height that contains them).
 
-.main-project-phone__header {
+Layout per project:
+  - header  (small, 7vh)
+  - viewer  (dominant, 46vh)
+  - thumbs  (horizontal row, 14vh)
+  - desc    (paragraph, ~10vh)
+  total content ~= 77vh; project box is 80vh tall.
+
+Stagger: each project starts 70vh after the previous, so adjacent
+projects share a 10vh overlap zone. Top + bottom of each card fade to
+transparent via mask-image so the overlap looks like a soft blur instead
+of one card cutting another.*/
+.mp-phone {
   position: absolute;
-  top: 0;
+  top: calc(var(--phone-i, 0) * 70vh);
   left: 0;
   right: 0;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: 0 var(--spacing-md);
+  z-index: 1;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 8%, black 92%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, black 8%, black 92%, transparent 100%);
+}
+
+/*HEADER ----------------------------------------------------------------*/
+.mp-phone__header {
   display: flex;
   align-items: baseline;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  z-index: 8;
+  height: 7vh;
+  flex-shrink: 0;
 }
 
-.main-project-phone__number {
+.mp-phone__number {
   font-family: sans-serif;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-lg);
   font-weight: 900;
   color: transparent;
   -webkit-text-stroke: 1px var(--color-gray-medium);
   line-height: 1;
 }
 
-.main-project-phone__title {
+.mp-phone__title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-tight);
@@ -333,36 +329,29 @@ sets its own height so scrolling still works.*/
   color: var(--color-text-hover);
 }
 
-.main-project-phone__stage {
-  position: absolute;
-  inset: 0;
-  /*Fade the top + bottom of each stage to transparent so two overlapping
-  stages bleed into each other instead of cutting at hard edges.*/
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 14%, black 86%, transparent 100%);
-          mask-image: linear-gradient(to bottom, transparent 0, black 14%, black 86%, transparent 100%);
+/*VIEWER ----------------------------------------------------------------*/
+.mp-phone__viewer {
+  position: relative;
+  flex: 0 0 46vh;
+  width: 100%;
+  overflow: hidden;
 }
 
-/*VIEWER - fills the OPPOSITE side from the thumbs.*/
-.main-project-phone__three,
-.main-project-phone__viewer-image,
-.main-project-phone__viewer-embed {
+.mp-phone__three,
+.mp-phone__viewer-image,
+.mp-phone__viewer-embed {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   border: none;
   background: transparent;
 }
-.main-project-phone--left  .main-project-phone__three,
-.main-project-phone--left  .main-project-phone__viewer-image,
-.main-project-phone--left  .main-project-phone__viewer-embed { left: 34vw; right: 0; }
-.main-project-phone--right .main-project-phone__three,
-.main-project-phone--right .main-project-phone__viewer-image,
-.main-project-phone--right .main-project-phone__viewer-embed { right: 34vw; left: 0; }
 
-.main-project-phone__viewer-embed--hidden { display: none; }
+.mp-phone__viewer-embed--hidden { display: none; }
 
-.main-project-phone__viewer-empty {
+.mp-phone__viewer-empty {
   position: absolute;
   inset: 0;
   display: flex;
@@ -374,57 +363,10 @@ sets its own height so scrolling still works.*/
   text-transform: uppercase;
 }
 
-/*THUMBS - vertical column on the alternating edge. Pulled up a touch so
-they start near the top of the stage but inside its visible area.*/
-.main-project-phone__thumbs {
+.mp-phone__wf-btn {
   position: absolute;
-  top: 12vh;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  width: 32vw;
-  max-width: 140px;
-  z-index: 6;
-}
-.main-project-phone--left  .main-project-phone__thumbs { left:  0; right: auto; }
-.main-project-phone--right .main-project-phone__thumbs { right: 0; left:  auto; }
-
-.main-project-phone__thumb {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-}
-.main-project-phone__thumb img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/*DESC - anchored low on the same side as the thumbs.*/
-.main-project-phone__desc {
-  position: absolute;
-  bottom: 6vh;
-  width: 55%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background-color: hsl(var(--background) / 0.7);
-  backdrop-filter: blur(10px);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-  z-index: 7;
-}
-.main-project-phone--left  .main-project-phone__desc { left:  0; right: auto; }
-.main-project-phone--right .main-project-phone__desc { right: 0; left:  auto; }
-
-/*Wireframe toggle - icon only on phone (no label).*/
-.main-project-phone__wf-btn {
-  position: absolute;
-  bottom: var(--spacing-md);
-  right:  var(--spacing-md);
+  bottom: var(--spacing-sm);
+  right:  var(--spacing-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -435,12 +377,44 @@ they start near the top of the stage but inside its visible area.*/
   color: var(--color-text-hover);
   cursor: pointer;
   backdrop-filter: blur(var(--filter-blur));
-  z-index: 10;
+  z-index: 4;
 }
-.main-project-phone--left .main-project-phone__wf-btn { right: auto; left: calc(34vw + var(--spacing-md)); }
-.main-project-phone__wf-btn--active {
+.mp-phone__wf-btn--active {
   background-color: var(--color-accent);
   border-color: var(--color-accent);
   color: hsl(0 0% 0%);
+}
+
+/*THUMBS ----------------------------------------------------------------*/
+.mp-phone__thumbs {
+  display: flex;
+  gap: var(--spacing-xs);
+  height: 14vh;
+  flex-shrink: 0;
+}
+
+.mp-phone__thumb {
+  position: relative;
+  flex: 1 1 0;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+}
+.mp-phone__thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*DESCRIPTION ----------------------------------------------------------*/
+.mp-phone__desc {
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  color: var(--color-text);
+  margin: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 </style>

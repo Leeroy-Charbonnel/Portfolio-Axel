@@ -15,11 +15,12 @@ const { t } = useLanguage()
 const { createMainProject } = usePortfolio()
 const { isPhone } = useIsPhone()
 
-//Phone list height = last project's top (n-1 * 65vh) + stage height (90vh).
+//Phone list height = last project's top (n-1 * 70vh) + card height (80vh).
+//Matches the MainProjectPhone card's positioning constants.
 const phoneListHeight = computed(() => {
   const n = props.projects.length
   if (n === 0) return "0vh"
-  return `calc((${n - 1}) * 65vh + 90vh)`
+  return `calc((${n - 1}) * 70vh + 80vh)`
 })
 </script>
 
