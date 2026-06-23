@@ -2672,21 +2672,12 @@ async function onSave() {
         WIREFRAME - wireframe-mode rig + shared material + emissive picks
         ====================================================================-->
         <div v-show="tab === 'wireframe'" class="editor__group">
-          <!--MODE section: just the overlay on/off toggle. Lines color +
-          mode color are GLOBAL so they live with the other global params
-          in the Material section below.-->
-          <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfMode }">
-            <button type="button" class="editor__section-head" @click="sectionOpen.wfMode = !sectionOpen.wfMode">
-              <span class="editor__section-title">Wireframe</span>
-              <ChevronDown :size="14" class="editor__section-chevron" />
-            </button>
-            <div v-show="sectionOpen.wfMode" class="editor__section-body">
-              <div class="editor__row editor__row--inline">
-                <input type="checkbox" class="editor__check" id="wf-overlay" :checked="wireframeOverlayOn" @change="(e) => onWireframeOverlayToggle((e.target as HTMLInputElement).checked)" />
-                <label class="editor__row-label" for="wf-overlay">Lines overlay</label>
-              </div>
-            </div>
-          </section>
+          <!--Show wireframe lines toggle - bare, outside any card so it
+          matches the "Show HDRI as skybox" toggle on the HDR tab.-->
+          <div class="editor__row editor__row--inline">
+            <input type="checkbox" class="editor__check" id="wf-overlay" :checked="wireframeOverlayOn" @change="(e) => onWireframeOverlayToggle((e.target as HTMLInputElement).checked)" />
+            <label class="editor__row-label" for="wf-overlay">Show wireframe lines</label>
+          </div>
 
           <!--HDR section-->
           <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfHdr }">
@@ -2715,7 +2706,7 @@ async function onSave() {
           </section>
 
           <!--Material section-->
-          <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfMaterial }">
+          <section class="editor__section editor__section--global" :class="{ 'editor__section--open': sectionOpen.wfMaterial }">
             <button type="button" class="editor__section-head" @click="sectionOpen.wfMaterial = !sectionOpen.wfMaterial">
               <span class="editor__section-title">Material</span>
               <ChevronDown :size="14" class="editor__section-chevron" />
@@ -3086,6 +3077,16 @@ section contains item-cards inside, the two layers are visually distinct.*/
   padding: var(--spacing-xs) 0;
   border-top: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
 }
+
+/*GLOBAL-WARNING variant - applied to the Wireframe-tab Material section
+to flag that edits ripple to every project. Red tint on the bg + border
+so the author can't miss it.*/
+.editor__section--global {
+  background-color: hsl(0 70% 50% / 0.08);
+  border-color: hsl(0 70% 50% / 0.35);
+}
+.editor__section--global .editor__section-title { color: hsl(0 80% 70%); }
+.editor__section--global .editor__section-body { border-top-color: hsl(0 70% 50% / 0.25); }
 .editor__sub-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
 .editor__sub-add-group { display: inline-flex; gap: var(--spacing-xxs); }
 .editor__sub-add { padding: var(--spacing-xxs) var(--spacing-sm); background-color: transparent; border: var(--border-width-sm) solid var(--color-gray-medium); color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; }
@@ -3148,8 +3149,10 @@ author can see at a glance which set of values they're editing.*/
 
 /*Default row layout is now HORIZONTAL: label - slider/picker - readout
 all on one line. Saves vertical space and matches the panel's density.
-The inline variant keeps a checkbox-friendly layout.*/
+The inline variant is for checkbox + label pairs that don't need the
+6.5rem label column.*/
 .editor__row { display: flex; flex-direction: row; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-xxs) 0; }
+.editor__row--inline .editor__row-label { flex: 0 0 auto; }
 .editor__row--inline { flex-direction: row; align-items: center; gap: var(--spacing-sm); }
 /*Fixed label column so sliders + readouts align vertically across rows
 in the same body (no jagged left edge from variable-length labels).*/
