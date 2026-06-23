@@ -1920,13 +1920,7 @@ function syncWireframeOverlays() {
 
 function onWireframeOverlayColor(hex: string) {
   wireframeOverlayColor.value = hex
-  //Persist globally via the settings table - the next project the author
-  //opens picks the value up from the DB.
-  updateSetting(WF_LINE_COLOR_KEY, hex, {
-    type: "string",
-    group: "editor3d",
-    description: "Wireframe line color (shared across every project in the editor).",
-  }).catch((err: unknown) => console.warn("[model-editor] save line color failed:", err))
+  saveGlobalPref(WF_LINE_COLOR_KEY, hex, "Wireframe line color (shared across every project in the editor).")
   for (const overlay of wfOverlays.values()) {
     if (overlay.material instanceof LineBasicMaterial) {
       overlay.material.color.set(hex)
@@ -1956,11 +1950,7 @@ function onWireframeColorChange(hex: string) {
   //applied to emissive picks. Existing wf lights keep their own color
   //so the user can color-pick each independently. Persisted globally.
   wireframeColor.value = hex
-  updateSetting(WF_MODE_COLOR_KEY, hex, {
-    type: "string",
-    group: "editor3d",
-    description: "Wireframe mode color (shared across every project in the editor).",
-  }).catch((err: unknown) => console.warn("[model-editor] save mode color failed:", err))
+  saveGlobalPref(WF_MODE_COLOR_KEY, hex, "Wireframe mode color (shared across every project in the editor).")
   for (const e of emissiveList.value) {
     e.material.emissive.set(hex)
     e.material.needsUpdate = true
@@ -1977,15 +1967,24 @@ function onEmissiveItemIntensity(uuid: string, v: number) {
 
 function onWfMatParam<K extends keyof WfMaterialParams>(key: K, value: WfMaterialParams[K]) {
   wfMatParams.value[key] = value
-  //Persist globally via the settings table so every other project picks
-  //up the change on next open.
-  updateSetting(WF_MAT_PARAMS_KEY, JSON.stringify(wfMatParams.value), {
-    type: "string",
-    group: "editor3d",
-    description: "Wireframe shared material params (color, metalness, roughness, env, specular).",
-  }).catch((err: unknown) => console.warn("[model-editor] save wf material failed:", err))
+  saveGlobalPref(WF_MAT_PARAMS_KEY, JSON.stringify(wfMatParams.value),
+    "Wireframe shared material params (color, metalness, roughness, env, specular).")
   syncWfMaterialsParams()
   requestRender()
+}
+
+//Shared global-pref save with LOUD failure: silent .catch was hiding 401s
+//in dev:client and the user thought the value had persisted (locally it
+//had) but the DB had nothing. Logs success too so the network trace is
+//easy to verify.
+function saveGlobalPref(key: string, value: string, description: string) {
+  updateSetting(key, value, { type: "string", group: "editor3d", description })
+    .then(() => console.log(`[model-editor] saved ${key} = ${value}`))
+    .catch((err: unknown) => {
+      console.error(`[model-editor] FAILED to save ${key}:`, err)
+      // eslint-disable-next-line no-alert
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("editor3d:save-failed", { detail: { key, err: String(err) } }))
+    })
 }
 
 //===========================================================================

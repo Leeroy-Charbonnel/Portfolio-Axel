@@ -99,10 +99,20 @@ export interface ProfileDto {
   avatarUrl: string
 }
 
+//Global editor preferences (admin's settings table rows). Public viewers
+//(ThreeViewer) layer these over the per-project values so a tweak in
+//one project propagates to every model on the site.
+export interface EditorPrefsDto {
+  wireframeLineColor: string | null
+  wireframeModeColor: string | null
+  wireframeMaterial:  string | null  //JSON-encoded WfMatParams
+}
+
 export interface PortfolioDto {
   software:        SoftwareDto[]
   mainProjects:    MainProjectDto[]
   galleryProjects: GalleryProjectDto[]
   experiences:     ExperienceDto[]
   profile:         ProfileDto | null
+  editorPrefs:     EditorPrefsDto
 }

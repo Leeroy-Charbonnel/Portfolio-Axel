@@ -67,10 +67,10 @@ function onKeydown(e: KeyboardEvent) {
 <style scoped>
 .editable-text--active {
   outline: 1px dashed var(--color-border-muted);
-  outline-offset: var(--spacing-xxs);
+  outline-offset: 1px;          /*hugs the text instead of leaving a halo*/
   cursor: text;
   min-height: 1em;
-  min-width: var(--spacing-3xl);
+  min-width: var(--spacing-2xl);
 }
 
 .editable-text--active:hover,

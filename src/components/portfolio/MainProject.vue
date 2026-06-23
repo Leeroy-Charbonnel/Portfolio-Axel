@@ -29,6 +29,24 @@ const props = defineProps<{
 const { lang } = useLanguage()
 const { editMode } = useAdmin()
 const { data: portfolioData, uploadFile, updateMainProject, deleteMainProject, setMainProjectSoftware } = usePortfolio()
+
+//Merge the project's saved viewerSettings with the admin's GLOBAL editor
+//prefs (line color, mode color, shared material). The globals always win
+//over what was frozen into the project at save time, so a change in the
+//editor propagates to every project on the site instead of being stuck
+//on whichever project was last saved with it.
+const effectiveViewerSettings = computed(() => {
+  const raw = (props.project.viewerSettings as any) ?? null
+  const prefs = portfolioData.value?.editorPrefs
+  if (!prefs) return raw
+  const next = raw ? { ...raw, wireframeMode: { ...(raw.wireframeMode ?? {}) } } : { wireframeMode: {} }
+  if (prefs.wireframeLineColor) next.wireframeMode.overlayColor = prefs.wireframeLineColor
+  if (prefs.wireframeModeColor) next.wireframeMode.color        = prefs.wireframeModeColor
+  if (prefs.wireframeMaterial) {
+    try { next.wireframeMode.material = JSON.parse(prefs.wireframeMaterial) } catch { /*malformed - ignore*/ }
+  }
+  return next
+})
 const router = useRouter()
 
 function openModelEditor() {
@@ -365,7 +383,7 @@ async function replaceThumbnailWireframe(idx: number) {
           <ThreeViewer
             v-if="project.glbUrl && !editMode"
             :glb-url="project.glbUrl"
-            :settings="(project.viewerSettings as any) ?? null"
+            :settings="effectiveViewerSettings"
             :wireframe="isWireframe"
             :is-in-view="isInView"
             class="main-project__three"

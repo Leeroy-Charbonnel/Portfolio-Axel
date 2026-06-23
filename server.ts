@@ -886,10 +886,33 @@ app.get("/api/portfolio", async (_req, res) => {
   //PROFILE - only one row
   const [profileRow] = await db.select().from(profile)
 
+  //EDITOR PREFS - the admin's editor3d_* settings rows. Public viewers
+  //(ThreeViewer) need them so global wireframe knobs (line color, mode
+  //color, shared material) override the per-project values that got
+  //frozen into viewerSettings at save time. Picks any admin's row - in
+  //a single-author portfolio there's only one user anyway.
+  const editorPrefRows = await db.execute(sql`
+    SELECT s.key, s.value
+    FROM settings s
+    JOIN "user" u ON u.id = s.user_id
+    WHERE u.role = 'admin' AND s.key LIKE 'editor3d_%'
+    ORDER BY s.user_id, s.key
+  `)
+  const editorPrefMap: Record<string, string> = {}
+  for (const r of ((editorPrefRows as any).rows ?? editorPrefRows) as { key: string; value: string }[]) {
+    if (!(r.key in editorPrefMap)) editorPrefMap[r.key] = r.value
+  }
+  const editorPrefs = {
+    wireframeLineColor: editorPrefMap["editor3d_wireframe_line_color"] ?? null,
+    wireframeModeColor: editorPrefMap["editor3d_wireframe_mode_color"] ?? null,
+    wireframeMaterial:  editorPrefMap["editor3d_wireframe_material"]   ?? null,
+  }
+
   res.json({
     software:        softwareRows.map((s) => ({ id: s.id, key: s.key, url: s.url, logoFileId: s.logoFileId, logoUrl: urlOf(s.logoFileId) })),
     mainProjects,
     galleryProjects,
+    editorPrefs,
     experiences:     experienceRows.map((e) => ({
       id:          e.id,
       period:      e.period,
