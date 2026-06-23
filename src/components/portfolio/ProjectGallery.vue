@@ -255,26 +255,36 @@ edge via margin-top:auto on .gallery-item__stats.*/
   letter-spacing: var(--letter-spacing-tight);
 }
 
+/*Edit-mode link row - red-tinted because it's an admin-only field that
+visitors don't see (matches the MainProject "admin only" model-id row).
+The value column flexes to fill remaining width and truncates with
+ellipsis instead of wrapping so the card height stays predictable.*/
 .gallery-item__link-row {
   display: flex;
   gap: var(--spacing-sm);
-  align-items: baseline;
+  align-items: center;
   margin-top: var(--spacing-sm);
-  padding-top: var(--spacing-sm);
-  border-top: var(--border-width-sm) dashed var(--color-gray-medium);
+  padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-xs);
+  background-color: hsl(0 70% 50% / 0.08);
+  border: var(--border-width-sm) solid hsl(0 70% 50% / 0.35);
 }
 
 .gallery-item__link-label {
-  color: var(--color-text-tertiary);
+  color: hsl(0 80% 70%);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
+  flex-shrink: 0;
 }
 
 .gallery-item__link-value {
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
   color: var(--color-text-hover);
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /*margin-top:auto pushes the stats strip down so it sits flush with the

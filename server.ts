@@ -342,9 +342,36 @@ app.get("/api/files", requireAuth, requireAdmin, async (_req, res) => {
   })))
 })
 
+//DELETE /api/files/orphans - admin only. Bulk-delete every row whose ref
+//count is 0. Returns the number actually removed. MUST be declared BEFORE
+//"/api/files/:id" so express doesn't match "orphans" as a uuid param.
+app.delete("/api/files/orphans", requireAuth, requireAdmin, async (_req, res) => {
+  const result = await db.execute(sql`
+    SELECT f.id, f.stored_filename FROM file f WHERE
+      NOT EXISTS (SELECT 1 FROM main_project    WHERE main_image_file_id     = f.id) AND
+      NOT EXISTS (SELECT 1 FROM main_project    WHERE main_wireframe_file_id = f.id) AND
+      NOT EXISTS (SELECT 1 FROM main_project    WHERE video_file_id          = f.id) AND
+      NOT EXISTS (SELECT 1 FROM gallery_project WHERE image_file_id          = f.id) AND
+      NOT EXISTS (SELECT 1 FROM software        WHERE logo_file_id           = f.id) AND
+      NOT EXISTS (
+        SELECT 1 FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
+        WHERE thumb->>'fileId' = f.id::text OR thumb->>'wireframeFileId' = f.id::text
+      )
+  `)
+  const orphans = ((result as any).rows ?? result) as { id: string; stored_filename: string }[]
+  let deleted = 0
+  for (const o of orphans) {
+    try { unlinkSync(join(storageDir, o.stored_filename)) } catch { /* already gone */ }
+    await db.delete(fileTable).where(eq(fileTable.id, o.id))
+    deleted++
+  }
+  res.json({ deletedCount: deleted })
+})
+
 //DELETE /api/files/:id - admin only. Removes the row AND the binary on disk.
 //Refuses (409) if the file is still referenced anywhere. The UI surfaces the
 //ref count so the admin always knows before clicking.
+//Declared AFTER /orphans so express's matcher doesn't claim "orphans" as a uuid.
 app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
   const id = String(req.params.id ?? "")
   const [row] = await db.select().from(fileTable).where(eq(fileTable.id, id))
@@ -379,31 +406,6 @@ app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
   }
   await db.delete(fileTable).where(eq(fileTable.id, id))
   res.json({ ok: true })
-})
-
-//DELETE /api/files/orphans - admin only. Bulk-delete every row whose ref
-//count is 0. Returns the number actually removed.
-app.delete("/api/files/orphans", requireAuth, requireAdmin, async (_req, res) => {
-  const result = await db.execute(sql`
-    SELECT f.id, f.stored_filename FROM file f WHERE
-      NOT EXISTS (SELECT 1 FROM main_project    WHERE main_image_file_id     = f.id) AND
-      NOT EXISTS (SELECT 1 FROM main_project    WHERE main_wireframe_file_id = f.id) AND
-      NOT EXISTS (SELECT 1 FROM main_project    WHERE video_file_id          = f.id) AND
-      NOT EXISTS (SELECT 1 FROM gallery_project WHERE image_file_id          = f.id) AND
-      NOT EXISTS (SELECT 1 FROM software        WHERE logo_file_id           = f.id) AND
-      NOT EXISTS (
-        SELECT 1 FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
-        WHERE thumb->>'fileId' = f.id::text OR thumb->>'wireframeFileId' = f.id::text
-      )
-  `)
-  const orphans = ((result as any).rows ?? result) as { id: string; stored_filename: string }[]
-  let deleted = 0
-  for (const o of orphans) {
-    try { unlinkSync(join(storageDir, o.stored_filename)) } catch { /* already gone */ }
-    await db.delete(fileTable).where(eq(fileTable.id, o.id))
-    deleted++
-  }
-  res.json({ deletedCount: deleted })
 })
 
 //POST /api/files - admin only. Returns the new file row + ready-to-use url

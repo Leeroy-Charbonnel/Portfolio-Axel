@@ -464,6 +464,19 @@ async function replaceThumbnailWireframe(idx: number) {
       The software list and optional model-id sit below as a full-width row
       so the project frame stays balanced regardless of stats column height.-->
       <div class="main-project__details">
+        <!--Admin-only Sketchfab model id - moved ABOVE the separator so
+        it sits with the other authoring fields. Red tint marks it as
+        "invisible in view mode" so the admin knows it's edit-only.-->
+        <div v-if="editMode" class="main-project__model-id main-project__model-id--admin-only">
+          <span class="main-project__model-id-label">Sketchfab model ID</span>
+          <EditableText
+            tag="span"
+            class="main-project__model-id-value"
+            :value="project.modelId"
+            placeholder="(empty = no embed)"
+            @save="onModelIdSave"
+          />
+        </div>
         <div class="main-project__details-top">
           <EditableText
             tag="p"
@@ -540,16 +553,6 @@ async function replaceThumbnailWireframe(idx: number) {
           </span>
         </div>
 
-        <div v-if="editMode" class="main-project__model-id">
-          <span class="main-project__model-id-label">Sketchfab model ID</span>
-          <EditableText
-            tag="span"
-            class="main-project__model-id-value"
-            :value="project.modelId"
-            placeholder="(empty = no embed)"
-            @save="onModelIdSave"
-          />
-        </div>
       </div>
     </article>
   </AnimatedReveal>
@@ -929,10 +932,18 @@ the right without forcing the description to wrap mid-paragraph.*/
   align-items: baseline;
   padding: var(--spacing-xs) var(--spacing-sm);
   background-color: hsl(var(--background) / 0.4);
-  border-left: var(--border-width-md) solid var(--color-accent);
   font-size: var(--font-size-xs);
   align-self: flex-start;
 }
+
+/*ADMIN-ONLY field marker - red tint so the admin can tell at a glance
+that this row doesn't appear to visitors (same hue as the wireframe
+section in the model editor's Material card).*/
+.main-project__model-id--admin-only {
+  background-color: hsl(0 70% 50% / 0.08);
+  border: var(--border-width-sm) solid hsl(0 70% 50% / 0.35);
+}
+.main-project__model-id--admin-only .main-project__model-id-label { color: hsl(0 80% 70%); }
 
 .main-project__model-id-label {
   color: var(--color-text-tertiary);
@@ -988,6 +999,12 @@ French S/A/F/T). Title attribute carries the full name as a tooltip.*/
   color: var(--color-text-hover);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+  /*Fixed width so the edit-mode dotted underline ends at the same place
+  for every stat row (vertices / edges / faces / triangles), regardless
+  of how long the value is.*/
+  min-width: 5ch;
+  display: inline-block;
+  text-align: right;
 }
 
 /*SOFTWARE LIST - sits directly under the description block. The hairline

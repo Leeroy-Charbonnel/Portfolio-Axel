@@ -723,18 +723,27 @@ onMounted(() => {
       const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2  //easeInOutQuad
       cameraRef.position.lerpVectors(cameraAnim.fromPos, cameraAnim.toPos, ease)
       controls.target.lerpVectors(cameraAnim.fromTarget, cameraAnim.toTarget, ease)
-      //Slerp the camera quaternion directly - no lookAt, no up-vector
-      //lerp. This is what kills the rotation snap: lookAt at intermediate
-      //frames was producing a brief roll around the forward axis while
-      //the up vector swung through (0,0.5,-0.5); slerp's shortest-arc
-      //rotation has no such intermediate state.
       cameraRef.quaternion.slerpQuaternions(cameraAnim.fromQuat, cameraAnim.toQuat, ease)
       if (t >= 1) {
-        //Snap camera.up to the final value so OrbitControls' next update()
-        //computes spherical against the right "up axis" - otherwise top
-        //view re-clamps phi and shifts the camera off the pole.
+        //Force the EXACT final state (lerp at alpha=1 returns toX algebraically
+        //but with no rounding tail, and quaternion slerp doesn't normalize.)
+        cameraRef.position.copy(cameraAnim.toPos)
+        cameraRef.quaternion.copy(cameraAnim.toQuat)
+        controls.target.copy(cameraAnim.toTarget)
         cameraRef.up.copy(cameraAnim.endUp)
+        //Kill any leftover orbit / pan momentum from BEFORE the snap, then
+        //let OrbitControls re-sync against the exact pose. Without the
+        //clear, decayed sphericalDelta from prior input was being applied
+        //on top of our pose at the end of the animation - that was the
+        //"contre-plonge" residual the user reported.
+        const c = controls as unknown as {
+          sphericalDelta?: { set: (a: number, b: number, c: number) => void }
+          panOffset?:      { set: (a: number, b: number, c: number) => void }
+        }
+        c.sphericalDelta?.set(0, 0, 0)
+        c.panOffset?.set(0, 0, 0)
         cameraAnim = null
+        controls.enabled = true
         controls.update()
       }
       requestRender()
@@ -1870,6 +1879,9 @@ function ensureOverlayForMesh(mesh: Mesh) {
   if (!scene) return
   if (wfOverlays.has(mesh.uuid)) return
   if (emissiveList.value.some((e) => e.uuid === mesh.uuid)) return   //emissive picks stay clean, no wireframe
+  //Currently picked (orange-highlight) mesh also stays clean - the
+  //overlay would compete visually with the pick highlight.
+  if (pickedMeshIdx.value !== null && sceneMeshes.value[pickedMeshIdx.value]?.mesh.uuid === mesh.uuid) return
   //threshold keeps "hard" edges only - triangulation diagonals (coplanar
   //faces, angle = 0) are filtered out. See WIREFRAME_EDGE_THRESHOLD_DEG.
   const edgesGeo = new EdgesGeometry(mesh.geometry, WIREFRAME_EDGE_THRESHOLD_DEG)
@@ -2111,11 +2123,15 @@ function switchCamera(mode: "persp" | "ortho") {
   renderPass.camera = to
   controls.object   = to
   controls.update()
-  //transformCtrls + viewHelper are bound to the perspective camera in
-  //their constructors. Their internal raycast / projection still works
-  //against any camera because they read .matrixWorld + .projectionMatrix
-  //at draw time - but viewHelper.editorCamera is private. We re-create
-  //the viewHelper to keep its axis quaternion mirror in sync.
+  //TransformControls' drag math (hit-test against the colored arrows /
+  //rings) reads from its bound camera every frame, so a stale camera
+  //reference makes the gizmo unusable - cursor offsets get wrong, the
+  //axis hover state lags, etc. Re-bind it explicitly on every swap.
+  if (transformCtrls) {
+    transformCtrls.camera = to as PerspectiveCamera
+  }
+  //ViewHelper exposes no public camera setter; recreate it so its axis
+  //quaternion mirror tracks the active camera.
   if (renderer && canvas.value && viewHelper) {
     viewHelper.dispose()
     viewHelper = new ViewHelper(to, canvas.value)
@@ -2141,6 +2157,10 @@ function switchCamera(mode: "persp" | "ortho") {
 function snapToView(axis: string) {
   if (!cameraRef || !controls) return
   switchCamera("ortho")
+  //Disable OrbitControls for the duration of the animation so input
+  //handling + damping decay can't fight the lerp. Re-enabled at the
+  //end of cameraAnim (in the tick handler).
+  controls.enabled = false
 
   //ALWAYS snap to the model's actual center (sceneCenter) - not the
   //current controls.target. The target can drift away from the model
@@ -2278,22 +2298,28 @@ function isTypingTarget(t: EventTarget | null): boolean {
 
 function pickMeshForEmissive(idx: number) {
   const sm = sceneMeshes.value[idx]; if (!sm) return
-  //release previous orange
+  //release previous orange + put its wireframe overlay back
   if (pickedMeshIdx.value !== null) {
     const prev = sceneMeshes.value[pickedMeshIdx.value]
     if (prev) {
       const prevIdx = pickedMeshIdx.value
       pickedMeshIdx.value = null
-      if (prevIdx !== idx) setMaterialFor(prev.mesh)
+      if (prevIdx !== idx) {
+        setMaterialFor(prev.mesh)
+        if (wireframeMode.value && wireframeOverlayOn.value) ensureOverlayForMesh(prev.mesh)
+      }
     }
   }
   if (pickedMeshIdx.value === idx) {
     pickedMeshIdx.value = null
     setMaterialFor(sm.mesh)
+    if (wireframeMode.value && wireframeOverlayOn.value) ensureOverlayForMesh(sm.mesh)
     requestRender(); return
   }
   pickedMeshIdx.value = idx
   setMaterialFor(sm.mesh)
+  //Picked mesh's overlay is removed so the orange highlight reads clean.
+  removeOverlayForMesh(sm.mesh.uuid)
   requestRender()
 }
 

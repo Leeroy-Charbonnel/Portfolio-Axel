@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue"
-import { X, Save, RotateCcw, Shuffle, Smartphone, Monitor } from "lucide-vue-next"
+import { X, Save, RotateCcw, Shuffle } from "lucide-vue-next"
 import { useSettings } from "vue-shared-ui"
 import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 
@@ -129,7 +129,9 @@ const localMobile  = ref<Record<string, string>>({})
 //watch below sets the real value once `loaded` flips true.
 const panelWidth = ref<number>(PANEL_WIDTH_DEFAULT_PX)
 //User can force a mode via the header buttons; null = follow auto.
-const modeOverride = ref<"desktop" | "phone" | null>(null)
+//Mode is PURELY auto - phone vs desktop is decided by available viewport
+//width (window minus panel). No manual override; the user resizes the
+//panel to enter / exit phone mode.
 const windowWidth = ref<number>(typeof window !== "undefined" ? window.innerWidth : 1920)
 
 function clampPanelWidth(n: number): number {
@@ -151,7 +153,7 @@ function persistPanelWidth(w: number) {
 const availableWidth = computed(() => Math.max(0, windowWidth.value - panelWidth.value))
 const autoPhoneMode  = computed(() => availableWidth.value < SIMULATE_PHONE_WIDTH_PX)
 const phoneMode      = computed(() =>
-  modeOverride.value === null ? autoPhoneMode.value : modeOverride.value === "phone",
+  autoPhoneMode.value,
 )
 
 //Mode-aware accessors so the rest of the script doesn't have to branch.
@@ -482,28 +484,7 @@ onBeforeUnmount(() => {
               <span class="css-panel__title-mode">{{ phoneMode ? "Phone" : "Desktop" }}</span>
             </h2>
             <!--Mode toggle - Desktop / Phone. Null override = follows the
-            auto detection (panel width vs viewport). The label dot below
-            shows which mode is currently active.-->
-            <div class="css-panel__mode-toggle" role="group" aria-label="Mode">
-              <button
-                type="button"
-                class="css-panel__mode-btn"
-                :class="{ 'css-panel__mode-btn--active': !phoneMode }"
-                :title="autoPhoneMode ? 'Pin desktop (auto says phone)' : 'Desktop mode'"
-                @click="modeOverride = modeOverride === 'desktop' ? null : 'desktop'"
-              >
-                <Monitor :size="13" />
-              </button>
-              <button
-                type="button"
-                class="css-panel__mode-btn"
-                :class="{ 'css-panel__mode-btn--active': phoneMode }"
-                :title="autoPhoneMode ? 'Phone mode (auto)' : 'Pin phone (override desktop)'"
-                @click="modeOverride = modeOverride === 'phone' ? null : 'phone'"
-              >
-                <Smartphone :size="13" />
-              </button>
-            </div>
+            auto detection (panel width vs viewport).-->
             <button
               type="button"
               class="css-panel__close"
@@ -776,31 +757,6 @@ the panel is currently editing without checking the toggle buttons.*/
 }
 
 .css-panel__close:hover { color: var(--color-text-hover); }
-
-/*Desktop / Phone mode toggle - segmented control at the right of the
-header. Active button is filled with --tag-bg; inactive ones are flat.*/
-.css-panel__mode-toggle {
-  display: inline-flex;
-  margin-left: auto;
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-}
-.css-panel__mode-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width:  var(--spacing-xl);
-  height: var(--spacing-lg);
-  background-color: transparent;
-  border: none;
-  color: var(--color-text-tertiary);
-  cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease;
-}
-.css-panel__mode-btn:hover { color: var(--color-text-hover); }
-.css-panel__mode-btn--active {
-  color: var(--color-text-hover);
-  background-color: var(--tag-bg);
-}
 
 .css-panel__confirm-label {
   font-size: var(--font-size-xs);
