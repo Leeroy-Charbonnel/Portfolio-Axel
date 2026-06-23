@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue"
-import { X, Save, RotateCcw, Shuffle } from "lucide-vue-next"
+import { X, Save, RotateCcw, Shuffle, Smartphone, Monitor } from "lucide-vue-next"
 import { useSettings } from "vue-shared-ui"
 import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 
@@ -10,22 +10,39 @@ import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 //domain. Edits apply to document.documentElement immediately for live
 //preview; nothing reaches the DB until the user presses Save. Discard
 //reverts to the last-saved snapshot.
+//
+//RESIZABLE - the user can drag the left edge to widen the panel. When
+//the remaining viewport drops under SIMULATE_PHONE_WIDTH_PX, the html
+//element gets the .simulate-phone class so component CSS that ALSO
+//keys on that selector (style.css + responsive components) flips into
+//phone layout. The panel itself flips to "Phone" mode at the same time:
+//each row's value is stored under a SEPARATE key (`${key}_mobile`) so
+//the author can tune phone-only values without touching desktop.
+const PANEL_WIDTH_KEY        = "css-panel.width"
+const PANEL_WIDTH_DEFAULT_PX = 448  //matches the old fixed 28rem
+const PANEL_WIDTH_MIN_PX     = 280
+const SIMULATE_PHONE_WIDTH_PX = 768
+const MOBILE_KEY_SUFFIX      = "_mobile"
 
 const { open, hide } = useCssVarsPanel()
 const { getString, update, loaded } = useSettings()
 
 type RowType = "text" | "color" | "color-hsl" | "color-accent" | "size" | "unitless" | "int"
 type CssVarRow = {
-  key:          string
-  cssVar:       string
-  label:        string
-  defaultValue: string
-  type:         RowType
-  group:        string
-  unit?:        "px" | "rem" | "%" | "s"  //size rows
-  min?:         number
-  max?:         number
-  step?:        number
+  key:           string
+  cssVar:        string
+  label:         string
+  defaultValue:  string
+  //Optional mobile fallback - used as the "Phone" mode default if the
+  //author hasn't customised the mobile value yet. Defaults to
+  //`defaultValue` (i.e. same as desktop) when missing.
+  mobileDefault?: string
+  type:          RowType
+  group:         string
+  unit?:         "px" | "rem" | "%" | "s"  //size rows
+  min?:          number
+  max?:          number
+  step?:         number
 }
 
 //ROWS - ordered to match the page scroll order so the panel reads like the
@@ -43,40 +60,40 @@ const ROWS: CssVarRow[] = [
   { group: "Colors", key: "css_var_tag_bg",     cssVar: "--tag-bg",     label: "Tag background", defaultValue: "#ffffff1a", type: "color" },
 
   //HOME (title screen) - first section the visitor sees
-  { group: "Home", key: "css_var_home_grid_size",          cssVar: "--home-grid-size",          label: "Grid cell size",        defaultValue: "50px",    type: "size", unit: "px",  min: 10, max: 200, step: 1 },
+  { group: "Home", key: "css_var_home_grid_size",          cssVar: "--home-grid-size",          label: "Grid cell size",        defaultValue: "50px",    mobileDefault: "30px",   type: "size", unit: "px",  min: 10, max: 200, step: 1 },
   { group: "Home", key: "css_var_home_grid_line_width",    cssVar: "--home-grid-line-width",    label: "Grid line thickness",   defaultValue: "1px",     type: "size", unit: "px",  min: 0, max: 6, step: 1 },
   { group: "Home", key: "css_var_home_grid_drift",         cssVar: "--home-grid-drift-speed",   label: "Grid drift speed",      defaultValue: "20s",     type: "size", unit: "s",   min: 5, max: 60, step: 1 },
-  { group: "Home", key: "css_var_home_title_size",         cssVar: "--home-title-size",         label: "Title font size",       defaultValue: "5rem",    type: "size", unit: "rem", min: 1, max: 12, step: 0.1 },
-  { group: "Home", key: "css_var_home_subtitle_size",      cssVar: "--home-subtitle-size",      label: "Subtitle font size",    defaultValue: "2rem",    type: "size", unit: "rem", min: 0.5, max: 5, step: 0.1 },
-  { group: "Home", key: "css_var_home_role_size",          cssVar: "--home-role-size",          label: "Role font size",        defaultValue: "1.2rem",  type: "size", unit: "rem", min: 0.5, max: 3, step: 0.05 },
-  { group: "Home", key: "css_var_home_container_margin",   cssVar: "--home-container-margin",   label: "Container margin",      defaultValue: "170px",   type: "size", unit: "px",  min: 0, max: 400, step: 2 },
+  { group: "Home", key: "css_var_home_title_size",         cssVar: "--home-title-size",         label: "Title font size",       defaultValue: "5rem",    mobileDefault: "2.4rem", type: "size", unit: "rem", min: 1, max: 12, step: 0.1 },
+  { group: "Home", key: "css_var_home_subtitle_size",      cssVar: "--home-subtitle-size",      label: "Subtitle font size",    defaultValue: "2rem",    mobileDefault: "1.2rem", type: "size", unit: "rem", min: 0.5, max: 5, step: 0.1 },
+  { group: "Home", key: "css_var_home_role_size",          cssVar: "--home-role-size",          label: "Role font size",        defaultValue: "1.2rem",  mobileDefault: "0.9rem", type: "size", unit: "rem", min: 0.5, max: 3, step: 0.05 },
+  { group: "Home", key: "css_var_home_container_margin",   cssVar: "--home-container-margin",   label: "Container margin",      defaultValue: "170px",   mobileDefault: "20px",   type: "size", unit: "px",  min: 0, max: 400, step: 2 },
   { group: "Home", key: "css_var_home_content_gap",        cssVar: "--home-content-gap",        label: "Content gap",           defaultValue: "1rem",    type: "size", unit: "rem", min: 0, max: 6, step: 0.05 },
   { group: "Home", key: "css_var_home_arrow_delay",        cssVar: "--home-arrow-delay",        label: "Scroll arrow delay",    defaultValue: "1.5s",    type: "size", unit: "s",   min: 0, max: 10, step: 0.1 },
 
   //MAIN PROJECT - second section
-  { group: "Main Project", key: "css_var_mp_padding_y",         cssVar: "--mp-padding-y",         label: "Vertical padding",       defaultValue: "4rem",    type: "size", unit: "rem", min: 0, max: 12, step: 0.25 },
-  { group: "Main Project", key: "css_var_mp_margin_bottom",     cssVar: "--mp-margin-bottom",     label: "Margin between",         defaultValue: "10rem",   type: "size", unit: "rem", min: 0, max: 20, step: 0.5 },
-  { group: "Main Project", key: "css_var_mp_section_gap",       cssVar: "--mp-section-gap",       label: "Section gap",            defaultValue: "3rem",    type: "size", unit: "rem", min: 0, max: 10, step: 0.25 },
-  { group: "Main Project", key: "css_var_mp_title_size",        cssVar: "--mp-title-size",        label: "Title size",             defaultValue: "2.5rem",  type: "size", unit: "rem", min: 0.5, max: 6, step: 0.1 },
-  { group: "Main Project", key: "css_var_mp_number_size",       cssVar: "--mp-number-size",       label: "Number watermark size",  defaultValue: "6rem",    type: "size", unit: "rem", min: 1, max: 16, step: 0.25 },
-  { group: "Main Project", key: "css_var_mp_description_size",  cssVar: "--mp-description-size",  label: "Description font size",  defaultValue: "1rem",    type: "size", unit: "rem", min: 0.5, max: 2.5, step: 0.05 },
+  { group: "Main Project", key: "css_var_mp_padding_y",         cssVar: "--mp-padding-y",         label: "Vertical padding",       defaultValue: "4rem",    mobileDefault: "2rem",    type: "size", unit: "rem", min: 0, max: 12, step: 0.25 },
+  { group: "Main Project", key: "css_var_mp_margin_bottom",     cssVar: "--mp-margin-bottom",     label: "Margin between",         defaultValue: "10rem",   mobileDefault: "4rem",    type: "size", unit: "rem", min: 0, max: 20, step: 0.5 },
+  { group: "Main Project", key: "css_var_mp_section_gap",       cssVar: "--mp-section-gap",       label: "Section gap",            defaultValue: "3rem",    mobileDefault: "1.5rem",  type: "size", unit: "rem", min: 0, max: 10, step: 0.25 },
+  { group: "Main Project", key: "css_var_mp_title_size",        cssVar: "--mp-title-size",        label: "Title size",             defaultValue: "2.5rem",  mobileDefault: "1.4rem",  type: "size", unit: "rem", min: 0.5, max: 6, step: 0.1 },
+  { group: "Main Project", key: "css_var_mp_number_size",       cssVar: "--mp-number-size",       label: "Number watermark size",  defaultValue: "6rem",    mobileDefault: "2.5rem",  type: "size", unit: "rem", min: 1, max: 16, step: 0.25 },
+  { group: "Main Project", key: "css_var_mp_description_size",  cssVar: "--mp-description-size",  label: "Description font size",  defaultValue: "1rem",    mobileDefault: "0.9rem",  type: "size", unit: "rem", min: 0.5, max: 2.5, step: 0.05 },
   { group: "Main Project", key: "css_var_mp_description_lh",    cssVar: "--mp-description-lh",    label: "Description line-height",defaultValue: "1.75",    type: "unitless",         min: 1, max: 3, step: 0.05 },
-  { group: "Main Project", key: "css_var_mp_stat_value_size",   cssVar: "--mp-stat-value-size",   label: "Stat value size",        defaultValue: "2rem",    type: "size", unit: "rem", min: 0.5, max: 5, step: 0.05 },
-  { group: "Main Project", key: "css_var_mp_stat_badge_size",   cssVar: "--mp-stat-badge-size",   label: "Stat badge size",        defaultValue: "2rem",    type: "size", unit: "rem", min: 1, max: 4, step: 0.05 },
-  { group: "Main Project", key: "css_var_mp_stat_gap",          cssVar: "--mp-stat-gap",          label: "Stat row gap",           defaultValue: "1rem",    type: "size", unit: "rem", min: 0, max: 4, step: 0.05 },
+  { group: "Main Project", key: "css_var_mp_stat_value_size",   cssVar: "--mp-stat-value-size",   label: "Stat value size",        defaultValue: "2rem",    mobileDefault: "1.2rem",  type: "size", unit: "rem", min: 0.5, max: 5, step: 0.05 },
+  { group: "Main Project", key: "css_var_mp_stat_badge_size",   cssVar: "--mp-stat-badge-size",   label: "Stat badge size",        defaultValue: "2rem",    mobileDefault: "1.4rem",  type: "size", unit: "rem", min: 1, max: 4, step: 0.05 },
+  { group: "Main Project", key: "css_var_mp_stat_gap",          cssVar: "--mp-stat-gap",          label: "Stat row gap",           defaultValue: "1rem",    mobileDefault: "0.5rem",  type: "size", unit: "rem", min: 0, max: 4, step: 0.05 },
   { group: "Main Project", key: "css_var_mp_thumb_strip_width", cssVar: "--mp-thumb-strip-width", label: "Thumbnail strip width",  defaultValue: "16%",     type: "size", unit: "%",   min: 5, max: 40, step: 1 },
   { group: "Main Project", key: "css_var_mp_thumb_gap",         cssVar: "--mp-thumb-gap",         label: "Thumbnail gap",          defaultValue: "0.4rem",  type: "size", unit: "rem", min: 0, max: 2, step: 0.05 },
   { group: "Main Project", key: "css_var_mp_thumb_bg",          cssVar: "--mp-thumb-bg",          label: "Thumbnail strip bg",     defaultValue: "#ffffff1a", type: "color" },
-  { group: "Main Project", key: "css_var_mp_software_size",     cssVar: "--mp-software-size",     label: "Software pill size",     defaultValue: "0.8rem",  type: "size", unit: "rem", min: 0.5, max: 1.5, step: 0.05 },
-  { group: "Main Project", key: "css_var_mp_details_gap",       cssVar: "--mp-details-gap",       label: "Description-stats gap",  defaultValue: "4rem",    type: "size", unit: "rem", min: 0, max: 10, step: 0.25 },
+  { group: "Main Project", key: "css_var_mp_software_size",     cssVar: "--mp-software-size",     label: "Software pill size",     defaultValue: "0.8rem",  mobileDefault: "0.7rem",  type: "size", unit: "rem", min: 0.5, max: 1.5, step: 0.05 },
+  { group: "Main Project", key: "css_var_mp_details_gap",       cssVar: "--mp-details-gap",       label: "Description-stats gap",  defaultValue: "4rem",    mobileDefault: "1rem",    type: "size", unit: "rem", min: 0, max: 10, step: 0.25 },
 
   //GALLERY - third section
-  { group: "Gallery", key: "css_var_gallery_columns",         cssVar: "--gallery-columns",         label: "Columns",         defaultValue: "3",      type: "int",                min: 1, max: 6, step: 1 },
-  { group: "Gallery", key: "css_var_gallery_gap",             cssVar: "--gallery-gap",             label: "Grid gap",        defaultValue: "2rem",   type: "size", unit: "rem", min: 0, max: 6, step: 0.1 },
-  { group: "Gallery", key: "css_var_gallery_card_padding",    cssVar: "--gallery-card-padding",    label: "Card padding",    defaultValue: "1rem",   type: "size", unit: "rem", min: 0, max: 3, step: 0.05 },
-  { group: "Gallery", key: "css_var_gallery_title_size",      cssVar: "--gallery-title-size",      label: "Title size",      defaultValue: "1.2rem", type: "size", unit: "rem", min: 0.5, max: 3, step: 0.05 },
-  { group: "Gallery", key: "css_var_gallery_stat_size",       cssVar: "--gallery-stat-size",       label: "Stat font size",  defaultValue: "0.9rem", type: "size", unit: "rem", min: 0.5, max: 1.5, step: 0.05 },
-  { group: "Gallery", key: "css_var_gallery_stat_badge_size", cssVar: "--gallery-stat-badge-size", label: "Stat badge size", defaultValue: "1.5rem", type: "size", unit: "rem", min: 0.75, max: 3, step: 0.05 },
+  { group: "Gallery", key: "css_var_gallery_columns",         cssVar: "--gallery-columns",         label: "Columns",         defaultValue: "3",      mobileDefault: "2",       type: "int",                min: 1, max: 6, step: 1 },
+  { group: "Gallery", key: "css_var_gallery_gap",             cssVar: "--gallery-gap",             label: "Grid gap",        defaultValue: "2rem",   mobileDefault: "0.75rem", type: "size", unit: "rem", min: 0, max: 6, step: 0.1 },
+  { group: "Gallery", key: "css_var_gallery_card_padding",    cssVar: "--gallery-card-padding",    label: "Card padding",    defaultValue: "1rem",   mobileDefault: "0.6rem",  type: "size", unit: "rem", min: 0, max: 3, step: 0.05 },
+  { group: "Gallery", key: "css_var_gallery_title_size",      cssVar: "--gallery-title-size",      label: "Title size",      defaultValue: "1.2rem", mobileDefault: "0.95rem", type: "size", unit: "rem", min: 0.5, max: 3, step: 0.05 },
+  { group: "Gallery", key: "css_var_gallery_stat_size",       cssVar: "--gallery-stat-size",       label: "Stat font size",  defaultValue: "0.9rem", mobileDefault: "0.7rem",  type: "size", unit: "rem", min: 0.5, max: 1.5, step: 0.05 },
+  { group: "Gallery", key: "css_var_gallery_stat_badge_size", cssVar: "--gallery-stat-badge-size", label: "Stat badge size", defaultValue: "1.5rem", mobileDefault: "1.1rem",  type: "size", unit: "rem", min: 0.75, max: 3, step: 0.05 },
 
   //EXPERIENCE - fourth section (timeline at the bottom)
   { group: "Experience", key: "css_var_exp_period_column",        cssVar: "--exp-period-column",        label: "Period column width", defaultValue: "8rem",   type: "size", unit: "rem", min: 4, max: 18, step: 0.25 },
@@ -89,20 +106,64 @@ const ROWS: CssVarRow[] = [
   { group: "Experience", key: "css_var_exp_line_height",          cssVar: "--exp-line-height",          label: "Line height",         defaultValue: "1.6",    type: "unitless",         min: 1, max: 3, step: 0.05 },
 
   //NAV BAR (side nav) - always-visible rail, last in the panel
-  { group: "Nav bar", key: "css_var_nav_font_size",   cssVar: "--nav-font-size",   label: "Font size",   defaultValue: "0.8rem", type: "size", unit: "rem", min: 0.5, max: 1.6, step: 0.05 },
-  { group: "Nav bar", key: "css_var_nav_gap",         cssVar: "--nav-gap",         label: "Link gap",    defaultValue: "1.5rem", type: "size", unit: "rem", min: 0, max: 6, step: 0.05 },
+  { group: "Nav bar", key: "css_var_nav_font_size",   cssVar: "--nav-font-size",   label: "Font size",   defaultValue: "0.8rem", mobileDefault: "0.7rem", type: "size", unit: "rem", min: 0.5, max: 1.6, step: 0.05 },
+  { group: "Nav bar", key: "css_var_nav_gap",         cssVar: "--nav-gap",         label: "Link gap",    defaultValue: "1.5rem", mobileDefault: "0.6rem", type: "size", unit: "rem", min: 0, max: 6, step: 0.05 },
   { group: "Nav bar", key: "css_var_nav_left",        cssVar: "--nav-left",        label: "Left offset", defaultValue: "1rem",   type: "size", unit: "rem", min: 0, max: 6, step: 0.05 },
   { group: "Nav bar", key: "css_var_nav_font_weight", cssVar: "--nav-font-weight", label: "Font weight", defaultValue: "700",    type: "int",               min: 100, max: 900, step: 100 },
 ]
 
-const savedValues = ref<Record<string, string>>({})
-const localValues = ref<Record<string, string>>({})
+//Two value maps - desktop and phone - so the author can tune each mode
+//independently. The ACTIVE mode is whichever matches the website area
+//width (auto) or whichever the user pinned via the desktop/phone toggle.
+//savedValues holds whatever was persisted on the server (per mode).
+const savedDesktop = ref<Record<string, string>>({})
+const savedMobile  = ref<Record<string, string>>({})
+const localDesktop = ref<Record<string, string>>({})
+const localMobile  = ref<Record<string, string>>({})
+
+//===========================================================================
+//RESIZABLE PANEL + AUTO PHONE-MODE
+//===========================================================================
+const panelWidth = ref<number>(loadPanelWidth())
+//User can force a mode via the header buttons; null = follow auto.
+const modeOverride = ref<"desktop" | "phone" | null>(null)
+const windowWidth = ref<number>(typeof window !== "undefined" ? window.innerWidth : 1920)
+
+function loadPanelWidth(): number {
+  if (typeof localStorage === "undefined") return PANEL_WIDTH_DEFAULT_PX
+  const raw = localStorage.getItem(PANEL_WIDTH_KEY)
+  const n = raw ? parseInt(raw, 10) : NaN
+  return Number.isFinite(n) && n >= PANEL_WIDTH_MIN_PX ? n : PANEL_WIDTH_DEFAULT_PX
+}
+
+function persistPanelWidth(w: number) {
+  try { localStorage.setItem(PANEL_WIDTH_KEY, String(Math.round(w))) } catch { /*ignore*/ }
+}
+
+//Width available for the page content next to the panel. When this drops
+//under SIMULATE_PHONE_WIDTH_PX we flip the document into simulate-phone
+//mode so component CSS that keys on .simulate-phone fires.
+const availableWidth = computed(() => Math.max(0, windowWidth.value - panelWidth.value))
+const autoPhoneMode  = computed(() => availableWidth.value < SIMULATE_PHONE_WIDTH_PX)
+const phoneMode      = computed(() =>
+  modeOverride.value === null ? autoPhoneMode.value : modeOverride.value === "phone",
+)
+
+//Mode-aware accessors so the rest of the script doesn't have to branch.
+function localValues(): Record<string, string> { return phoneMode.value ? localMobile.value  : localDesktop.value }
+function savedValues(): Record<string, string> { return phoneMode.value ? savedMobile.value  : savedDesktop.value }
+function rowDefault(row: CssVarRow): string    { return phoneMode.value ? (row.mobileDefault ?? row.defaultValue) : row.defaultValue }
+function rowKey(row: CssVarRow): string        { return phoneMode.value ? row.key + MOBILE_KEY_SUFFIX : row.key }
 
 function loadSaved() {
-  const next: Record<string, string> = {}
-  for (const row of ROWS) next[row.key] = getString(row.key, row.defaultValue)
-  savedValues.value = { ...next }
-  localValues.value = { ...next }
+  const nextD: Record<string, string> = {}
+  const nextM: Record<string, string> = {}
+  for (const row of ROWS) {
+    nextD[row.key] = getString(row.key, row.defaultValue)
+    nextM[row.key] = getString(row.key + MOBILE_KEY_SUFFIX, row.mobileDefault ?? row.defaultValue)
+  }
+  savedDesktop.value = { ...nextD }; localDesktop.value = { ...nextD }
+  savedMobile.value  = { ...nextM }; localMobile.value  = { ...nextM }
   applyAll()
 }
 
@@ -118,15 +179,19 @@ function applyToRoot(row: CssVarRow, raw: string) {
 }
 
 function applyAll() {
-  for (const row of ROWS) applyToRoot(row, localValues.value[row.key] ?? row.defaultValue)
+  //Active mode's values win - desktop tokens flow normally, phone tokens
+  //also override the same root variable so the site reacts as if it were
+  //actually rendered at phone width.
+  const values = localValues()
+  for (const row of ROWS) applyToRoot(row, values[row.key] ?? rowDefault(row))
 }
 
 function onInput(row: CssVarRow, raw: string) {
-  localValues.value[row.key] = raw
+  localValues()[row.key] = raw
   applyToRoot(row, raw)
 }
 
-function resetRow(row: CssVarRow) { onInput(row, row.defaultValue) }
+function resetRow(row: CssVarRow) { onInput(row, rowDefault(row)) }
 
 //Randomize every numeric row in a domain. Color rows are left alone (the
 //user picks them deliberately, randomizing them just yields visual noise).
@@ -148,32 +213,51 @@ function randomizeGroup(groupName: string) {
   }
 }
 
+//Dirty status spans BOTH modes - a save commits whatever has changed in
+//either bucket. We don't want the author to lose phone tweaks just
+//because they were viewing the desktop tab.
 const dirty = computed(() => {
   for (const row of ROWS) {
-    if (localValues.value[row.key] !== savedValues.value[row.key]) return true
+    if (localDesktop.value[row.key] !== savedDesktop.value[row.key]) return true
+    if (localMobile.value[row.key]  !== savedMobile.value[row.key])  return true
   }
   return false
 })
 
 async function save() {
   for (const row of ROWS) {
-    const next = localValues.value[row.key]
-    if (next === savedValues.value[row.key]) continue
-    try {
-      await update(row.key, next, {
-        type:        "string",
-        group:       "css-vars",
-        description: `CSS variable ${row.cssVar}`,
-      })
-    } catch (err) {
-      console.error(`[css-panel] save ${row.key} failed:`, err)
+    const nextD = localDesktop.value[row.key]
+    if (nextD !== savedDesktop.value[row.key]) {
+      try {
+        await update(row.key, nextD, {
+          type:        "string",
+          group:       "css-vars",
+          description: `CSS variable ${row.cssVar} (desktop)`,
+        })
+      } catch (err) {
+        console.error(`[css-panel] save ${row.key} failed:`, err)
+      }
+    }
+    const nextM = localMobile.value[row.key]
+    if (nextM !== savedMobile.value[row.key]) {
+      try {
+        await update(row.key + MOBILE_KEY_SUFFIX, nextM, {
+          type:        "string",
+          group:       "css-vars",
+          description: `CSS variable ${row.cssVar} (phone)`,
+        })
+      } catch (err) {
+        console.error(`[css-panel] save ${row.key}${MOBILE_KEY_SUFFIX} failed:`, err)
+      }
     }
   }
-  savedValues.value = { ...localValues.value }
+  savedDesktop.value = { ...localDesktop.value }
+  savedMobile.value  = { ...localMobile.value }
 }
 
 function discard() {
-  localValues.value = { ...savedValues.value }
+  localDesktop.value = { ...savedDesktop.value }
+  localMobile.value  = { ...savedMobile.value }
   applyAll()
 }
 
@@ -195,7 +279,7 @@ function cancelClose() { confirming.value = false }
 watch(dirty, (val) => { if (!val) confirming.value = false })
 
 function sizeNumber(row: CssVarRow): number {
-  const raw = localValues.value[row.key] ?? row.defaultValue
+  const raw = localValues()[row.key] ?? rowDefault(row)
   return parseFloat(raw) || 0
 }
 
@@ -255,7 +339,7 @@ function hslToHex(hsl: string): string {
 }
 
 function colorHex(row: CssVarRow): string {
-  const raw = localValues.value[row.key] ?? row.defaultValue
+  const raw = localValues()[row.key] ?? rowDefault(row)
   if (row.type === "color-hsl")    return hslToHex(raw)
   if (row.type === "color-accent") return raw    //already a hex string
   const match = raw.match(/#[0-9a-fA-F]{6}/)
@@ -286,11 +370,72 @@ const grouped = computed(() => {
 watch(open, (val) => {
   document.documentElement.classList.toggle("css-panel-open", val)
   if (val && loaded.value) loadSaved()
+  //panel-width var on the root so the rest of the app can offset for it
+  if (val) document.documentElement.style.setProperty("--panel-width", `${panelWidth.value}px`)
+  else     document.documentElement.style.removeProperty("--panel-width")
+  syncPhoneClass()
 })
 
 watch(loaded, () => { if (loaded.value) loadSaved() })
-onMounted(() => { if (loaded.value) loadSaved() })
-onBeforeUnmount(() => { document.documentElement.classList.remove("css-panel-open") })
+
+//===========================================================================
+//RESIZE INTERACTION - drag the left edge of the panel
+//===========================================================================
+const dragging = ref(false)
+
+function onResizeStart(e: PointerEvent) {
+  if (!open.value) return
+  dragging.value = true
+  document.body.style.cursor = "col-resize"
+  ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+  e.preventDefault()
+}
+
+function onResizeMove(e: PointerEvent) {
+  if (!dragging.value) return
+  const next = Math.max(PANEL_WIDTH_MIN_PX, window.innerWidth - e.clientX)
+  panelWidth.value = next
+  document.documentElement.style.setProperty("--panel-width", `${next}px`)
+}
+
+function onResizeEnd(e: PointerEvent) {
+  if (!dragging.value) return
+  dragging.value = false
+  document.body.style.cursor = ""
+  ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+  persistPanelWidth(panelWidth.value)
+}
+
+//===========================================================================
+//PHONE-MODE BRIDGE - keep the html class + active values in sync.
+//===========================================================================
+function syncPhoneClass() {
+  document.documentElement.classList.toggle("simulate-phone", open.value && phoneMode.value)
+}
+
+//Apply the active mode's values + flip the html class whenever either
+//the auto-detection (window or panel resize) or the manual override flips.
+watch(phoneMode, () => {
+  syncPhoneClass()
+  if (loaded.value) applyAll()
+})
+
+function onWindowResize() {
+  windowWidth.value = window.innerWidth
+}
+
+onMounted(() => {
+  window.addEventListener("resize", onWindowResize)
+  if (loaded.value) loadSaved()
+  syncPhoneClass()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", onWindowResize)
+  document.documentElement.classList.remove("css-panel-open")
+  document.documentElement.classList.remove("simulate-phone")
+  document.documentElement.style.removeProperty("--panel-width")
+})
 </script>
 
 <template>
@@ -301,10 +446,44 @@ onBeforeUnmount(() => { document.documentElement.classList.remove("css-panel-ope
         class="css-panel"
         role="dialog"
         aria-label="Global CSS variables editor"
+        :style="{ width: `${panelWidth}px` }"
       >
+        <!--Resize handle on the LEFT edge (panel is anchored right)-->
+        <div
+          class="css-panel__resize"
+          aria-hidden="true"
+          @pointerdown="onResizeStart"
+          @pointermove="onResizeMove"
+          @pointerup="onResizeEnd"
+          @pointercancel="onResizeEnd"
+        ></div>
+
         <header class="css-panel__header">
           <template v-if="!confirming">
             <h2 class="css-panel__title">CSS variables</h2>
+            <!--Mode toggle - Desktop / Phone. Null override = follows the
+            auto detection (panel width vs viewport). The label dot below
+            shows which mode is currently active.-->
+            <div class="css-panel__mode-toggle" role="group" aria-label="Mode">
+              <button
+                type="button"
+                class="css-panel__mode-btn"
+                :class="{ 'css-panel__mode-btn--active': !phoneMode }"
+                :title="autoPhoneMode ? 'Pin desktop (auto says phone)' : 'Desktop mode'"
+                @click="modeOverride = modeOverride === 'desktop' ? null : 'desktop'"
+              >
+                <Monitor :size="13" />
+              </button>
+              <button
+                type="button"
+                class="css-panel__mode-btn"
+                :class="{ 'css-panel__mode-btn--active': phoneMode }"
+                :title="autoPhoneMode ? 'Phone mode (auto)' : 'Pin phone (override desktop)'"
+                @click="modeOverride = modeOverride === 'phone' ? null : 'phone'"
+              >
+                <Smartphone :size="13" />
+              </button>
+            </div>
             <button
               type="button"
               class="css-panel__close"
@@ -347,14 +526,14 @@ onBeforeUnmount(() => { document.documentElement.classList.remove("css-panel-ope
               v-for="row in g.rows"
               :key="row.key"
               class="css-panel__row"
-              :class="{ 'css-panel__row--dirty': localValues[row.key] !== savedValues[row.key] }"
+              :class="{ 'css-panel__row--dirty': localValues()[row.key] !== savedValues()[row.key] }"
             >
               <div class="css-panel__row-head">
                 <span class="css-panel__row-label">{{ row.label }}</span>
                 <button
                   type="button"
                   class="css-panel__reset"
-                  :title="`Reset to ${row.defaultValue}`"
+                  :title="`Reset to ${rowDefault(row)}`"
                   @click="resetRow(row)"
                 >
                   <RotateCcw :size="11" />
@@ -372,7 +551,7 @@ onBeforeUnmount(() => { document.documentElement.classList.remove("css-panel-ope
                   <input
                     class="css-panel__text"
                     type="text"
-                    :value="localValues[row.key] ?? row.defaultValue"
+                    :value="localValues()[row.key] ?? rowDefault(row)"
                     @input="(e) => onInput(row, (e.target as HTMLInputElement).value)"
                   />
                 </template>
@@ -397,10 +576,10 @@ onBeforeUnmount(() => { document.documentElement.classList.remove("css-panel-ope
                     :min="row.min"
                     :max="row.max"
                     :step="row.step"
-                    :value="parseFloat(localValues[row.key] ?? row.defaultValue) || 0"
+                    :value="parseFloat(localValues()[row.key] ?? rowDefault(row)) || 0"
                     @input="(e) => onUnitlessInput(row, (e.target as HTMLInputElement).value)"
                   />
-                  <span class="css-panel__readout">{{ localValues[row.key] ?? row.defaultValue }}</span>
+                  <span class="css-panel__readout">{{ localValues()[row.key] ?? rowDefault(row) }}</span>
                 </template>
 
                 <template v-else-if="row.type === 'int'">
@@ -410,18 +589,18 @@ onBeforeUnmount(() => { document.documentElement.classList.remove("css-panel-ope
                     :min="row.min"
                     :max="row.max"
                     :step="row.step"
-                    :value="parseInt(localValues[row.key] ?? row.defaultValue, 10) || 0"
+                    :value="parseInt(localValues()[row.key] ?? rowDefault(row), 10) || 0"
                     @input="(e) => onIntInput(row, (e.target as HTMLInputElement).value)"
                   />
-                  <span class="css-panel__readout">{{ localValues[row.key] ?? row.defaultValue }}</span>
+                  <span class="css-panel__readout">{{ localValues()[row.key] ?? rowDefault(row) }}</span>
                 </template>
 
                 <template v-else>
                   <input
                     class="css-panel__text"
                     type="text"
-                    :value="localValues[row.key] ?? row.defaultValue"
-                    :placeholder="row.defaultValue"
+                    :value="localValues()[row.key] ?? rowDefault(row)"
+                    :placeholder="rowDefault(row)"
                     @input="(e) => onInput(row, (e.target as HTMLInputElement).value)"
                   />
                 </template>
@@ -498,12 +677,36 @@ still track the user's accent choice.*/
   top:    0;
   right:  0;
   bottom: 0;
+  /*Inline `width: ${panelWidth}px` is set by the component; the var
+  fallback covers the (rare) case where the inline style isn't applied
+  yet on first paint.*/
   width: var(--panel-width, 28rem);
+  min-width: 280px;
+  max-width: 95vw;
   z-index: 9990;
   display: flex;
   flex-direction: column;
   background-color: hsl(0 0% 0%);
   border-left: 1px solid hsl(0 0% 20%);
+}
+
+/*Resize handle - thin invisible grab strip on the LEFT edge of the panel
+(since the panel is anchored right). Pointer events propagate to the
+script handlers which update --panel-width live and persist on release.*/
+.css-panel__resize {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 0;
+  width: 6px;
+  margin-left: -3px;   /*half outside the panel so the hit area is centered*/
+  cursor: col-resize;
+  z-index: 2;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+.css-panel__resize:hover,
+.css-panel__resize:active {
+  background-color: var(--color-accent);
 }
 
 .css-panel__header {
@@ -537,6 +740,31 @@ still track the user's accent choice.*/
 }
 
 .css-panel__close:hover { color: var(--color-text-hover); }
+
+/*Desktop / Phone mode toggle - segmented control at the right of the
+header. Active button is filled with --tag-bg; inactive ones are flat.*/
+.css-panel__mode-toggle {
+  display: inline-flex;
+  margin-left: auto;
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+}
+.css-panel__mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width:  var(--spacing-xl);
+  height: var(--spacing-lg);
+  background-color: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.css-panel__mode-btn:hover { color: var(--color-text-hover); }
+.css-panel__mode-btn--active {
+  color: var(--color-text-hover);
+  background-color: var(--tag-bg);
+}
 
 .css-panel__confirm-label {
   font-size: var(--font-size-xs);

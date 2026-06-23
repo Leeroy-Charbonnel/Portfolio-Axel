@@ -404,8 +404,10 @@ RESPONSIVE - global token overrides for tablet (<= 1024px) and phone
 (<= 480px). Component CSS already handles structural collapses (grids
 becoming columns, side-nav becoming a bottom bar). These rules shrink
 the visual scale so titles + spacing don't dominate the viewport.
-The 480px threshold matches the "small phone" definition we use across
-the SideNav + ProjectGallery + MainProject component breakpoints.*/
+Every phone-mode rule below ALSO fires when html.simulate-phone is set
+(the CssVarsPanel adds it when its drag makes the page area narrow).
+The CssVarsPanel itself uses the same tokens; .css-panel re-declares
+them locally so its UI doesn't shrink in simulate-phone mode.*/
 @media (max-width: 1024px) {
   :root {
     --mp-title-size:        2rem;
@@ -419,6 +421,10 @@ the SideNav + ProjectGallery + MainProject component breakpoints.*/
   }
 }
 
+/*Note: the CssVarsPanel writes the active mode's chosen values back
+onto :root inline so the cascade picks them up regardless of which
+@media rules also match. These :root overrides act as defaults when
+the panel hasn't been edited.*/
 @media (max-width: 480px) {
   :root {
     --mp-padding-y:         2rem;
@@ -448,10 +454,16 @@ the SideNav + ProjectGallery + MainProject component breakpoints.*/
     --nav-font-size:        0.7rem;
     --nav-gap:              0.6rem;
   }
-
-  /*Tighter horizontal padding on the section frame - the default 1rem
-  pads the gallery cards to the edge but on small phones the cards
-  themselves want every pixel.*/
   .container { padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
   .section-title { font-size: var(--font-size-lg); }
 }
+
+/*Class-driven simulate-phone: same structural rules as the 480px media
+query so the CssVarsPanel can preview phone layout in a desktop window.
+The class is added on html by the panel when its width + the viewport
+combo leaves under 768px for the page area.*/
+html.simulate-phone .container {
+  padding-left: var(--spacing-sm);
+  padding-right: var(--spacing-sm);
+}
+html.simulate-phone .section-title { font-size: var(--font-size-lg); }

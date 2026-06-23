@@ -295,8 +295,9 @@ const sectionOpen = ref({
   wfMode:       false,
   wfHdr:        false,
   wfMaterial:   false,
-  //wfLights section was removed - lights live in the Lights tab as a
-  //single shared list (per-mode intensity+color via sub-blocks)
+  //Wireframe tab also shows the Lights list as a read-only-tweak section
+  //(add/remove are Lights-tab only); this controls its accordion state.
+  wfLights:     false,
   wfEmissive:   false,
 })
 
@@ -2696,9 +2697,54 @@ async function onSave() {
             </div>
           </section>
 
-          <!--Lights are shared between modes - manage them from the Lights
-          tab; the per-mode intensity / color live there as a dedicated
-          "Wireframe" sub-block on each light.-->
+          <!--Lights are SHARED with normal mode but exposed here too so
+          the author can tune the wireframe pair (intensity + color) for
+          each existing light without leaving the tab. ADD/REMOVE happen
+          in the Lights tab only; here we offer read-only tweak controls.-->
+          <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfLights }">
+            <button type="button" class="editor__section-head" @click="sectionOpen.wfLights = !sectionOpen.wfLights">
+              <span class="editor__section-title">Lights (wireframe values)</span>
+              <ChevronDown :size="14" class="editor__section-chevron" />
+            </button>
+            <div v-show="sectionOpen.wfLights" class="editor__section-body">
+              <p v-if="!lights.length" class="editor__empty">No lights — add one in the Lights tab</p>
+              <article
+                v-for="(e, i) in lights"
+                :key="e.id"
+                class="editor__mat editor__light-row"
+                :class="{ 'editor__mat--selected': selectedLightId?.endsWith(`:${e.id}`) }"
+                @mouseenter="onLightHover(i, true)"
+                @mouseleave="onLightHover(i, false)"
+              >
+                <div class="editor__mat-head editor__mat-head--static editor__light-head">
+                  <span
+                    class="editor__light-swatch-dot"
+                    :style="{ backgroundColor: e.wfColor }"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="editor__mat-title editor__light-name">{{ e.type === 'point' ? 'Point' : 'Directional' }} {{ i + 1 }}</span>
+                  <button type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `src:${e.id}` }" @click="selectGizmo(i, 'source')" title="Source">S</button>
+                  <button v-if="e.type === 'directional'" type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `tgt:${e.id}` }" @click="selectGizmo(i, 'target')" title="Target">T</button>
+                </div>
+                <div class="editor__mat-body">
+                  <div class="editor__row">
+                    <label class="editor__row-label">Intensity</label>
+                    <div class="editor__row-control">
+                      <input type="range" class="editor__slider" min="0" max="10" step="0.05" :value="e.wfIntensity" @input="(ev) => onLightIntensity('wireframe', i, parseFloat((ev.target as HTMLInputElement).value))" />
+                      <span class="editor__readout">{{ e.wfIntensity.toFixed(2) }}</span>
+                    </div>
+                  </div>
+                  <div class="editor__row">
+                    <label class="editor__row-label">Color</label>
+                    <div class="editor__row-control">
+                      <input type="color" class="editor__color" :value="e.wfColor" @input="(ev) => onLightColorChange('wireframe', i, (ev.target as HTMLInputElement).value)" />
+                      <span class="editor__readout">{{ e.wfColor }}</span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
 
           <!--Emissive objects section-->
           <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfEmissive }">

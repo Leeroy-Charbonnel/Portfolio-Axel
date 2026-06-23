@@ -104,7 +104,8 @@ onBeforeUnmount(() => {
 
 /*Mobile - the desktop vertical-text rail doesn't fit on a narrow viewport
 so we re-orient as a horizontal pill bar pinned to the bottom edge. Same
-behaviour, just laid out differently.*/
+behaviour, just laid out differently. simulate-phone mirrors the layout
+for the CssVarsPanel preview without needing an actual narrow window.*/
 @media (max-width: 768px) {
   .side-nav {
     top:    auto;
@@ -122,5 +123,22 @@ behaviour, just laid out differently.*/
     writing-mode: horizontal-tb;
     transform: none;
   }
+}
+
+html.simulate-phone .side-nav {
+  top:    auto;
+  bottom: var(--spacing-sm);
+  left:   50%;
+  transform: translateX(-50%);
+  flex-direction: row;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background-color: hsl(0 0% 0% / 0.6);
+  backdrop-filter: blur(var(--filter-blur));
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+}
+html.simulate-phone .side-nav__link {
+  writing-mode: horizontal-tb;
+  transform: none;
 }
 </style>

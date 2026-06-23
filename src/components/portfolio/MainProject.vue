@@ -1102,4 +1102,36 @@ fit the side column or move to a horizontal row at the bottom.*/
   }
   .main-project__software-name { display: none; }
 }
+
+/*simulate-phone mirror so the CssVarsPanel can preview the phone layout
+without resizing the actual window.*/
+html.simulate-phone .main-project {
+  padding: var(--spacing-xl) 0;
+  margin-bottom: var(--spacing-5xl);
+}
+html.simulate-phone .main-project__stage { aspect-ratio: 4 / 5; }
+html.simulate-phone .main-project__details-top {
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+html.simulate-phone .main-project__stats {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  min-width: 0;
+}
+html.simulate-phone .main-project__software-name { display: none; }
+html.simulate-phone .main-project--layout-thumbs-left .main-project__thumbnails,
+html.simulate-phone .main-project--layout-thumbs-right .main-project__thumbnails {
+  top: auto;
+  bottom: var(--spacing-md);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  flex-direction: row;
+  width: auto;
+  max-width: calc(100% - var(--spacing-xl) * 2);
+  max-height: none;
+  height: var(--spacing-5xl);
+}
 </style>

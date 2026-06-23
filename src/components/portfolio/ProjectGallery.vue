@@ -322,17 +322,28 @@ one visual language.*/
 
 /*Responsive grid - phones get 2 columns (not 1, there's room) so the
 gallery feels dense; tablets get 2; only very narrow / portrait phones
-collapse to a single column.*/
+collapse to a single column. The .simulate-phone selectors mirror the
+same layout for the CssVarsPanel preview.*/
 @media (max-width: 1024px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 480px)  {
   .gallery-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-sm);
   }
-  /*4-badge stats row would be cramped at this width - drop to 2x2*/
   .gallery-item__stats {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-xs);
   }
+}
+
+/*simulate-phone (driven by the CssVarsPanel's drag). html.simulate-phone
+is an ancestor selector; scoped CSS still hashes the descendant.*/
+html.simulate-phone .gallery-grid {
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-sm);
+}
+html.simulate-phone .gallery-item__stats {
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-xs);
 }
 </style>

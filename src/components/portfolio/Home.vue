@@ -278,4 +278,13 @@ jumps to #projects.*/
   .home-section__subtitle { font-size: var(--font-size-md); }
   .home-section__role     { font-size: var(--font-size-base); }
 }
+
+/*simulate-phone mirror (for the CssVarsPanel preview).*/
+html.simulate-phone .home-section__title    { font-size: var(--font-size-xl); }
+html.simulate-phone .home-section__subtitle { font-size: var(--font-size-md); }
+html.simulate-phone .home-section__role     { font-size: var(--font-size-base); }
+html.simulate-phone .home-section__title-wrap {
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-lg);
+}
 </style>
