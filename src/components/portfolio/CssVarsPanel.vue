@@ -460,7 +460,13 @@ onBeforeUnmount(() => {
 
         <header class="css-panel__header">
           <template v-if="!confirming">
-            <h2 class="css-panel__title">CSS variables</h2>
+            <h2
+              class="css-panel__title"
+              :class="{ 'css-panel__title--phone': phoneMode }"
+            >
+              CSS variables
+              <span class="css-panel__title-mode">{{ phoneMode ? "Phone" : "Desktop" }}</span>
+            </h2>
             <!--Mode toggle - Desktop / Phone. Null override = follows the
             auto detection (panel width vs viewport). The label dot below
             shows which mode is currently active.-->
@@ -719,11 +725,27 @@ script handlers which update --panel-width live and persist on release.*/
 }
 
 .css-panel__title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-xs);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
   color: var(--color-text-hover);
+  transition: color 0.15s ease;
+}
+
+/*Phone-mode tint - title glows accent so it's obvious which value set
+the panel is currently editing without checking the toggle buttons.*/
+.css-panel__title--phone { color: var(--color-accent); }
+
+.css-panel__title-mode {
+  padding: 0 var(--spacing-xs);
+  border: var(--border-width-sm) solid currentColor;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-tight);
+  opacity: 0.85;
 }
 
 .css-panel__close {
