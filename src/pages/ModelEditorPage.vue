@@ -2496,16 +2496,28 @@ async function onSave() {
       ViewHelper viewport so axis-snap + scene-debug controls live in the
       same spot. Stacked vertically, each row owns one feature.-->
       <div class="editor__viewport-tools">
-        <!--Show / hide light gizmos in the scene-->
-        <button
-          type="button"
-          class="editor__viewport-tool"
-          :class="{ 'editor__viewport-tool--off': !showLightGizmos }"
-          :data-tooltip="showLightGizmos ? 'Hide light gizmos' : 'Show light gizmos'"
-          @click="onShowGizmosToggle(!showLightGizmos)"
-        >
-          <component :is="showLightGizmos ? Eye : EyeOff" :size="14" />
-        </button>
+        <!--VIEWPORT TOGGLES cluster: light-gizmos visibility + camera
+        projection sit together as a single row since both control HOW
+        the viewport is rendered (debug overlays + projection math).-->
+        <div class="editor__viewport-cluster-row">
+          <button
+            type="button"
+            class="editor__viewport-tool"
+            :class="{ 'editor__viewport-tool--off': !showLightGizmos }"
+            :data-tooltip="showLightGizmos ? 'Hide light gizmos' : 'Show light gizmos'"
+            @click="onShowGizmosToggle(!showLightGizmos)"
+          >
+            <component :is="showLightGizmos ? Eye : EyeOff" :size="14" />
+          </button>
+          <button
+            type="button"
+            class="editor__viewport-tool"
+            :data-tooltip="cameraMode === 'persp' ? 'Switch to orthographic' : 'Switch to perspective'"
+            @click="switchCamera(cameraMode === 'persp' ? 'ortho' : 'persp')"
+          >
+            <component :is="cameraMode === 'persp' ? Box : Square" :size="14" />
+          </button>
+        </div>
 
         <!--START POSE grid - two columns (desktop / phone) with a greyed
         device icon as a column "label", then the two action buttons below
@@ -2558,16 +2570,6 @@ async function onSave() {
           </div>
         </div>
 
-        <!--Perspective / orthographic projection toggle. Ortho avoids the
-        perspective skew at the poles - useful when snapping to top view.-->
-        <button
-          type="button"
-          class="editor__viewport-tool"
-          :data-tooltip="cameraMode === 'persp' ? 'Switch to orthographic' : 'Switch to perspective'"
-          @click="switchCamera(cameraMode === 'persp' ? 'ortho' : 'persp')"
-        >
-          <component :is="cameraMode === 'persp' ? Box : Square" :size="14" />
-        </button>
       </div>
      </div>
     </div>
@@ -3111,6 +3113,17 @@ they pair visually with the ViewHelper cube.*/
   display: flex; flex-direction: column; gap: var(--spacing-xxs);
   z-index: 5;
 }
+/*Horizontal cluster - two related single-purpose buttons that read as a
+pair (eg. light-gizmos toggle + projection toggle).*/
+.editor__viewport-cluster-row {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+.editor__viewport-cluster-row > .editor__viewport-tool + .editor__viewport-tool {
+  border-left-width: 0;
+}
+
 /*START POSE grid - two columns (desktop / phone) side by side. Each
 column has a greyed device icon at the top acting as a label, then the
 save + go buttons stacked below it. Gap between the two columns is what
