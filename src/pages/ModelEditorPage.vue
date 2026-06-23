@@ -49,6 +49,7 @@ import { RenderPass }        from "three/examples/jsm/postprocessing/RenderPass.
 import { OutputPass }        from "three/examples/jsm/postprocessing/OutputPass.js"
 import { SMAAPass }          from "three/examples/jsm/postprocessing/SMAAPass.js"
 import { ViewHelper }        from "three/examples/jsm/helpers/ViewHelper.js"
+import { toAbsoluteUrl, toRelativeUrl } from "../lib/api-base"
 
 //MODEL EDITOR - 4-tab side panel design:
 //  - Materials  : per-material accordion. Click a mesh in scene to open it
@@ -765,7 +766,7 @@ async function loadProjectAndModel() {
     return
   }
   try {
-    const res = await fetch(`/api/main-project/${projectId.value}`, { credentials: "include" })
+    const res = await fetch(toAbsoluteUrl(`/api/main-project/${projectId.value}`), { credentials: "include" })
     if (!res.ok) throw new Error(`fetch project ${res.status}`)
     const row = await res.json() as {
       id: number
@@ -774,9 +775,11 @@ async function loadProjectAndModel() {
       viewerSettings: unknown
     }
     projectTitle.value = row.title?.en ?? `Project ${row.id}`
-    glbUrl.value = row.glbUrl
+    //GLB URL needs to be absolute too so GLTFLoader (which uses fetch
+    //internally) doesn't ask localhost for the model.
+    glbUrl.value = row.glbUrl ? toAbsoluteUrl(row.glbUrl) : null
     if (row.viewerSettings) hydrateFromSavedSettings(row.viewerSettings)
-    if (row.glbUrl) loadGlbFn?.(row.glbUrl)
+    if (row.glbUrl) loadGlbFn?.(toAbsoluteUrl(row.glbUrl))
     else status.value = "No .glb yet — use Upload .glb above to start editing"
   } catch (e) {
     console.error("[edit-3d] project load failed:", e)
@@ -1004,19 +1007,19 @@ async function uploadGlb() {
     glbUploadError.value = null
     try {
       const fd = new FormData(); fd.append("file", file)
-      const res = await fetch("/api/files", { method: "POST", credentials: "include", body: fd })
+      const res = await fetch(toAbsoluteUrl("/api/files"), { method: "POST", credentials: "include", body: fd })
       if (!res.ok) throw new Error(`upload ${res.status} ${await res.text().catch(() => "")}`)
       const row = await res.json() as { id: string; url: string }
       //attach the file to the project
-      const patch = await fetch(`/api/main-project/${projectId.value}`, {
+      const patch = await fetch(toAbsoluteUrl(`/api/main-project/${projectId.value}`), {
         method:      "PUT",
         credentials: "include",
         headers:     { "Content-Type": "application/json" },
         body:        JSON.stringify({ glbFileId: row.id }),
       })
       if (!patch.ok) throw new Error(`patch ${patch.status}`)
-      glbUrl.value = row.url
-      loadGlbFn?.(row.url)
+      glbUrl.value = toAbsoluteUrl(row.url)
+      loadGlbFn?.(toAbsoluteUrl(row.url))
     } catch (e) {
       glbUploadError.value = e instanceof Error ? e.message : String(e)
       console.error("[edit-3d] glb upload failed:", e)
@@ -1031,7 +1034,7 @@ async function saveViewerSettings(payload: unknown) {
   if (!Number.isFinite(projectId.value)) return
   isSaving.value = true; saveError.value = null
   try {
-    const res = await fetch(`/api/main-project/${projectId.value}/viewer-settings`, {
+    const res = await fetch(toAbsoluteUrl(`/api/main-project/${projectId.value}/viewer-settings`), {
       method:      "PUT",
       credentials: "include",
       headers:     { "Content-Type": "application/json" },
@@ -1248,10 +1251,10 @@ async function uploadHdrFile(file: File) {
   hdrUploading.value = true; hdrError.value = null
   try {
     const fd = new FormData(); fd.append("file", file)
-    const res = await fetch("/api/files", { method: "POST", credentials: "include", body: fd })
+    const res = await fetch(toAbsoluteUrl("/api/files"), { method: "POST", credentials: "include", body: fd })
     if (!res.ok) throw new Error(`upload ${res.status} ${await res.text().catch(() => "")}`)
     const row = await res.json() as { id: string; url: string; originalFilename: string }
-    const entry: HdrEntry = { id: row.id, url: row.url, name: row.originalFilename ?? file.name, thumbnail: null }
+    const entry: HdrEntry = { id: row.id, url: toAbsoluteUrl(row.url), name: row.originalFilename ?? file.name, thumbnail: null }
     hdris.value = [...hdris.value, entry]
     ensureHdrThumbnail(entry)
   } catch (e) {
@@ -1300,7 +1303,7 @@ function onHdrDragLeave() { hdrDragOver.value = false }
 async function deleteHdr(entry: HdrEntry) {
   if (!window.confirm(`Delete ${entry.name}?`)) return
   try {
-    const res = await fetch(`/api/files/${entry.id}`, { method: "DELETE", credentials: "include" })
+    const res = await fetch(toAbsoluteUrl(`/api/files/${entry.id}`), { method: "DELETE", credentials: "include" })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
       hdrError.value = body.error ?? `delete returned ${res.status}`
@@ -1323,12 +1326,12 @@ async function deleteHdr(entry: HdrEntry) {
 
 async function loadExistingHdris() {
   try {
-    const res = await fetch("/api/files", { credentials: "include" })
+    const res = await fetch(toAbsoluteUrl("/api/files"), { credentials: "include" })
     if (!res.ok) return
     const all = await res.json() as Array<{ id: string; url: string; originalFilename: string }>
     hdris.value = all
       .filter((f) => /\.(hdr|exr|hdri)$/i.test(f.originalFilename))
-      .map((f) => ({ id: f.id, url: f.url, name: f.originalFilename, thumbnail: null }))
+      .map((f) => ({ id: f.id, url: toAbsoluteUrl(f.url), name: f.originalFilename, thumbnail: null }))
     //kick off thumbnail generation for every entry so the list shows
     //previews even before any of them is selected
     for (const entry of hdris.value) ensureHdrThumbnail(entry)
@@ -2244,12 +2247,14 @@ async function onSave() {
       //the resolved /media/<storedFilename> path embedded so ThreeViewer
       //can apply the env without needing the file library at runtime.
       hdrId:  normalHdrId.value,
-      hdrUrl: normalHdrId.value ? (hdris.value.find((h) => h.id === normalHdrId.value)?.url ?? null) : null,
+      //Persist the RELATIVE /media path so the saved settings stay
+      //environment-agnostic (the viewer prepends the base URL at runtime).
+      hdrUrl: normalHdrId.value ? toRelativeUrl(hdris.value.find((h) => h.id === normalHdrId.value)?.url ?? null) : null,
       hdrIntensity: normalHdrIntensity.value,
     },
     wireframeMode: {
       hdrId:  wfHdrId.value,
-      hdrUrl: wfHdrId.value ? (hdris.value.find((h) => h.id === wfHdrId.value)?.url ?? null) : null,
+      hdrUrl: wfHdrId.value ? toRelativeUrl(hdris.value.find((h) => h.id === wfHdrId.value)?.url ?? null) : null,
       hdrIntensity: wfHdrIntensity.value,
       color: wireframeColor.value,
       overlayOn: wireframeOverlayOn.value, overlayColor: wireframeOverlayColor.value,

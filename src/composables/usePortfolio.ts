@@ -1,5 +1,26 @@
 import { ref } from "vue"
 import type { PortfolioDto } from "../types/portfolio"
+import { API_BASE_URL, toAbsoluteUrl } from "../lib/api-base"
+
+//Walk an arbitrary JSON tree and prepend API_BASE_URL to every string that
+//starts with "/media" or "/api". Mutates in place to avoid copying large
+//portfolio payloads. Called once on each fetch when API_BASE_URL is set;
+//noop otherwise.
+function rewriteUrls(value: unknown): void {
+  if (!API_BASE_URL) return
+  if (value === null || value === undefined) return
+  if (Array.isArray(value)) { for (const v of value) rewriteUrls(v); return }
+  if (typeof value !== "object") return
+  const obj = value as Record<string, unknown>
+  for (const k of Object.keys(obj)) {
+    const v = obj[k]
+    if (typeof v === "string" && (v.startsWith("/media") || v.startsWith("/api"))) {
+      obj[k] = toAbsoluteUrl(v)
+    } else if (v && typeof v === "object") {
+      rewriteUrls(v)
+    }
+  }
+}
 
 //SHARED portfolio state - one fetch per page load, cached in module scope so
 //every section component reads the same ref. No silent fallback: on error we
@@ -23,9 +44,13 @@ async function fetchPortfolio() {
 
   inFlight = (async () => {
     try {
-      const res = await fetch("/api/portfolio", { credentials: "include" })
+      const res = await fetch(toAbsoluteUrl("/api/portfolio"), { credentials: "include" })
       if (!res.ok) throw new Error(`/api/portfolio returned ${res.status}`)
-      data.value = await res.json()
+      const payload = await res.json()
+      //Rewrite every /media + /api URL inside the payload so <img src=...>
+      //and similar bindings hit prod directly instead of localhost.
+      rewriteUrls(payload)
+      data.value = payload
       loaded.value = true
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -50,7 +75,7 @@ async function reload() {
 //server-side denormalization like file ids -> media URLs).
 
 async function apiJson(method: string, path: string, body?: unknown): Promise<any> {
-  const res = await fetch(path, {
+  const res = await fetch(toAbsoluteUrl(path), {
     method,
     credentials: "include",
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
@@ -60,16 +85,20 @@ async function apiJson(method: string, path: string, body?: unknown): Promise<an
     const txt = await res.text().catch(() => "")
     throw new Error(`${method} ${path} -> ${res.status} ${txt}`)
   }
-  return res.json()
+  const json = await res.json()
+  rewriteUrls(json)
+  return json
 }
 
 //FILE UPLOAD - returns { id, url, ... } on success. multipart, no JSON.
 async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   const fd = new FormData()
   fd.append("file", file)
-  const res = await fetch("/api/files", { method: "POST", credentials: "include", body: fd })
+  const res = await fetch(toAbsoluteUrl("/api/files"), { method: "POST", credentials: "include", body: fd })
   if (!res.ok) throw new Error(`upload failed: ${res.status}`)
-  return res.json()
+  const json = await res.json()
+  rewriteUrls(json)
+  return json
 }
 
 //MAIN PROJECT mutations
@@ -96,7 +125,7 @@ async function createSoftware(logo: File, key: string, url: string) {
   fd.append("logo", logo)
   fd.append("key", key)
   fd.append("url", url)
-  const res = await fetch("/api/software", { method: "POST", credentials: "include", body: fd })
+  const res = await fetch(toAbsoluteUrl("/api/software"), { method: "POST", credentials: "include", body: fd })
   if (!res.ok) {
     const txt = await res.text().catch(() => "")
     throw new Error(`POST /api/software -> ${res.status} ${txt}`)
