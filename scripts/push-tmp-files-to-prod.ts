@@ -28,18 +28,37 @@ const env = await Bun.file(".env").text().then((t) => {
   return out
 })
 
-const FORWARD_URL    = env.FILES_FORWARD_URL?.replace(/\/$/, "")
-const FORWARD_SECRET = env.FILES_FORWARD_SECRET ?? ""
-const DATABASE_URL   = env.DATABASE_URL
+const FORWARD_URL        = env.FILES_FORWARD_URL?.replace(/\/$/, "")
+const FORWARD_SECRET     = env.FILES_FORWARD_SECRET ?? ""
+const PROD_BASE_URL      = (env.PROD_BASE_URL ?? "https://axel.somerandomcreator.com").replace(/\/$/, "")
+const PROD_SESSION_COOKIE = env.PROD_SESSION_COOKIE ?? ""
+const DATABASE_URL       = env.DATABASE_URL
 
-if (!FORWARD_URL || !FORWARD_SECRET) {
-  console.error("[push-tmp] FILES_FORWARD_URL or FILES_FORWARD_SECRET missing in .env - abort")
-  process.exit(1)
-}
 if (!DATABASE_URL) {
   console.error("[push-tmp] DATABASE_URL missing - abort")
   process.exit(1)
 }
+
+//Two auth modes, in priority order:
+//  1) FILES_FORWARD_URL + FILES_FORWARD_SECRET -> tunnel path. Requires
+//     prod to be on the tunnel commit AND to share FILES_FORWARD_SECRET.
+//  2) PROD_SESSION_COOKIE -> raw better-auth cookie from the user's
+//     browser (devtools > Application > Cookies). Hits prod directly,
+//     no tunnel deploy needed. The cookie format is
+//     `better-auth.session_token=<token>.<signature>` - paste the whole
+//     value (everything to the right of `=`) into the env var.
+const useTunnel  = Boolean(FORWARD_URL && FORWARD_SECRET)
+const useCookie  = Boolean(PROD_SESSION_COOKIE)
+if (!useTunnel && !useCookie) {
+  console.error("[push-tmp] need either (FILES_FORWARD_URL+FILES_FORWARD_SECRET) or PROD_SESSION_COOKIE in .env - abort")
+  process.exit(1)
+}
+const targetUrl  = useTunnel ? FORWARD_URL! : PROD_BASE_URL
+const authHeader = useTunnel
+  ? { "x-files-forward-secret": FORWARD_SECRET }
+  : { "cookie": `better-auth.session_token=${PROD_SESSION_COOKIE}` }
+console.log(`[push-tmp] auth mode: ${useTunnel ? "TUNNEL secret" : "PROD session cookie"}`)
+console.log(`[push-tmp] target: ${targetUrl}`)
 
 const sql = postgres(DATABASE_URL)
 
@@ -48,9 +67,9 @@ async function uploadOne(localPath: string, originalName: string, mimeType: stri
   const form = new FormData()
   form.append("file", new Blob([new Uint8Array(buf)], { type: mimeType }), originalName)
 
-  const res = await fetch(`${FORWARD_URL}/api/files`, {
+  const res = await fetch(`${targetUrl}/api/files`, {
     method:  "POST",
-    headers: { "x-files-forward-secret": FORWARD_SECRET },
+    headers: { ...authHeader },
     body:    form,
   })
   if (!res.ok) {
