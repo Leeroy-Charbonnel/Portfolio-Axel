@@ -28,8 +28,8 @@ const { isPhone } = useIsPhone()
       <h2 class="section-title">{{ t("projectsTitle") }}</h2>
     </AnimatedReveal>
 
-    <!--PHONE LIST - normal block stacking; each card is a CSS grid that
-    sizes itself via aspect-ratio.-->
+    <!--PHONE LIST - normal block stacking; each card is a viewer-dominant
+    vertical stack that fills ~one screen so projects scroll one-at-a-time.-->
     <div v-if="isPhone" class="main-projects-section__phone-list">
       <MainProjectPhone
         v-for="(project, idx) in projects"

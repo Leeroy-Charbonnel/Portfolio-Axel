@@ -11,25 +11,19 @@ import EditableText from "./EditableText.vue"
 import ThreeViewer from "./ThreeViewer.vue"
 import type { MainProjectDto } from "../../types/portfolio"
 
-//PHONE PROJECT CARD - CSS Grid 2 cols x 6 rows, columns swap per project.
+//PHONE PROJECT CARD - viewer-dominant vertical stack for a 3D artist
+//portfolio. Each card occupies ~one screen with the next project just
+//peeking from below, so the visitor scrolls from one piece to the next
+//with no horizontal real estate wasted on side columns.
 //
-//  col 1                col 2
-//  +-----------------+  +-------+
-//  | thumb 1         |  | title |  row 1
-//  | thumb 2         |  | view  |  row 2
-//  | thumb 3         |  | view  |  row 3
-//  | desc            |  | view  |  row 4
-//  | desc            |  | view  |  row 5
-//  | desc            |  | view  |  row 6
+// - Number + title sit as a small bandeau at the top.
+// - 3D viewer fills the middle, free-floating with only the ground
+//   shadow (canvas + parent are both transparent).
+// - Thumbs row + description sit at the bottom.
+// - Wireframe toggle floats top-right of the viewer.
 //
-//Even projects: thumbs LEFT, viewer RIGHT. Odd: mirrored. Layout mirrors
-//the static mockup at public/mockup/mobile-layout.html.
-
-declare global {
-  interface Window {
-    Sketchfab: any
-  }
-}
+//No grid, no alternating sides, no overlap tricks - the model is the
+//hero, everything else is in service of it.
 
 const props = defineProps<{
   project: MainProjectDto
@@ -40,8 +34,6 @@ const { lang } = useLanguage()
 const { editMode } = useAdmin()
 const { data: portfolioData, updateMainProject } = usePortfolio()
 
-//Phone-specific start pose wins via { mobile: true }. All the wireframe
-//global prefs merge logic is shared with MainProject via the composable.
 const effectiveViewerSettings = useEffectiveViewerSettings(toRef(props, "project"), portfolioData, { mobile: true })
 
 const containerRef = ref<{ $el: HTMLElement } | HTMLElement | null>(null)
@@ -50,7 +42,6 @@ const iframeRef    = ref<HTMLIFrameElement | null>(null)
 const isInView    = ref(false)
 const isWireframe = ref(false)
 
-//Sketchfab lifecycle shared with MainProject (desktop layout).
 const sketchfab = useSketchfabViewer({
   iframeRef,
   modelId:  toRef(() => props.project.modelId),
@@ -70,15 +61,11 @@ const hasAnyWireframeImage = computed(() => {
   return props.project.thumbnails.some((t) => t.wireframeUrl)
 })
 
-const sideClass = computed(() => props.index % 2 === 0
-  ? "mp-phone--left"
-  : "mp-phone--right")
-
 const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && !editMode.value))
 const showMainImage = computed(() => !showSketchfab.value || isLoading.value)
 
-//Pad the thumbnail list with empty slots so the grid always has the 3
-//cells the layout expects, even when a project only saved 1-2 thumbs.
+//Pad to 3 cells so the thumbs row is always evenly distributed, even
+//when the project only saved 1-2 thumbnails.
 const thumbCells = computed(() => {
   const real = props.project.thumbnails.slice(0, 3)
   while (real.length < 3) real.push({ fileId: null, wireframeFileId: null, url: null, wireframeUrl: null, description: { en: "", fr: "" } })
@@ -106,7 +93,6 @@ onBeforeUnmount(() => {
   observer = null
 })
 
-//Wireframe state lives in this layout - reset when leaving edit mode.
 watch(editMode, (newVal) => { if (newVal === false) isWireframe.value = false })
 
 function toggleWireframe(e: Event) {
@@ -138,41 +124,23 @@ async function onDescriptionSave(newVal: string) {
     :distance="50"
     :duration="0.8"
     :threshold="0.1"
-    :class="['mp-phone', sideClass]"
+    class="mp-phone"
   >
-    <!--THUMBS - rows 1, 2, 3 of column 1 (or column 2 for project--right)-->
-    <div
-      v-for="(thumb, i) in thumbCells"
-      :key="i"
-      class="mp-phone__thumb"
-      :class="`mp-phone__thumb--${i + 1}`"
-    >
-      <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
-    </div>
-
-    <!--DESC - rows 4-6 of the same column as the thumbs.-->
-    <EditableText
-      tag="p"
-      class="mp-phone__desc"
-      :value="project.description[lang]"
-      :multiline="true"
-      placeholder="Project description..."
-      @save="onDescriptionSave"
-    />
-
-    <!--TITLE - row 1 of the viewer column.-->
-    <div class="mp-phone__title">
-      <span class="mp-phone__title-number">{{ String(index + 1).padStart(2, "0") }}</span>
+    <!--HEADER bandeau: small number + title. Sits ABOVE the viewer so it
+    never overlaps the model. No background - it floats over the page bg.-->
+    <header class="mp-phone__header">
+      <span class="mp-phone__number">{{ String(index + 1).padStart(2, "0") }}</span>
       <EditableText
-        tag="span"
-        class="mp-phone__title-text"
+        tag="h3"
+        class="mp-phone__title"
         :value="project.title[lang]"
         placeholder="Project title"
         @save="onTitleSave"
       />
-    </div>
+    </header>
 
-    <!--VIEWER - rows 2-6 of the viewer column.-->
+    <!--VIEWER: dominates the card. Canvas + container are transparent so
+    the model floats with only its ground shadow visible.-->
     <div class="mp-phone__viewer">
       <ThreeViewer
         v-if="project.glbUrl && !editMode"
@@ -212,82 +180,51 @@ async function onDescriptionSave(newVal: string) {
         <Grid :size="14" />
       </button>
     </div>
+
+    <!--THUMBS row: 3 squares, equal width, just below the viewer.-->
+    <div class="mp-phone__thumbs">
+      <div
+        v-for="(thumb, i) in thumbCells"
+        :key="i"
+        class="mp-phone__thumb"
+      >
+        <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
+      </div>
+    </div>
+
+    <!--DESCRIPTION: short paragraph under the thumbs. Auto-height so
+    longer text doesn't get clipped.-->
+    <EditableText
+      tag="p"
+      class="mp-phone__desc"
+      :value="project.description[lang]"
+      :multiline="true"
+      placeholder="Project description..."
+      @save="onDescriptionSave"
+    />
   </AnimatedReveal>
 </template>
 
 <style scoped>
-/*PHONE CARD - CSS Grid 2 cols x 6 rows. aspect-ratio gives the grid a
-defined height proportional to width so `repeat(6, 1fr)` splits into
-6 EQUAL rows. Tuned so each row matches the thumbnail column width,
-keeping thumbs square. No transforms, no border-radius, no fixed pixel
-heights.*/
+/*PHONE CARD - vertical stack, viewer-dominant. Roughly one screen per
+project; the next project's header peeks into the bottom of the screen
+to invite continued scroll. No quinconce, no alternating sides.*/
 .mp-phone {
-  display: grid;
-  aspect-ratio: var(--mp-phone-aspect, 5 / 9);
-  grid-template-rows: repeat(6, 1fr);
-  gap: var(--mp-phone-gap, 4%);
-  padding: 6% 0 var(--mp-phone-margin-bottom, 4%);
-}
-
-/*Default = thumbs LEFT, viewer RIGHT.*/
-.mp-phone--left {
-  grid-template-columns: var(--mp-phone-thumbs-col, 30%) 1fr;
-  grid-template-areas:
-    "thumb1 title"
-    "thumb2 viewer"
-    "thumb3 viewer"
-    "desc   viewer"
-    "desc   viewer"
-    "desc   viewer";
-}
-
-/*Inverted = thumbs RIGHT, viewer LEFT.*/
-.mp-phone--right {
-  grid-template-columns: 1fr var(--mp-phone-thumbs-col, 30%);
-  grid-template-areas:
-    "title  thumb1"
-    "viewer thumb2"
-    "viewer thumb3"
-    "viewer desc"
-    "viewer desc"
-    "viewer desc";
-}
-
-/*--- Grid placements ---*/
-.mp-phone__thumb--1 { grid-area: thumb1; }
-.mp-phone__thumb--2 { grid-area: thumb2; }
-.mp-phone__thumb--3 { grid-area: thumb3; }
-.mp-phone__desc     { grid-area: desc; }
-.mp-phone__title    { grid-area: title; }
-.mp-phone__viewer   { grid-area: viewer; }
-
-/*THUMBS ---------------------------------------------------------------*/
-.mp-phone__thumb {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  background: var(--color-background-gray-100);
-}
-.mp-phone__thumb img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/*TITLE ---------------------------------------------------------------*/
-.mp-phone__title {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   gap: var(--spacing-sm);
-  padding-bottom: var(--spacing-xxs);
-  text-align: center;
+  padding: var(--mp-phone-padding, var(--spacing-md)) var(--mp-phone-side-padding, var(--spacing-md));
+  margin-bottom: var(--mp-phone-margin-bottom, var(--spacing-xl));
 }
-.mp-phone__title-number {
+
+/*HEADER bandeau - number + title at the top of the card.----------------*/
+.mp-phone__header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  padding: 0 var(--spacing-xs);
+}
+.mp-phone__number {
   font-family: sans-serif;
   font-weight: 900;
   font-size: var(--mp-phone-number-size, var(--font-size-md));
@@ -295,7 +232,7 @@ heights.*/
   -webkit-text-stroke: 1px var(--color-gray-medium);
   line-height: 1;
 }
-.mp-phone__title-text {
+.mp-phone__title {
   color: var(--color-text-hover);
   font-weight: var(--font-weight-bold);
   font-size: var(--mp-phone-title-size, var(--font-size-md));
@@ -303,16 +240,16 @@ heights.*/
   line-height: 1.1;
 }
 
-/*VIEWER ---------------------------------------------------------------*/
-/*Viewer container is FULLY transparent and borderless - the model and
-its ground shadow float on the page bg, no frame around them.*/
+/*VIEWER - the hero. Aspect-ratio + max-height keep it dominant without
+swallowing the whole screen, leaving room for the thumbs + desc strip
+and for the next project's header to peek from below.------------------*/
 .mp-phone__viewer {
   position: relative;
+  width: 100%;
+  aspect-ratio: var(--mp-phone-viewer-aspect, 4 / 5);
+  max-height: var(--mp-phone-viewer-max-height, 65vh);
   overflow: hidden;
-  border: none;
   background: transparent;
-  min-height: 0;
-  min-width:  0;
 }
 
 .mp-phone__three,
@@ -342,8 +279,8 @@ its ground shadow float on the page bg, no frame around them.*/
 
 .mp-phone__wf-btn {
   position: absolute;
-  bottom: var(--spacing-sm);
-  right:  var(--spacing-sm);
+  top:   var(--spacing-sm);
+  right: var(--spacing-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -362,13 +299,33 @@ its ground shadow float on the page bg, no frame around them.*/
   color: hsl(0 0% 0%);
 }
 
-/*DESCRIPTION ----------------------------------------------------------*/
+/*THUMBS row - 3 evenly-distributed squares below the viewer.------------*/
+.mp-phone__thumbs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--mp-phone-thumb-gap, var(--spacing-xs));
+}
+
+.mp-phone__thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background-color: var(--color-background-gray-100);
+}
+.mp-phone__thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*DESCRIPTION - the last row of the card, auto-height paragraph.--------*/
 .mp-phone__desc {
   color: var(--color-text);
   font-size: var(--mp-phone-desc-size, var(--font-size-sm));
   line-height: var(--mp-phone-desc-lh, 1.55);
   margin: 0;
-  min-height: 0;
-  overflow: hidden;
+  padding: 0 var(--spacing-xs);
 }
 </style>
