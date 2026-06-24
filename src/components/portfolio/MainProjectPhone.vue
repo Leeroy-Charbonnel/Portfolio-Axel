@@ -4,6 +4,7 @@ import { Grid } from "lucide-vue-next"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { useEffectiveViewerSettings } from "../../composables/useEffectiveViewerSettings"
+import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
 import AnimatedReveal from "./AnimatedReveal.vue"
@@ -104,6 +105,24 @@ function thumbSrc(t: { url: string | null; wireframeUrl: string | null }): strin
   return (isWireframe.value ? t.wireframeUrl ?? t.url : t.url) ?? ""
 }
 
+//LIGHTBOX hookup - tapping a thumbnail (or the static main-image fallback)
+//opens the project's images as an infinite carousel.
+const { open: openLightbox } = useLightbox()
+const lightboxImages = computed(() => {
+  const list: { url: string; alt?: string }[] = []
+  const main = isWireframe.value ? props.project.mainWireframeUrl ?? props.project.mainImageUrl : props.project.mainImageUrl
+  if (main) list.push({ url: main, alt: props.project.title[lang.value] })
+  for (const t of props.project.thumbnails) {
+    const u = isWireframe.value ? t.wireframeUrl ?? t.url : t.url
+    if (u) list.push({ url: u, alt: t.description?.[lang.value] ?? "" })
+  }
+  return list
+})
+function onImageClick(startIndex: number) {
+  if (editMode.value) return
+  openLightbox(lightboxImages.value, startIndex)
+}
+
 async function onTitleSave(newVal: string) {
   await updateMainProject(props.project.id, {
     title: { ...props.project.title, [lang.value]: newVal },
@@ -155,7 +174,8 @@ async function onDescriptionSave(newVal: string) {
         v-if="!project.glbUrl && showMainImage && mainImageUrl"
         :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
         :alt="project.title[lang]"
-        class="mp-phone__viewer-image"
+        class="mp-phone__viewer-image mp-phone__viewer-image--clickable"
+        @click="onImageClick(0)"
       />
       <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
         No image
@@ -181,12 +201,15 @@ async function onDescriptionSave(newVal: string) {
       </button>
     </div>
 
-    <!--THUMBS row: 3 squares, equal width, just below the viewer.-->
+    <!--THUMBS row: 3 squares, equal width, just below the viewer.
+    Each clickable thumb opens the project's image carousel at its index.-->
     <div class="mp-phone__thumbs">
       <div
         v-for="(thumb, i) in thumbCells"
         :key="i"
         class="mp-phone__thumb"
+        :class="{ 'mp-phone__thumb--clickable': thumbSrc(thumb) }"
+        @click="onImageClick(i + 1)"
       >
         <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
       </div>
@@ -312,6 +335,8 @@ and for the next project's header to peek from below.------------------*/
   overflow: hidden;
   background-color: var(--color-background-gray-100);
 }
+.mp-phone__thumb--clickable,
+.mp-phone__viewer-image--clickable { cursor: zoom-in; }
 .mp-phone__thumb img {
   position: absolute;
   inset: 0;

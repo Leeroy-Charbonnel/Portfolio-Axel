@@ -5,6 +5,7 @@ import { useRouter } from "vue-router"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { useEffectiveViewerSettings } from "../../composables/useEffectiveViewerSettings"
+import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
 import { pickImageFile, statLetter, statName } from "../../lib/portfolio-utils"
@@ -104,6 +105,25 @@ const LAYOUT_ICONS: Record<MainProjectLayout, typeof PanelLeft> = {
 }
 
 const showThumbnails = computed(() => props.project.layout !== "viewer-only")
+
+//LIGHTBOX - opening a clicked image presents the project's main + thumbs
+//as an infinite horizontal carousel. Wireframe variant is picked based
+//on the current isWireframe toggle so the lightbox matches the page state.
+const { open: openLightbox } = useLightbox()
+const lightboxImages = computed(() => {
+  const list: { url: string; alt?: string }[] = []
+  const main = isWireframe.value ? props.project.mainWireframeUrl ?? props.project.mainImageUrl : props.project.mainImageUrl
+  if (main) list.push({ url: main, alt: props.project.title[lang.value] })
+  for (const t of props.project.thumbnails) {
+    const u = isWireframe.value ? t.wireframeUrl ?? t.url : t.url
+    if (u) list.push({ url: u, alt: t.description?.[lang.value] ?? "" })
+  }
+  return list
+})
+function onImageClick(startIndex: number) {
+  if (editMode.value) return
+  openLightbox(lightboxImages.value, startIndex)
+}
 
 const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && !editMode.value))
 const showMainImage = computed(() => !showSketchfab.value || isLoading.value)
@@ -312,6 +332,8 @@ async function replaceThumbnailWireframe(idx: number) {
             :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
             :alt="project.title[lang]"
             class="main-project__viewer-image"
+            :class="{ 'main-project__viewer-image--clickable': !editMode }"
+            @click="onImageClick(0)"
           />
           <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="main-project__viewer-empty">
             No image
@@ -345,11 +367,13 @@ async function replaceThumbnailWireframe(idx: number) {
             v-for="(thumb, i) in project.thumbnails"
             :key="i"
             class="main-project__thumbnail"
+            :class="{ 'main-project__thumbnail--clickable': !editMode && thumbSrc(thumb) }"
+            @click="onImageClick(i + 1)"
           >
             <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
             <div v-else class="main-project__thumbnail-empty">No image</div>
-            <RemoveButton v-if="editMode" label="Remove thumbnail" @click="removeThumbnail(i)" />
-            <ReplaceImageButton v-if="editMode" @click="isWireframe ? replaceThumbnailWireframe(i) : replaceThumbnailImage(i)" />
+            <RemoveButton v-if="editMode" label="Remove thumbnail" @click.stop="removeThumbnail(i)" />
+            <ReplaceImageButton v-if="editMode" @click.stop="isWireframe ? replaceThumbnailWireframe(i) : replaceThumbnailImage(i)" />
           </div>
 
           <button
@@ -760,6 +784,9 @@ column (left edge, bottom row, hidden entirely).*/
   max-height: calc(100% - var(--spacing-xl) * 2);
   width: calc(var(--mp-thumb-strip-width) - var(--spacing-md));
 }
+
+.main-project__viewer-image--clickable,
+.main-project__thumbnail--clickable { cursor: zoom-in; }
 
 .main-project__thumbnail {
   position: relative;

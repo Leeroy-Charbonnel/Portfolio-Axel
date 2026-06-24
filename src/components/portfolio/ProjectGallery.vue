@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue"
+import { ExternalLink } from "lucide-vue-next"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
+import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { formatNumber, pickImageFile, statLetter, statName } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
@@ -10,11 +13,26 @@ import ReplaceImageButton from "./ReplaceImageButton.vue"
 import AddButton from "./AddButton.vue"
 import type { GalleryProjectDto } from "../../types/portfolio"
 
-defineProps<{ projects: GalleryProjectDto[] }>()
+const props = defineProps<{ projects: GalleryProjectDto[] }>()
 
 const { t, lang } = useLanguage()
 const { editMode } = useAdmin()
 const { uploadFile, updateGalleryProject, deleteGalleryProject, createGalleryProject } = usePortfolio()
+
+//LIGHTBOX hookup - tapping any gallery card opens the carousel with the
+//FULL gallery list and starts at the clicked card's index.
+const { open: openLightbox } = useLightbox()
+const galleryAsLightbox = computed(() => props.projects
+  .filter((p) => p.imageUrl)
+  .map((p) => ({ url: p.imageUrl as string, alt: p.title[lang.value] }))
+)
+function onCardImageClick(p: GalleryProjectDto) {
+  if (editMode.value || !p.imageUrl) return
+  //index inside the LIGHTBOX list (which already filtered out items
+  //without an imageUrl) - find by url match.
+  const i = galleryAsLightbox.value.findIndex((it) => it.url === p.imageUrl)
+  openLightbox(galleryAsLightbox.value, i >= 0 ? i : 0)
+}
 
 async function onTitleSave(p: GalleryProjectDto, newVal: string) {
   await updateGalleryProject(p.id, { title: { ...p.title, [lang.value]: newVal } })
@@ -60,13 +78,12 @@ async function onReplaceImage(p: GalleryProjectDto) {
         >
           <RemoveButton v-if="editMode" label="Delete gallery item" @click="deleteGalleryProject(project.id)" />
 
-          <component :is="editMode ? 'div' : 'a'"
-            :href="editMode ? undefined : project.link"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="gallery-item__inner"
-          >
-            <div class="gallery-item__thumbnail-wrap no-grain">
+          <div class="gallery-item__inner">
+            <div
+              class="gallery-item__thumbnail-wrap no-grain"
+              :class="{ 'gallery-item__thumbnail-wrap--clickable': !editMode && project.imageUrl }"
+              @click="onCardImageClick(project)"
+            >
               <img
                 v-if="project.imageUrl"
                 :src="project.imageUrl"
@@ -76,7 +93,22 @@ async function onReplaceImage(p: GalleryProjectDto) {
               <div v-else class="gallery-item__thumbnail gallery-item__thumbnail--empty">
                 No image
               </div>
-              <ReplaceImageButton v-if="editMode" @click="onReplaceImage(project)" />
+              <ReplaceImageButton v-if="editMode" @click.stop="onReplaceImage(project)" />
+
+              <!--Sketchfab external link - sits as a small badge in the
+              corner so the image click is reserved for the lightbox.-->
+              <a
+                v-if="!editMode && project.link"
+                :href="project.link"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="gallery-item__sketchfab"
+                :aria-label="`Open ${project.title[lang]} on Sketchfab`"
+                title="Open on Sketchfab"
+                @click.stop
+              >
+                <ExternalLink :size="14" />
+              </a>
             </div>
 
             <div class="gallery-item__details">
@@ -165,7 +197,7 @@ async function onReplaceImage(p: GalleryProjectDto) {
                 </div>
               </div>
             </div>
-          </component>
+          </div>
         </AnimatedReveal>
 
         <AddButton label="Add gallery item" @click="createGalleryProject" />
@@ -215,6 +247,31 @@ row stick to the BOTTOM of every card on the same baseline.*/
   width: 100%;
   aspect-ratio: var(--gallery-thumb-aspect);
   overflow: hidden;
+}
+.gallery-item__thumbnail-wrap--clickable { cursor: zoom-in; }
+
+/*Sketchfab badge - tucked in the top-right corner of the thumb wrap so
+the main click is reserved for the lightbox.*/
+.gallery-item__sketchfab {
+  position: absolute;
+  top:   var(--spacing-xs);
+  right: var(--spacing-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width:  var(--spacing-xl);
+  height: var(--spacing-xl);
+  background-color: hsl(0 0% 0% / 0.6);
+  border: var(--border-width-sm) solid var(--color-accent);
+  color: var(--color-accent);
+  text-decoration: none;
+  backdrop-filter: blur(var(--filter-blur));
+  z-index: 4;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.gallery-item__sketchfab:hover {
+  background-color: var(--color-accent);
+  color: hsl(0 0% 0%);
 }
 
 .gallery-item__thumbnail {

@@ -897,18 +897,25 @@ watch(() => props.settings, (s) => {
   height: 100%;
 }
 
+/*BRUTALIST loading bar - thicker than the original 2px so it actually
+reads against a busy background. Track at 8% alpha gives a visible base
+line even at 0% progress; fill is the accent so the loading state ties
+to the rest of the site's interactive palette. min-width keeps a small
+visible bar even before the first progress event fires.*/
 .three-viewer__loading {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  background-color: hsl(0 0% 100% / 0.1);
+  height: 4px;
+  background-color: hsl(0 0% 100% / 0.08);
   pointer-events: none;
   z-index: 10;
 }
 .three-viewer__loading-fill {
   height: 100%;
-  background-color: var(--color-text-hover);
+  min-width: 2%;
+  background-color: var(--color-accent);
+  transition: width 0.15s linear;
 }
 </style>
