@@ -60,6 +60,22 @@ async function uploadOne(localPath: string, originalName: string, mimeType: stri
   return await res.json() as { id: string; storedFilename: string; url: string }
 }
 
+//=== SOFTWARE LOGOS - bind new uploads to software rows by key ===
+console.log("\n== software logos ==")
+const logoMap: Record<string, string> = {
+  "blender-logo.png":     "Blender",
+  "substance-logo.png":   "Substance",
+  "photoshop-logo.png":   "Photoshop",
+  "illustrator-logo.png": "Illustrator",
+}
+for (const [filename, swKey] of Object.entries(logoMap)) {
+  const localPath = join("src", "tmp", filename)
+  if (!existsSync(localPath)) { console.warn(`  skip ${filename} - missing`); continue }
+  const row = await uploadOne(localPath, filename, "image/png")
+  await sql`UPDATE software SET logo_file_id = ${row.id}::uuid WHERE key = ${swKey}`
+  console.log(`  software key=${swKey} logo <- ${row.url}`)
+}
+
 //=== GALLERY 4..8 - bind new uploads to gallery_project rows by id ===
 console.log("\n== gallery 4..8 ==")
 for (const id of [4, 5, 6, 7, 8]) {
