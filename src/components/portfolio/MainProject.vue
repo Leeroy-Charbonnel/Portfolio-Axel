@@ -384,7 +384,7 @@ async function replaceThumbnailWireframe(idx: number) {
               :alt="''"
               aria-hidden="true"
               class="main-project__wf-layer"
-              :style="{ '--wf-delay': `${(i + 1) * 120}ms` }"
+              :style="{ '--wf-delay': `${(i + 1) * 220}ms` }"
             />
             <RemoveButton v-if="editMode" label="Remove thumbnail" @click.stop="removeThumbnail(i)" />
             <ReplaceImageButton v-if="editMode" @click.stop="isWireframe ? replaceThumbnailWireframe(i) : replaceThumbnailImage(i)" />
@@ -804,35 +804,31 @@ column (left edge, bottom row, hidden entirely).*/
 
 /*=== WIREFRAME OVERLAY - diagonal-sweep reveal =========================
 Both the normal and the wireframe variants live in the DOM at all times
-so the wireframe is already cached when the visitor toggles. A
-linear-gradient mask with a hard diagonal stop reveals it via mask-
-position. The per-image --wf-delay staggers each overlay so the sweep
-propagates through the card as ONE continuous wave (main image -> thumb
-1 -> thumb 2 -> thumb 3) rather than four independent wipes.*/
+so the wireframe is already cached when the visitor toggles. We then
+clip the wireframe layer with a 3-point polygon that grows from the
+top-left corner outwards: vertices at (0%,0%) all collapsed to a point
+(hidden), then to (0%,0%), (200%,0%), (0%,200%) (a right-triangle whose
+hypotenuse sweeps from the top-left to the bottom-right corner). The
+per-element --wf-delay staggers each overlay so the sweep propagates
+through the card as ONE continuous wave (main image -> thumb 1 ->
+thumb 2 -> thumb 3) rather than four independent wipes. Duration is
+intentionally long (1200ms) so the diagonal is actually perceptible -
+anything shorter just reads as a snap.*/
 .main-project__wf-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: inherit;
-  -webkit-mask-image: linear-gradient(135deg, #000 50%, transparent 50%);
-          mask-image: linear-gradient(135deg, #000 50%, transparent 50%);
-  -webkit-mask-size: 250% 250%;
-          mask-size: 250% 250%;
-  -webkit-mask-position: 100% 100%;
-          mask-position: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-          mask-repeat: no-repeat;
-  transition: -webkit-mask-position 600ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms),
-                      mask-position 600ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms);
+  clip-path: polygon(0% 0%, 0% 0%, 0% 0%);
+  transition: clip-path 1200ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms);
   pointer-events: none;
 }
 img.main-project__wf-layer { object-fit: cover; }
 img.main-project__viewer-image.main-project__wf-layer { object-fit: contain; }
 
 .main-project__article--wireframe .main-project__wf-layer {
-  -webkit-mask-position: 0% 0%;
-          mask-position: 0% 0%;
+  clip-path: polygon(0% 0%, 200% 0%, 0% 200%);
 }
 
 .main-project__thumbnail {

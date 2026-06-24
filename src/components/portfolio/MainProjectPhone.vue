@@ -231,7 +231,7 @@ async function onDescriptionSave(newVal: string) {
           :alt="''"
           aria-hidden="true"
           class="mp-phone__thumb-img mp-phone__wf-layer"
-          :style="{ '--wf-delay': `${(i + 1) * 120}ms` }"
+          :style="{ '--wf-delay': `${(i + 1) * 220}ms` }"
         />
       </div>
     </div>
@@ -310,33 +310,24 @@ and for the next project's header to peek from below.------------------*/
 
 /*=== WIREFRAME OVERLAY - diagonal-sweep reveal =========================
 The wireframe variant of every image is rendered at mount-time and stays
-in the DOM; we just mask it. mask-image is a hard diagonal gradient that
-covers either nothing (transparent on the visible portion of the
-element) or the whole thing depending on mask-position. Animating
-mask-position from 100% 100% (gradient off the bottom-right, image
-hidden) to 0% 0% (gradient covers the element, image visible) gives a
-diagonal wipe.
+in the DOM; we just clip it. clip-path with a 3-point polygon is a
+right-triangle anchored at the top-left corner; we grow its other two
+vertices from (0%,0%) to (200%, 0%) and (0%, 200%) so the hypotenuse
+passes diagonally through the element from the top-left corner to the
+bottom-right.
 
-The per-element --wf-delay staggers each overlay so the wipe propagates
-through the card as a SINGLE wave from main image to the last thumb,
-not as 4 independent wipes. The mirror happens automatically when the
-class is removed.*/
+The per-element --wf-delay staggers each overlay so the sweep
+propagates from the main image through to the last thumb as a SINGLE
+wave instead of four independent wipes. Duration intentionally long
+(1200ms) so the sweep is actually perceptible - shorter than that and
+it just reads as a snap.*/
 .mp-phone__wf-layer {
-  -webkit-mask-image: linear-gradient(135deg, #000 50%, transparent 50%);
-          mask-image: linear-gradient(135deg, #000 50%, transparent 50%);
-  -webkit-mask-size: 250% 250%;
-          mask-size: 250% 250%;
-  -webkit-mask-position: 100% 100%;
-          mask-position: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-          mask-repeat: no-repeat;
-  transition: -webkit-mask-position 600ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms),
-                      mask-position 600ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms);
+  clip-path: polygon(0% 0%, 0% 0%, 0% 0%);
+  transition: clip-path 1200ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms);
   pointer-events: none;
 }
 .mp-phone--wireframe .mp-phone__wf-layer {
-  -webkit-mask-position: 0% 0%;
-          mask-position: 0% 0%;
+  clip-path: polygon(0% 0%, 200% 0%, 0% 200%);
 }
 .mp-phone__viewer-embed--hidden { display: none; }
 
