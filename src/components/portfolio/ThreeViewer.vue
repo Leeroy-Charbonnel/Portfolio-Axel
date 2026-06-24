@@ -2,6 +2,7 @@
 import { onMounted, onBeforeUnmount, ref, watch } from "vue"
 import {
   Box3,
+  type Material,
   Color,
   DataTexture,
   DirectionalLight,
@@ -277,25 +278,51 @@ function applyEnvFromSource(source: Texture, intensity: number) {
   requestRender()
 }
 
+//HDR CACHE - the previous applyHdrFromUrl reloaded + reparsed + re-PMREM
+//generated the same HDR every wireframe toggle, which is the actual
+//cause of the perceptible lag (EXR parsing of a 5-6MB file is the
+//culprit, not the material swap). We now cache the last URL + its
+//rendered PMREM probe; same URL = just retint the existing probe with
+//the new intensity (constant-time), no reload, no parse, no PMREM.
+let currentHdrUrl:     string | null = null
+let currentHdrProbe:   Texture | null = null
+
 //Apply env from a direct URL saved on the viewerSettings (file extension
 //in the URL drives the loader choice). Falls back to procedural sky when
-//the URL is missing OR the file fails to load - we never want the
-//viewer to render with no environment because of a 404 / bad MIME on
-///media (which surfaced before as opaque "EXRLoader: not OpenEXR" errors
-//when the server returned HTML for a missing file).
+//the URL is missing OR the file fails to load.
 function applyHdrFromUrl(url: string | null | undefined, intensity: number) {
   if (!url) {
+    currentHdrUrl   = null
+    currentHdrProbe = null
     applyEnvFromSource(makeSkyGradient(), intensity)
+    return
+  }
+  //Same URL as last time - skip the load/parse/PMREM round-trip and
+  //just rebind the cached probe at the new intensity. This is the hot
+  //path on every wireframe toggle for projects whose normal-mode HDR
+  //and wireframe-mode HDR are the same file.
+  if (url === currentHdrUrl && currentHdrProbe && scene) {
+    scene.environment = currentHdrProbe
+    scene.environmentIntensity = intensity
+    requestRender()
     return
   }
   const isExr = /\.exr$/i.test(url)
   const loader = isExr ? new EXRLoader() : new HDRLoader()
   loader.load(
     url,
-    (source) => applyEnvFromSource(source, intensity),
+    (source) => {
+      applyEnvFromSource(source, intensity)
+      //pull the probe back out of the scene so we can rebind it on the
+      //next toggle without re-running PMREM.
+      currentHdrUrl   = url
+      currentHdrProbe = scene?.environment ?? null
+    },
     undefined,
     (err) => {
       console.error(`[ThreeViewer] HDR load failed for ${url}:`, err)
+      currentHdrUrl   = null
+      currentHdrProbe = null
       applyEnvFromSource(makeSkyGradient(), intensity)
     },
   )
@@ -431,6 +458,101 @@ function applyMaterialOverrides(materials: MaterialState[]) {
 }
 
 //===========================================================================
+//WIREFRAME SWEEP - shader-driven directional reveal that progressively
+//paints the wireframe tint across the model along the world X axis.
+//
+//Each original material gets a shared onBeforeCompile patch that adds a
+//uWfProgress (0..1) uniform + a vWfWorldPos varying. The fragment shader
+//mixes the lit color toward uWfTint where worldPos.x along the model's
+//bounding box has already been "passed" by the wipe front. Stepping
+//uWfProgress in the tick loop drives the animation.
+//
+//Driving the SAME uWfProgress across every patched shader keeps the
+//sweep visually unified - one straight line crossing the whole model.
+const wfPatchedMaterials = new Set<string>()
+const wfShaders: { mat: Material; shader: { uniforms: Record<string, { value: unknown }> } }[] = []
+let   wfBoxMinX  = 0
+let   wfBoxRange = 1
+
+const WF_SWEEP_DURATION_MS = 1500
+
+let wfTransition: {
+  startTime: number
+  from:      number
+  to:        number
+  duration:  number
+  phase:     "enter" | "leave"
+} | null = null
+
+function wireframeTintColor(): Color {
+  const hex = props.settings?.wireframeMode?.material?.color ?? "#808080"
+  return new Color(hex)
+}
+
+function patchMaterialForSweep(material: Material) {
+  if (wfPatchedMaterials.has(material.uuid)) return
+  wfPatchedMaterials.add(material.uuid)
+
+  const prevOnBeforeCompile = material.onBeforeCompile?.bind(material)
+  material.onBeforeCompile = (shader, renderer) => {
+    if (prevOnBeforeCompile) prevOnBeforeCompile(shader, renderer)
+    shader.uniforms.uWfProgress = { value: wfTransition ? wfTransition.from : (isWireframe.value ? 1 : 0) }
+    shader.uniforms.uWfTint     = { value: wireframeTintColor() }
+    shader.uniforms.uWfMin      = { value: wfBoxMinX }
+    shader.uniforms.uWfRange    = { value: wfBoxRange }
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying vec3 vWfWorldPos;",
+      )
+      .replace(
+        "#include <project_vertex>",
+        "#include <project_vertex>\nvWfWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;",
+      )
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying vec3 vWfWorldPos;\nuniform float uWfProgress;\nuniform vec3 uWfTint;\nuniform float uWfMin;\nuniform float uWfRange;",
+      )
+      .replace(
+        "#include <dithering_fragment>",
+        "#include <dithering_fragment>\n" +
+        "float wfT = (vWfWorldPos.x - uWfMin) / max(uWfRange, 0.0001);\n" +
+        //wfT is 0 at minX, 1 at maxX. The sweep advances left-to-right:
+        //a fragment is in "wireframe" state once uWfProgress >= wfT.
+        "float wfMask = smoothstep(uWfProgress - 0.02, uWfProgress + 0.02, 1.0 - wfT);\n" +
+        "gl_FragColor.rgb = mix(gl_FragColor.rgb, uWfTint, wfMask);\n",
+      )
+
+    wfShaders.push({ mat: material, shader: shader as unknown as { uniforms: Record<string, { value: unknown }> } })
+  }
+  material.needsUpdate = true
+}
+
+function recordBoxFromSceneGraph(root: { traverse: (cb: (obj: any) => void) => void }) {
+  const box = new Box3()
+  let any = false
+  root.traverse((obj: any) => {
+    const m = obj as Mesh
+    if (m.isMesh && m.geometry) {
+      box.expandByObject(m)
+      any = true
+    }
+  })
+  if (any) {
+    wfBoxMinX  = box.min.x
+    wfBoxRange = Math.max(0.0001, box.max.x - box.min.x)
+  }
+}
+
+function setUWfProgressOnAll(v: number) {
+  for (const e of wfShaders) {
+    e.shader.uniforms.uWfProgress.value = v
+  }
+}
+
 function ensureWfBaseMat() {
   const matSpec = props.settings?.wireframeMode?.material
   if (wfBaseMat) {
@@ -502,15 +624,14 @@ function applyWireframeMode(on: boolean) {
   requestRender(800)
 }
 
-function enterWireframe() {
+//Compute emissive overrides + swap each mesh to its wireframe material.
+//Factored so enterWireframe can defer this until the sweep animation ends.
+function finalizeEnterWireframe() {
   if (!scene) return
   ensureWfBaseMat()
   const wf = props.settings?.wireframeMode
   const modeColor = wf?.color ?? "#14b8a6"
 
-  //swap mesh.material refs - wfBaseMat for everything, per-emissive
-  //materials for picks. Emissive picks are matched by mesh NAME (the
-  //glTF name is stable; mesh.uuid regenerates on every reload).
   const intensityFor = (mesh: Mesh): number | undefined => {
     const sm = sceneMeshes.find((s) => s.mesh === mesh)
     for (const e of (wf?.emissiveMeshes ?? [])) {
@@ -550,15 +671,42 @@ function enterWireframe() {
   }
 
   syncWireframeOverlays(wf?.overlayOn ?? true, wf?.overlayColor ?? "#000000", emissiveSet)
+}
 
-  //Shared lights stay on - we just swap their intensity + color pair.
+function enterWireframe() {
+  if (!scene) return
+  const wf = props.settings?.wireframeMode
+
+  //Refresh the sweep uniforms - tint follows the user's wireframe color,
+  //bbox range is already populated by recordBoxFromSceneGraph at load.
+  const tint = wireframeTintColor()
+  for (const e of wfShaders) {
+    (e.shader.uniforms.uWfTint  as { value: Color }).value.copy(tint)
+    ;(e.shader.uniforms.uWfMin   as { value: number }).value = wfBoxMinX
+    ;(e.shader.uniforms.uWfRange as { value: number }).value = wfBoxRange
+  }
+
+  //Lights + HDR snap to wireframe mode immediately (HDR cache makes this
+  //free when the URL doesn't change between modes).
   applyLightsForMode("wireframe")
-
   applyHdrFromUrl(wf?.hdrUrl, wf?.hdrIntensity ?? 1)
+
+  //Materials stay as ORIGINALS during the sweep; the shader uniform
+  //drives the tint reveal. At the end we swap to the actual wireframe
+  //materials so the user's PBR settings + emissive picks land exactly.
+  wfTransition = {
+    startTime: performance.now(),
+    from:      0,
+    to:        1,
+    duration:  WF_SWEEP_DURATION_MS,
+    phase:     "enter",
+  }
 }
 
 function leaveWireframe() {
   if (!scene) return
+  //Swap materials back to originals NOW so the sweep can drag the tint
+  //back to 0 visually. Edge overlays come off immediately.
   for (const sm of sceneMeshes) {
     const orig = meshOriginalMaterials.get(sm.mesh.uuid)
     if (orig) sm.mesh.material = orig
@@ -567,6 +715,29 @@ function leaveWireframe() {
   applyLightsForMode("normal")
   const n = props.settings?.normalMode
   applyHdrFromUrl(n?.hdrUrl, n?.hdrIntensity ?? 1)
+
+  wfTransition = {
+    startTime: performance.now(),
+    from:      1,
+    to:        0,
+    duration:  WF_SWEEP_DURATION_MS,
+    phase:     "leave",
+  }
+}
+
+function advanceWfTransition() {
+  if (!wfTransition) return
+  const now = performance.now()
+  const t   = Math.min(1, (now - wfTransition.startTime) / wfTransition.duration)
+  //easeOutCubic - quick deceleration so the sweep "lands" softly.
+  const eased = 1 - Math.pow(1 - t, 3)
+  const v = wfTransition.from + (wfTransition.to - wfTransition.from) * eased
+  setUWfProgressOnAll(v)
+  if (t >= 1) {
+    if (wfTransition.phase === "enter") finalizeEnterWireframe()
+    wfTransition = null
+  }
+  requestRender()
 }
 
 //===========================================================================
@@ -662,6 +833,19 @@ onMounted(() => {
         meshOriginalMaterials.set(m.uuid, m.material as MeshPhysicalMaterial)
         meshIndex++
       })
+
+      //SWEEP shader prep: world-bbox once (used for the wipe range) and
+      //patch every original material with the onBeforeCompile injection
+      //so the uniform-driven tint is available the moment the user
+      //toggles wireframe mode. Idempotent per-material via the
+      //wfPatchedMaterials Set.
+      gltf.scene.updateMatrixWorld(true)
+      recordBoxFromSceneGraph(gltf.scene)
+      for (const sm of sceneMeshes) {
+        const mat = sm.mesh.material as Material | Material[]
+        if (Array.isArray(mat)) { for (const sub of mat) patchMaterialForSweep(sub) }
+        else                    patchMaterialForSweep(mat)
+      }
 
       //apply saved material overrides
       if (props.settings?.materials) applyMaterialOverrides(props.settings.materials)
@@ -788,6 +972,10 @@ onMounted(() => {
     } else if (now < renderUntil) {
       controls!.update()
     }
+    //Wireframe-sweep tint advance. Ticked here so it runs at framerate
+    //alongside the camera anim + render keepalive; calls requestRender
+    //internally so the composer keeps painting until the sweep is done.
+    if (wfTransition) advanceWfTransition()
     if (now < renderUntil) composer!.render()
     rafId = requestAnimationFrame(tick)
   }
