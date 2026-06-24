@@ -406,13 +406,17 @@ function patchMaterialForSweep(material: Material) {
         "#include <common>",
         "#include <common>\nvarying vec3 vWfWorldPos;\nuniform float uWfProgress;\nuniform vec3 uWfTint;\nuniform vec3 uWfAxis;\nuniform float uWfMin;\nuniform float uWfRange;",
       )
+      //Inject BEFORE PBR lighting: replace diffuseColor with the tint so
+      //the full lighting pipeline runs on the wireframe color. This way
+      //the swept portion of the surface looks identical to wfBaseMat
+      //instead of being a sRGB blend on top of the lit original color.
       .replace(
-        "#include <dithering_fragment>",
-        "#include <dithering_fragment>\n" +
+        "#include <map_fragment>",
+        "#include <map_fragment>\n" +
         "float wfT = (dot(vWfWorldPos, uWfAxis) - uWfMin) / max(uWfRange, 0.0001);\n" +
         "float wfP = uWfProgress * 1.04 - 0.02;\n" +
         "float wfMask = 1.0 - smoothstep(wfP - 0.02, wfP + 0.02, wfT);\n" +
-        "gl_FragColor.rgb = mix(gl_FragColor.rgb, uWfTint, wfMask);\n",
+        "diffuseColor.rgb = mix(diffuseColor.rgb, uWfTint, wfMask);\n",
       )
 
     wfShaders.push({ mat: material, shader: shader as unknown as { uniforms: Record<string, { value: unknown }> } })
@@ -465,7 +469,12 @@ function advanceWfTransition() {
   if (!wfTransition) return
   const now = performance.now()
   const t   = Math.min(1, (now - wfTransition.startTime) / wfTransition.duration)
-  const eased = 1 - Math.pow(1 - t, 3)
+  //easeInOutCubic gives a uniform-feeling march across the model: slow
+  //start, steady middle, soft landing. easeOutCubic was rushing the
+  //first frames so the user saw the line "appear" already mid-way.
+  const eased = t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2
   const v = wfTransition.from + (wfTransition.to - wfTransition.from) * eased
   setUWfProgressOnAll(v)
   if (t >= 1) {
@@ -2049,22 +2058,25 @@ function finalizeEnterWireframe() {
     setMaterialFor(sm.mesh)
   }
   syncWireframeOverlays()
+  //Lights + HDR + overlays all switch over IN ONE FRAME at the end of
+  //the sweep, when the surface is already fully tinted - the swap is
+  //hidden by the uniform grey covering the model.
+  applyLightsForMode()
+  syncEnvForCurrentMode()
 }
 
 function enableWireframeMode() {
   if (!scene) return
   wireframeMode.value = true
-  //Refresh the sweep uniforms to whatever the user has dialled in right
-  //now - axis/start/end and the material colour - so the preview reflects
-  //unsaved edits too.
+  //Refresh sweep uniforms to whatever the user has dialled in - axis,
+  //start, end, tint colour - so the preview reflects unsaved edits.
   refreshSweepTint()
   recomputeSweepRange()
-  //Lights + HDR snap to wireframe mode immediately (HDR cache makes the
-  //hot path free when the URL doesn't change between modes).
-  applyLightsForMode()
-  syncEnvForCurrentMode()
-  //Run the tint reveal on the originals. finalizeEnterWireframe() at the
-  //end swaps to wfBaseMat / picks so the user's PBR settings land.
+  //Run the tint reveal on the ORIGINAL materials (with normal-mode
+  //lights + HDR still active so the lighting on the swept surface
+  //matches the unswept surface for the whole transition). At the end
+  //finalizeEnterWireframe() swaps to wfBaseMat / picks AND snaps the
+  //lights + HDR to wireframe mode, hidden by the now-uniform tint.
   wfTransition = { startTime: performance.now(), from: 0, to: 1, duration: WF_SWEEP_DURATION_MS, phase: "enter" }
   requestRender(WF_SWEEP_DURATION_MS + 200)
 }

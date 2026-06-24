@@ -528,18 +528,19 @@ function patchMaterialForSweep(material: Material) {
         "#include <common>",
         "#include <common>\nvarying vec3 vWfWorldPos;\nuniform float uWfProgress;\nuniform vec3 uWfTint;\nuniform vec3 uWfAxis;\nuniform float uWfMin;\nuniform float uWfRange;",
       )
+      //Inject BEFORE PBR lighting: replace diffuseColor with the tint
+      //so the full lighting pipeline (lights, env contribution, tone
+      //mapping) runs on the wireframe colour. Otherwise the tint would
+      //land as a sRGB blend on top of the already-lit original colour
+      //and look distinct from the real wfBaseMat at the end of the
+      //sweep.
       .replace(
-        "#include <dithering_fragment>",
-        "#include <dithering_fragment>\n" +
-        //project the fragment's world position on the user-chosen axis,
-        //then map it into the [0, 1] range bracketed by uWfMin / uWfMax.
+        "#include <map_fragment>",
+        "#include <map_fragment>\n" +
         "float wfT = (dot(vWfWorldPos, uWfAxis) - uWfMin) / max(uWfRange, 0.0001);\n" +
-        //progress padded to [-0.02, 1.02] so progress=0 = no tint at all
-        //(no half-pixel artefact on the leading edge) and progress=1 =
-        //every fragment fully tinted.
         "float wfP = uWfProgress * 1.04 - 0.02;\n" +
         "float wfMask = 1.0 - smoothstep(wfP - 0.02, wfP + 0.02, wfT);\n" +
-        "gl_FragColor.rgb = mix(gl_FragColor.rgb, uWfTint, wfMask);\n",
+        "diffuseColor.rgb = mix(diffuseColor.rgb, uWfTint, wfMask);\n",
       )
 
     wfShaders.push({ mat: material, shader: shader as unknown as { uniforms: Record<string, { value: unknown }> } })
@@ -735,29 +736,27 @@ function finalizeEnterWireframe() {
   }
 
   syncWireframeOverlays(wf?.overlayOn ?? true, wf?.overlayColor ?? "#000000", emissiveSet)
+
+  //Snap lights + HDR to wireframe mode NOW that the model is uniformly
+  //tinted - the lighting change is invisible against the flat surface.
+  applyLightsForMode("wireframe")
+  applyHdrFromUrl(wf?.hdrUrl, wf?.hdrIntensity ?? 1)
 }
 
 function enterWireframe() {
   if (!scene) return
-  const wf = props.settings?.wireframeMode
-
   //Refresh the sweep uniforms - tint follows the user's wireframe color,
-  //bbox range is already populated by recordBoxFromSceneGraph at load.
+  //axis + range are recomputed against the user's saved sweep settings.
+  recomputeSweepRange()
   const tint = wireframeTintColor()
   for (const e of wfShaders) {
-    (e.shader.uniforms.uWfTint  as { value: Color }).value.copy(tint)
-    ;(e.shader.uniforms.uWfMin   as { value: number }).value = wfBoxMinX
-    ;(e.shader.uniforms.uWfRange as { value: number }).value = wfBoxRange
+    (e.shader.uniforms.uWfTint as { value: Color }).value.copy(tint)
   }
 
-  //Lights + HDR snap to wireframe mode immediately (HDR cache makes this
-  //free when the URL doesn't change between modes).
-  applyLightsForMode("wireframe")
-  applyHdrFromUrl(wf?.hdrUrl, wf?.hdrIntensity ?? 1)
-
-  //Materials stay as ORIGINALS during the sweep; the shader uniform
-  //drives the tint reveal. At the end we swap to the actual wireframe
-  //materials so the user's PBR settings + emissive picks land exactly.
+  //Materials stay as ORIGINALS during the sweep with normal-mode lights
+  //and HDR still active. finalizeEnterWireframe() swaps to wfBaseMat +
+  //picks AND snaps lights + HDR to wireframe mode at the END, when the
+  //model is already a uniform tint so the lighting swap is invisible.
   wfTransition = {
     startTime: performance.now(),
     from:      0,
@@ -793,8 +792,12 @@ function advanceWfTransition() {
   if (!wfTransition) return
   const now = performance.now()
   const t   = Math.min(1, (now - wfTransition.startTime) / wfTransition.duration)
-  //easeOutCubic - quick deceleration so the sweep "lands" softly.
-  const eased = 1 - Math.pow(1 - t, 3)
+  //easeInOutCubic - uniform-feeling march across the model. easeOutCubic
+  //was over 14% by the first frame after start, which felt like the
+  //sweep already began mid-way.
+  const eased = t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2
   const v = wfTransition.from + (wfTransition.to - wfTransition.from) * eased
   setUWfProgressOnAll(v)
   if (t >= 1) {
