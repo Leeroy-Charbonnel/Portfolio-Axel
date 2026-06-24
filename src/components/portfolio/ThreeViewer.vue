@@ -130,6 +130,13 @@ interface ViewerSettings {
     //than this are merged so coplanar triangulation diagonals don't
     //pollute the wireframe. Global editor pref - applies everywhere.
     edgeThresholdDeg?: number
+    //Per-project sweep axis (free vec3, normalized at runtime) + start
+    ///end offsets (% of bbox projected on that axis) for the wireframe
+    //wipe animation. Default = X axis 0%..100% reproduces the auto-bbox
+    //behaviour when the project predates these fields.
+    sweepAxis?:  [number, number, number]
+    sweepStart?: number
+    sweepEnd?:   number
     material?: {
       color:             string
       metalness:         number
@@ -471,8 +478,12 @@ function applyMaterialOverrides(materials: MaterialState[]) {
 //sweep visually unified - one straight line crossing the whole model.
 const wfPatchedMaterials = new Set<string>()
 const wfShaders: { mat: Material; shader: { uniforms: Record<string, { value: unknown }> } }[] = []
-let   wfBoxMinX  = 0
-let   wfBoxRange = 1
+//Bbox stays raw - the per-corner projection on the sweep axis happens
+//in recordBoxFromSceneGraph; result lands in wfMin / wfRange below.
+let   wfBox: Box3 | null = null
+let   wfMin   = 0
+let   wfRange = 1
+let   wfAxis  = new Vector3(1, 0, 0)
 
 const WF_SWEEP_DURATION_MS = 1500
 
@@ -498,8 +509,9 @@ function patchMaterialForSweep(material: Material) {
     if (prevOnBeforeCompile) prevOnBeforeCompile(shader, renderer)
     shader.uniforms.uWfProgress = { value: wfTransition ? wfTransition.from : (isWireframe.value ? 1 : 0) }
     shader.uniforms.uWfTint     = { value: wireframeTintColor() }
-    shader.uniforms.uWfMin      = { value: wfBoxMinX }
-    shader.uniforms.uWfRange    = { value: wfBoxRange }
+    shader.uniforms.uWfAxis     = { value: wfAxis.clone() }
+    shader.uniforms.uWfMin      = { value: wfMin }
+    shader.uniforms.uWfRange    = { value: wfRange }
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -514,18 +526,17 @@ function patchMaterialForSweep(material: Material) {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
-        "#include <common>\nvarying vec3 vWfWorldPos;\nuniform float uWfProgress;\nuniform vec3 uWfTint;\nuniform float uWfMin;\nuniform float uWfRange;",
+        "#include <common>\nvarying vec3 vWfWorldPos;\nuniform float uWfProgress;\nuniform vec3 uWfTint;\nuniform vec3 uWfAxis;\nuniform float uWfMin;\nuniform float uWfRange;",
       )
       .replace(
         "#include <dithering_fragment>",
         "#include <dithering_fragment>\n" +
-        "float wfT = (vWfWorldPos.x - uWfMin) / max(uWfRange, 0.0001);\n" +
-        //wfT is 0 at the left edge of the model, 1 at the right. The
-        //sweep marches the line from x=0 to x=1: a fragment is "passed"
-        //(wireframe-tinted) when wfT < uWfProgress, untouched otherwise.
-        //We pad progress to [-0.02, 1.02] so progress=0 leaves the model
-        //completely untinted (no half-pixel tint on the very left edge)
-        //and progress=1 tints every fragment fully.
+        //project the fragment's world position on the user-chosen axis,
+        //then map it into the [0, 1] range bracketed by uWfMin / uWfMax.
+        "float wfT = (dot(vWfWorldPos, uWfAxis) - uWfMin) / max(uWfRange, 0.0001);\n" +
+        //progress padded to [-0.02, 1.02] so progress=0 = no tint at all
+        //(no half-pixel artefact on the leading edge) and progress=1 =
+        //every fragment fully tinted.
         "float wfP = uWfProgress * 1.04 - 0.02;\n" +
         "float wfMask = 1.0 - smoothstep(wfP - 0.02, wfP + 0.02, wfT);\n" +
         "gl_FragColor.rgb = mix(gl_FragColor.rgb, uWfTint, wfMask);\n",
@@ -547,8 +558,56 @@ function recordBoxFromSceneGraph(root: { traverse: (cb: (obj: any) => void) => v
     }
   })
   if (any) {
-    wfBoxMinX  = box.min.x
-    wfBoxRange = Math.max(0.0001, box.max.x - box.min.x)
+    wfBox = box
+    recomputeSweepRange()
+  }
+}
+
+//Take the user-set axis + start/end offsets and project the bbox corners
+//onto the axis to figure out the min and max world-space coordinates the
+//wipe should travel between. Called whenever the axis OR the offsets
+//change, and once at GLTF load after the bbox is filled.
+function recomputeSweepRange() {
+  if (!wfBox) return
+  const axisInput = props.settings?.wireframeMode?.sweepAxis ?? [1, 0, 0]
+  const start     = (props.settings?.wireframeMode?.sweepStart ?? 0)   / 100
+  const end       = (props.settings?.wireframeMode?.sweepEnd   ?? 100) / 100
+
+  //Normalize the axis - degenerate (all zero) falls back to world X.
+  const ax = new Vector3(axisInput[0], axisInput[1], axisInput[2])
+  if (ax.lengthSq() < 0.0001) ax.set(1, 0, 0)
+  ax.normalize()
+  wfAxis = ax
+
+  //Project every corner of the bbox on the axis and take the min/max
+  //so the wipe covers the WHOLE model along the chosen direction.
+  const corners = [
+    new Vector3(wfBox.min.x, wfBox.min.y, wfBox.min.z),
+    new Vector3(wfBox.min.x, wfBox.min.y, wfBox.max.z),
+    new Vector3(wfBox.min.x, wfBox.max.y, wfBox.min.z),
+    new Vector3(wfBox.min.x, wfBox.max.y, wfBox.max.z),
+    new Vector3(wfBox.max.x, wfBox.min.y, wfBox.min.z),
+    new Vector3(wfBox.max.x, wfBox.min.y, wfBox.max.z),
+    new Vector3(wfBox.max.x, wfBox.max.y, wfBox.min.z),
+    new Vector3(wfBox.max.x, wfBox.max.y, wfBox.max.z),
+  ]
+  let pmin =  Infinity
+  let pmax = -Infinity
+  for (const c of corners) {
+    const p = c.dot(ax)
+    if (p < pmin) pmin = p
+    if (p > pmax) pmax = p
+  }
+  const span = Math.max(0.0001, pmax - pmin)
+  //Apply user start/end offsets - extend or shrink the visible sweep.
+  wfMin   = pmin + span * start
+  wfRange = Math.max(0.0001, span * (end - start))
+
+  //Push the freshly-recomputed values onto every patched shader.
+  for (const e of wfShaders) {
+    ;(e.shader.uniforms.uWfAxis  as { value: Vector3 }).value.copy(wfAxis)
+    ;(e.shader.uniforms.uWfMin   as { value: number  }).value = wfMin
+    ;(e.shader.uniforms.uWfRange as { value: number  }).value = wfRange
   }
 }
 
@@ -1060,6 +1119,9 @@ watch(() => props.settings, (s) => {
   if (!isReady.value || !s) return
   if (s.materials) applyMaterialOverrides(s.materials)
   //don't re-spawn lights here, would require teardown - keep it simple
+  //but DO push fresh sweep axis / start / end into the shader uniforms
+  //so live edits in the editor preview without a reload.
+  recomputeSweepRange()
   requestRender(500)
 }, { deep: true })
 </script>
