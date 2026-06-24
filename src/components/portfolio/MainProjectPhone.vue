@@ -101,9 +101,6 @@ function toggleWireframe(e: Event) {
   isWireframe.value = !isWireframe.value
 }
 
-function thumbSrc(t: { url: string | null; wireframeUrl: string | null }): string {
-  return (isWireframe.value ? t.wireframeUrl ?? t.url : t.url) ?? ""
-}
 
 //LIGHTBOX hookup - tapping a thumbnail (or the static main-image fallback)
 //opens the project's images as an infinite carousel.
@@ -143,7 +140,7 @@ async function onDescriptionSave(newVal: string) {
     :distance="50"
     :duration="0.8"
     :threshold="0.1"
-    class="mp-phone"
+    :class="['mp-phone', { 'mp-phone--wireframe': isWireframe }]"
   >
     <!--HEADER bandeau: small number + title. Sits ABOVE the viewer so it
     never overlaps the model. No background - it floats over the page bg.-->
@@ -170,13 +167,26 @@ async function onDescriptionSave(newVal: string) {
         class="mp-phone__three"
       />
 
-      <img
-        v-if="!project.glbUrl && showMainImage && mainImageUrl"
-        :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
-        :alt="project.title[lang]"
-        class="mp-phone__viewer-image mp-phone__viewer-image--clickable"
-        @click="onImageClick(0)"
-      />
+      <!--Static-image fallback: render BOTH the normal and wireframe
+      variants at mount-time so the wireframe is already in the browser
+      cache when the user toggles. Wireframe overlay is mask-clipped and
+      its mask-position is the actual animated property.-->
+      <template v-if="!project.glbUrl && showMainImage && mainImageUrl">
+        <img
+          :src="mainImageUrl"
+          :alt="project.title[lang]"
+          class="mp-phone__viewer-image mp-phone__viewer-image--clickable"
+          @click="onImageClick(0)"
+        />
+        <img
+          v-if="project.mainWireframeUrl"
+          :src="project.mainWireframeUrl"
+          :alt="''"
+          aria-hidden="true"
+          class="mp-phone__viewer-image mp-phone__wf-layer"
+          :style="{ '--wf-delay': '0ms' }"
+        />
+      </template>
       <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
         No image
       </div>
@@ -201,17 +211,28 @@ async function onDescriptionSave(newVal: string) {
       </button>
     </div>
 
-    <!--THUMBS row: 3 squares, equal width, just below the viewer.
-    Each clickable thumb opens the project's image carousel at its index.-->
+    <!--THUMBS row: 3 squares. Each renders BOTH variants so the
+    wireframe wipe just animates the mask without a network round-trip.
+    The --wf-delay var staggers each overlay so the diagonal sweep
+    propagates from main image -> thumb 1 -> thumb 2 -> thumb 3 as a
+    single continuous wave rather than three independent wipes.-->
     <div class="mp-phone__thumbs">
       <div
         v-for="(thumb, i) in thumbCells"
         :key="i"
         class="mp-phone__thumb"
-        :class="{ 'mp-phone__thumb--clickable': thumbSrc(thumb) }"
+        :class="{ 'mp-phone__thumb--clickable': thumb.url }"
         @click="onImageClick(i + 1)"
       >
-        <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
+        <img v-if="thumb.url" :src="thumb.url" :alt="thumb.description?.[lang] ?? ''" class="mp-phone__thumb-img" />
+        <img
+          v-if="thumb.wireframeUrl"
+          :src="thumb.wireframeUrl"
+          :alt="''"
+          aria-hidden="true"
+          class="mp-phone__thumb-img mp-phone__wf-layer"
+          :style="{ '--wf-delay': `${(i + 1) * 120}ms` }"
+        />
       </div>
     </div>
 
@@ -286,6 +307,37 @@ and for the next project's header to peek from below.------------------*/
   border: none;
   background: transparent;
 }
+
+/*=== WIREFRAME OVERLAY - diagonal-sweep reveal =========================
+The wireframe variant of every image is rendered at mount-time and stays
+in the DOM; we just mask it. mask-image is a hard diagonal gradient that
+covers either nothing (transparent on the visible portion of the
+element) or the whole thing depending on mask-position. Animating
+mask-position from 100% 100% (gradient off the bottom-right, image
+hidden) to 0% 0% (gradient covers the element, image visible) gives a
+diagonal wipe.
+
+The per-element --wf-delay staggers each overlay so the wipe propagates
+through the card as a SINGLE wave from main image to the last thumb,
+not as 4 independent wipes. The mirror happens automatically when the
+class is removed.*/
+.mp-phone__wf-layer {
+  -webkit-mask-image: linear-gradient(135deg, #000 50%, transparent 50%);
+          mask-image: linear-gradient(135deg, #000 50%, transparent 50%);
+  -webkit-mask-size: 250% 250%;
+          mask-size: 250% 250%;
+  -webkit-mask-position: 100% 100%;
+          mask-position: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  transition: -webkit-mask-position 600ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms),
+                      mask-position 600ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms);
+  pointer-events: none;
+}
+.mp-phone--wireframe .mp-phone__wf-layer {
+  -webkit-mask-position: 0% 0%;
+          mask-position: 0% 0%;
+}
 .mp-phone__viewer-embed--hidden { display: none; }
 
 .mp-phone__viewer-empty {
@@ -337,7 +389,7 @@ and for the next project's header to peek from below.------------------*/
 }
 .mp-phone__thumb--clickable,
 .mp-phone__viewer-image--clickable { cursor: zoom-in; }
-.mp-phone__thumb img {
+.mp-phone__thumb-img {
   position: absolute;
   inset: 0;
   width: 100%;

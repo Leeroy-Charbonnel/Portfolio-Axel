@@ -167,9 +167,6 @@ const statRows = computed(() => [
   { key: "triangles" as const, value: props.project.stats.triangles ?? 0 },
 ])
 
-function thumbSrc(t: { url: string | null; wireframeUrl: string | null }): string {
-  return (isWireframe.value ? t.wireframeUrl ?? t.url : t.url) ?? ""
-}
 
 //ADMIN MUTATIONS - each save fires a PUT and the parent's reload picks up the new state
 async function onTitleSave(newVal: string) {
@@ -279,7 +276,7 @@ async function replaceThumbnailWireframe(idx: number) {
     :threshold="0.1"
     class="main-project"
   >
-    <article ref="containerRef" :class="['container', 'main-project__article', layoutClass, phoneSideClass]">
+    <article ref="containerRef" :class="['container', 'main-project__article', layoutClass, phoneSideClass, { 'main-project__article--wireframe': isWireframe }]">
       <RemoveButton v-if="editMode" label="Delete project" @click="onDelete" />
 
       <!--Layout picker - absolute top-right of the article so overflow on the
@@ -327,14 +324,23 @@ async function replaceThumbnailWireframe(idx: number) {
             class="main-project__three"
           />
 
-          <img
-            v-if="!project.glbUrl && showMainImage && mainImageUrl"
-            :src="(isWireframe ? wireframeImageUrl : mainImageUrl) ?? ''"
-            :alt="project.title[lang]"
-            class="main-project__viewer-image"
-            :class="{ 'main-project__viewer-image--clickable': !editMode }"
-            @click="onImageClick(0)"
-          />
+          <template v-if="!project.glbUrl && showMainImage && mainImageUrl">
+            <img
+              :src="mainImageUrl ?? ''"
+              :alt="project.title[lang]"
+              class="main-project__viewer-image"
+              :class="{ 'main-project__viewer-image--clickable': !editMode }"
+              @click="onImageClick(0)"
+            />
+            <img
+              v-if="project.mainWireframeUrl"
+              :src="project.mainWireframeUrl"
+              :alt="''"
+              aria-hidden="true"
+              class="main-project__viewer-image main-project__wf-layer"
+              :style="{ '--wf-delay': '0ms' }"
+            />
+          </template>
           <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="main-project__viewer-empty">
             No image
           </div>
@@ -367,11 +373,19 @@ async function replaceThumbnailWireframe(idx: number) {
             v-for="(thumb, i) in project.thumbnails"
             :key="i"
             class="main-project__thumbnail"
-            :class="{ 'main-project__thumbnail--clickable': !editMode && thumbSrc(thumb) }"
+            :class="{ 'main-project__thumbnail--clickable': !editMode && thumb.url }"
             @click="onImageClick(i + 1)"
           >
-            <img v-if="thumbSrc(thumb)" :src="thumbSrc(thumb)" :alt="thumb.description?.[lang] ?? ''" />
-            <div v-else class="main-project__thumbnail-empty">No image</div>
+            <img v-if="thumb.url" :src="thumb.url" :alt="thumb.description?.[lang] ?? ''" />
+            <div v-else-if="!thumb.url" class="main-project__thumbnail-empty">No image</div>
+            <img
+              v-if="thumb.wireframeUrl"
+              :src="thumb.wireframeUrl"
+              :alt="''"
+              aria-hidden="true"
+              class="main-project__wf-layer"
+              :style="{ '--wf-delay': `${(i + 1) * 120}ms` }"
+            />
             <RemoveButton v-if="editMode" label="Remove thumbnail" @click.stop="removeThumbnail(i)" />
             <ReplaceImageButton v-if="editMode" @click.stop="isWireframe ? replaceThumbnailWireframe(i) : replaceThumbnailImage(i)" />
           </div>
@@ -787,6 +801,39 @@ column (left edge, bottom row, hidden entirely).*/
 
 .main-project__viewer-image--clickable,
 .main-project__thumbnail--clickable { cursor: zoom-in; }
+
+/*=== WIREFRAME OVERLAY - diagonal-sweep reveal =========================
+Both the normal and the wireframe variants live in the DOM at all times
+so the wireframe is already cached when the visitor toggles. A
+linear-gradient mask with a hard diagonal stop reveals it via mask-
+position. The per-image --wf-delay staggers each overlay so the sweep
+propagates through the card as ONE continuous wave (main image -> thumb
+1 -> thumb 2 -> thumb 3) rather than four independent wipes.*/
+.main-project__wf-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: inherit;
+  -webkit-mask-image: linear-gradient(135deg, #000 50%, transparent 50%);
+          mask-image: linear-gradient(135deg, #000 50%, transparent 50%);
+  -webkit-mask-size: 250% 250%;
+          mask-size: 250% 250%;
+  -webkit-mask-position: 100% 100%;
+          mask-position: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  transition: -webkit-mask-position 600ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms),
+                      mask-position 600ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms);
+  pointer-events: none;
+}
+img.main-project__wf-layer { object-fit: cover; }
+img.main-project__viewer-image.main-project__wf-layer { object-fit: contain; }
+
+.main-project__article--wireframe .main-project__wf-layer {
+  -webkit-mask-position: 0% 0%;
+          mask-position: 0% 0%;
+}
 
 .main-project__thumbnail {
   position: relative;
