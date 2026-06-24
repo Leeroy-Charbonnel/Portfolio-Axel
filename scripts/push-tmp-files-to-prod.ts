@@ -17,16 +17,21 @@ import { readFileSync, existsSync, readdirSync } from "node:fs"
 import { basename, join } from "node:path"
 import postgres from "postgres"
 
-const env = await Bun.file(".env").text().then((t) => {
-  const out: Record<string, string> = {}
+//Read .env if present, then overlay process.env so inline env-vars win
+//(handy for one-shot runs that don't want secrets persisted on disk).
+const env: Record<string, string> = {}
+try {
+  const t = await Bun.file(".env").text()
   for (const line of t.split(/\r?\n/)) {
     if (!line || line.startsWith("#")) continue
     const eq = line.indexOf("=")
     if (eq < 0) continue
-    out[line.slice(0, eq).trim()] = line.slice(eq + 1).trim()
+    env[line.slice(0, eq).trim()] = line.slice(eq + 1).trim()
   }
-  return out
-})
+} catch { /*no .env, fine*/ }
+for (const k of ["FILES_FORWARD_URL", "FILES_FORWARD_SECRET", "PROD_BASE_URL", "PROD_SESSION_COOKIE", "DATABASE_URL"]) {
+  if (process.env[k]) env[k] = process.env[k]!
+}
 
 const FORWARD_URL        = env.FILES_FORWARD_URL?.replace(/\/$/, "")
 const FORWARD_SECRET     = env.FILES_FORWARD_SECRET ?? ""
@@ -56,7 +61,7 @@ if (!useTunnel && !useCookie) {
 const targetUrl  = useTunnel ? FORWARD_URL! : PROD_BASE_URL
 const authHeader = useTunnel
   ? { "x-files-forward-secret": FORWARD_SECRET }
-  : { "cookie": `better-auth.session_token=${PROD_SESSION_COOKIE}` }
+  : { "cookie": `__Secure-better-auth.session_token=${PROD_SESSION_COOKIE}` }
 console.log(`[push-tmp] auth mode: ${useTunnel ? "TUNNEL secret" : "PROD session cookie"}`)
 console.log(`[push-tmp] target: ${targetUrl}`)
 
