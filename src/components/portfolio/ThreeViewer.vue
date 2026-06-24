@@ -634,27 +634,12 @@ function buildPrecomputedEdges() {
   }
 }
 
-//Force the wireframe-base material's program into the renderer's cache
-//by briefly swapping every mesh's material to wfBaseMat + calling
-//renderer.compile. Otherwise the GLSL compile happens on the click
-//frame.
+//Pre-build the wireframe edge geometries at load time. Materials no
+//longer need a precompile pass (we never swap them - the original is
+//also the wireframe material via the sweep shader, and it's already
+//rendered on the first paint so its program is in the cache).
 function precompileWireframeAssets() {
-  if (!scene || !renderer || !camera) return
-  ensureWfBaseMat()
   buildPrecomputedEdges()
-  if (!wfBaseMat) return
-
-  const stash: { mesh: Mesh; orig: MeshPhysicalMaterial | MeshPhysicalMaterial[] }[] = []
-  for (const sm of sceneMeshes) {
-    stash.push({ mesh: sm.mesh, orig: sm.mesh.material as MeshPhysicalMaterial | MeshPhysicalMaterial[] })
-    sm.mesh.material = wfBaseMat
-  }
-  try {
-    renderer.compile(scene, camera)
-  } catch (err) {
-    console.warn("[ThreeViewer] wireframe warmup compile failed:", err)
-  }
-  for (const { mesh, orig } of stash) mesh.material = orig
 }
 
 function ensureWfBaseMat() {
@@ -738,56 +723,20 @@ function applyWireframeMode(on: boolean) {
   requestRender(800)
 }
 
-//Compute emissive overrides + swap each mesh to its wireframe material.
-//Factored so enterWireframe can defer this until the sweep animation ends.
+//Single material per mesh - the original, patched with the sweep
+//shader. The final "wireframe-on" state is uWfProgress=1 which lets the
+//shader's clip range honor sweepStart / sweepEnd: fragments past the
+//end stay un-tinted, naturally producing a permanent partial-blend
+//when the user dials a short sweep range. No material swap means the
+//visual at progress=1 matches exactly what they preview while dragging
+//the slider, and there's no "blip" at the end of the transition.
 function finalizeEnterWireframe() {
   if (!scene) return
-  ensureWfBaseMat()
   const wf = props.settings?.wireframeMode
-  const modeColor = wf?.color ?? "#14b8a6"
-
-  const intensityFor = (mesh: Mesh): number | undefined => {
-    const sm = sceneMeshes.find((s) => s.mesh === mesh)
-    for (const e of (wf?.emissiveMeshes ?? [])) {
-      if (e.name && sm?.name === e.name) return e.intensity
-      if (e.uuid && mesh.uuid === e.uuid) return e.intensity
-    }
-    return undefined
-  }
-
-  const emissiveSet = new Set<string>()
-  for (const sm of sceneMeshes) {
-    const intensity = intensityFor(sm.mesh)
-    if (intensity !== undefined) {
-      emissiveSet.add(sm.mesh.uuid)
-      let mat = wfEmissiveMaterials.get(sm.mesh.uuid)
-      if (!mat) {
-        const base = props.settings?.wireframeMode?.material
-        mat = new MeshPhysicalMaterial({
-          color:             new Color(base?.color             ?? "#808080"),
-          metalness:         base?.metalness                   ?? 0,
-          roughness:         base?.roughness                   ?? 0.5,
-          envMapIntensity:   base?.envMapIntensity             ?? 1,
-          specularIntensity: base?.specularIntensity           ?? 1,
-          emissive:          new Color(modeColor),
-          emissiveIntensity: intensity,
-        })
-        wfEmissiveMaterials.set(sm.mesh.uuid, mat)
-      } else {
-        mat.emissive.set(modeColor)
-        mat.emissiveIntensity = intensity
-        mat.needsUpdate = true
-      }
-      sm.mesh.material = mat
-    } else {
-      sm.mesh.material = wfBaseMat!
-    }
-  }
-
-  syncWireframeOverlays(wf?.overlayOn ?? true, wf?.overlayColor ?? "#000000", emissiveSet)
-
-  //Snap lights + HDR to wireframe mode NOW that the model is uniformly
-  //tinted - the lighting change is invisible against the flat surface.
+  //Emissive picks are skipped on the "single material" path - bringing
+  //them back would require either a second pass on top of the tint or
+  //a per-mesh shader fork, and the user explicitly wants ONE material.
+  syncWireframeOverlays(wf?.overlayOn ?? true, wf?.overlayColor ?? "#000000", new Set())
   applyLightsForMode("wireframe")
   applyHdrFromUrl(wf?.hdrUrl, wf?.hdrIntensity ?? 1)
 }
@@ -817,12 +766,9 @@ function enterWireframe() {
 
 function leaveWireframe() {
   if (!scene) return
-  //Swap materials back to originals NOW so the sweep can drag the tint
-  //back to 0 visually. Edge overlays come off immediately.
-  for (const sm of sceneMeshes) {
-    const orig = meshOriginalMaterials.get(sm.mesh.uuid)
-    if (orig) sm.mesh.material = orig
-  }
+  //No material swap to undo - originals already carry the sweep shader
+  //and were never swapped out. Just drop edge overlays, flip lights +
+  //HDR back to normal mode, then animate uWfProgress 1 -> 0.
   syncWireframeOverlays(false, "", new Set())
   applyLightsForMode("normal")
   const n = props.settings?.normalMode

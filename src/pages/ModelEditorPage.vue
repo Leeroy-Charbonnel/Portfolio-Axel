@@ -481,27 +481,11 @@ function buildPrecomputedEdges() {
   }
 }
 
-//Force the wireframe-base material's GLSL program into the renderer's
-//program cache by temporarily swapping every mesh's material to it and
-//calling renderer.compile. Avoids the multi-hundred-millisecond stall
-//on the first wireframe toggle.
+//Pre-build the wireframe edge geometries at load time. Material swaps
+//are gone (single material with sweep shader handles both states), so
+//the only meaningful warmup left is the EdgesGeometry cache.
 function precompileWireframeAssets() {
-  if (!scene || !renderer || !cameraRef) return
-  ensureWfMaterials()
   buildPrecomputedEdges()
-  if (!wfBaseMat) return
-
-  const stash: { mesh: Mesh; orig: MeshPhysicalMaterial | MeshPhysicalMaterial[] }[] = []
-  for (const sm of sceneMeshes.value) {
-    stash.push({ mesh: sm.mesh, orig: sm.mesh.material as MeshPhysicalMaterial | MeshPhysicalMaterial[] })
-    sm.mesh.material = wfBaseMat
-  }
-  try {
-    renderer.compile(scene, cameraRef)
-  } catch (err) {
-    console.warn("[edit-3d] wireframe warmup compile failed:", err)
-  }
-  for (const { mesh, orig } of stash) mesh.material = orig
 }
 
 function advanceWfTransition() {
@@ -2093,21 +2077,15 @@ function setMaterialFor(mesh: Mesh) {
   }
 }
 
-//Apply the actual wireframe materials (wfBaseMat + per-pick emissives).
-//Called at the END of the enter sweep so the tint reveal can run on the
-//originals first, then we land on the proper PBR.
+//ONE material - the original, patched with the sweep shader. The final
+//"wireframe-on" state is just uWfProgress=1 plus the lights + HDR +
+//overlays for the wireframe mode. Fragments past sweepEnd stay
+//un-tinted because the shader's smoothstep clip naturally drops them.
+//No material swap means a too-short sweepEnd produces a permanent
+//partial-blend, exactly what the user is dialing for.
 function finalizeEnterWireframe() {
   if (!scene) return
-  ensureWfMaterials()
-  meshMatSnapshots.clear()
-  for (const sm of sceneMeshes.value) {
-    meshMatSnapshots.set(sm.mesh.uuid, sm.mesh.material as MeshPhysicalMaterial)
-    setMaterialFor(sm.mesh)
-  }
   syncWireframeOverlays()
-  //Lights + HDR + overlays all switch over IN ONE FRAME at the end of
-  //the sweep, when the surface is already fully tinted - the swap is
-  //hidden by the uniform grey covering the model.
   applyLightsForMode()
   syncEnvForCurrentMode()
 }
@@ -2115,27 +2093,21 @@ function finalizeEnterWireframe() {
 function enableWireframeMode() {
   if (!scene) return
   wireframeMode.value = true
-  //Refresh sweep uniforms to whatever the user has dialled in - axis,
-  //start, end, tint colour - so the preview reflects unsaved edits.
+  //Refresh sweep uniforms - axis, start, end, tint - so the preview
+  //reflects unsaved edits.
   refreshSweepTint()
   recomputeSweepRange()
-  //Run the tint reveal on the ORIGINAL materials (with normal-mode
-  //lights + HDR still active so the lighting on the swept surface
-  //matches the unswept surface for the whole transition). At the end
-  //finalizeEnterWireframe() swaps to wfBaseMat / picks AND snaps the
-  //lights + HDR to wireframe mode, hidden by the now-uniform tint.
+  //Tint reveal runs on the originals. finalizeEnterWireframe() at the
+  //end attaches the edge overlays and snaps lights + HDR over.
   wfTransition = { startTime: performance.now(), from: 0, to: 1, duration: WF_SWEEP_DURATION_MS, phase: "enter" }
   requestRender(WF_SWEEP_DURATION_MS + 200)
 }
 
 function disableWireframeMode() {
   wireframeMode.value = false
-  //Drop back to originals NOW so the sweep can drag the tint backwards.
-  for (const sm of sceneMeshes.value) {
-    const orig = meshMatSnapshots.get(sm.mesh.uuid)
-    if (orig) sm.mesh.material = orig
-  }
-  meshMatSnapshots.clear()
+  //No material swap to undo - we only ever ran the shader on the
+  //originals. Just remove the overlays + flip lights + HDR back, then
+  //drive uWfProgress back to 0.
   removeWireframeOverlays()
   applyLightsForMode()
   syncEnvForCurrentMode()
