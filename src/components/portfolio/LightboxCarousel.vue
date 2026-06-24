@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { ChevronLeft, ChevronRight, X } from "lucide-vue-next"
 import { useLightbox } from "../../composables/useLightbox"
 
@@ -7,18 +7,22 @@ import { useLightbox } from "../../composables/useLightbox"
 //module-level state from useLightbox; any component opens it by calling
 //useLightbox().open([{url,alt}], startIndex).
 //
-// - infinite horizontal scroll (modulo wrap on next/prev)
-// - touch swipe + keyboard arrows + mouse arrow buttons
-// - dot pagination at the bottom
-// - escape / backdrop click closes
-// - locks body scroll while open
+//Truly infinite scroll - duplicate-edges trick: the DOM track holds
+//[clone(last), ...items, clone(first)]. Going past the last item slides
+//forward into the cloned first; once the slide finishes we teleport
+//(transition off) back to the real first at the same visual position.
+//Same trick mirrored on the prev edge. So forward and backward feel
+//like an infinite belt with no rewind.
 
-const { items, index, isOpen, close, next, prev, goTo } = useLightbox()
+const { items, index, isOpen, close, goTo } = useLightbox()
 
-//Track translation - the active item is centered, neighbours flank it.
-//Renders the full list once and slides via translateX. Wrap-around does
-//a quiet rewind which is fine for a brutalist viewer.
-const track = ref<HTMLElement | null>(null)
+//`position` is the displayed offset inside the extended track. It can
+//briefly land on -1 (clone of last) or items.length (clone of first)
+//during the transition, then snaps to the real range [0, items.length).
+const position           = ref(0)
+const transitionEnabled  = ref(true)
+
+const trackOffsetPercent = computed(() => -((position.value + 1) * 100))
 
 //SWIPE / drag handling - same pointer events for touch and mouse.
 const dragStartX = ref<number | null>(null)
@@ -43,6 +47,54 @@ function onPointerUp(e: PointerEvent) {
   dragDX.value = 0
 }
 
+function next() {
+  if (items.value.length === 0) return
+  position.value++
+}
+function prev() {
+  if (items.value.length === 0) return
+  position.value--
+}
+
+//Sync the public `index` (used for the dot pagination + by goTo) with
+//`position`. Whenever position lands on a "real" slot, index follows.
+watch(position, (p) => {
+  const n = items.value.length
+  if (n === 0) return
+  if (p >= 0 && p < n) index.value = p
+})
+
+//Jumping via a dot click bypasses the carousel anim - we map directly
+//to the real index. Reset position to match so the snap behaviour stays
+//consistent.
+watch(index, (i) => {
+  if (i !== ((position.value % items.value.length) + items.value.length) % items.value.length) {
+    transitionEnabled.value = true
+    position.value = i
+  }
+})
+
+//When a slide transition ends in the "clone" zone (position -1 or
+//position = N), teleport (transition off) to the matching real slot so
+//the visitor never sees a rewind. requestAnimationFrame + nextTick
+//ensures the no-transition style is applied for at least one paint
+//before re-enabling transitions for the NEXT user action.
+async function onTrackTransitionEnd() {
+  const n = items.value.length
+  if (n === 0) return
+  if (position.value >= n) {
+    transitionEnabled.value = false
+    position.value = position.value - n
+    await nextTick()
+    requestAnimationFrame(() => { transitionEnabled.value = true })
+  } else if (position.value < 0) {
+    transitionEnabled.value = false
+    position.value = position.value + n
+    await nextTick()
+    requestAnimationFrame(() => { transitionEnabled.value = true })
+  }
+}
+
 function onKey(e: KeyboardEvent) {
   if (!isOpen.value) return
   if (e.key === "Escape")     { e.preventDefault(); close() }
@@ -50,11 +102,16 @@ function onKey(e: KeyboardEvent) {
   if (e.key === "ArrowLeft")  { e.preventDefault(); prev() }
 }
 
-//Lock body scroll while the lightbox is open so swipes inside the
-//overlay don't accidentally scroll the page behind it.
-watch(isOpen, (open) => {
-  if (typeof document === "undefined") return
-  document.documentElement.style.overflow = open ? "hidden" : ""
+//On open: reset position to the requested start index with transitions
+//disabled so the lightbox appears at the chosen slide without a slide-in
+//animation.
+watch(isOpen, async (open) => {
+  if (typeof document !== "undefined") document.documentElement.style.overflow = open ? "hidden" : ""
+  if (!open) return
+  transitionEnabled.value = false
+  position.value = index.value
+  await nextTick()
+  requestAnimationFrame(() => { transitionEnabled.value = true })
 })
 
 onMounted(() => { window.addEventListener("keydown", onKey) })
@@ -105,17 +162,32 @@ onBeforeUnmount(() => {
           <ChevronRight :size="22" />
         </button>
 
-        <!--TRACK - all items rendered side by side, translated by index.
-        Drag offset is added on top so the swipe gesture feels responsive.-->
+        <!--TRACK - extended with clones of the last item (left edge) and
+        the first item (right edge) so going past either edge slides into
+        identical content and we teleport back inside the real range with
+        the transition disabled. The visitor never sees a rewind.
+        Drag offset is added on top so the swipe feels responsive.-->
         <div
-          ref="track"
           class="lightbox__track"
-          :style="{ transform: `translateX(calc(${-index * 100}% + ${dragDX}px))` }"
+          :class="{ 'lightbox__track--no-transition': !transitionEnabled }"
+          :style="{ transform: `translateX(calc(${trackOffsetPercent}% + ${dragDX}px))` }"
           @pointerdown="onPointerDown"
           @pointermove="onPointerMove"
           @pointerup="onPointerUp"
           @pointercancel="onPointerUp"
+          @transitionend="onTrackTransitionEnd"
         >
+          <!--CLONE of the last item at the head of the track.-->
+          <div v-if="items.length" class="lightbox__slide" aria-hidden="true">
+            <img
+              v-if="items[items.length - 1].url"
+              :src="items[items.length - 1].url"
+              :alt="''"
+              draggable="false"
+              class="lightbox__image"
+            />
+          </div>
+
           <div
             v-for="(it, i) in items"
             :key="i"
@@ -125,6 +197,17 @@ onBeforeUnmount(() => {
               v-if="it.url"
               :src="it.url"
               :alt="it.alt ?? ''"
+              draggable="false"
+              class="lightbox__image"
+            />
+          </div>
+
+          <!--CLONE of the first item at the tail of the track.-->
+          <div v-if="items.length" class="lightbox__slide" aria-hidden="true">
+            <img
+              v-if="items[0].url"
+              :src="items[0].url"
+              :alt="''"
               draggable="false"
               class="lightbox__image"
             />
@@ -220,6 +303,9 @@ between them.*/
   cursor: grab;
 }
 .lightbox__track:active { cursor: grabbing; }
+/*Toggled during the teleport snap from clone -> real slot so the
+position jump is invisible.*/
+.lightbox__track--no-transition { transition: none; }
 
 .lightbox__slide {
   flex: 0 0 100%;
