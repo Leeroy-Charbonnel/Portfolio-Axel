@@ -4,10 +4,19 @@ import { Trash2, AlertTriangle, RefreshCw } from "lucide-vue-next"
 import { usePortfolio } from "../../composables/usePortfolio"
 
 //Admin-only file manager. Lists every row in the file table with a usage
-//count, lets the admin delete individual files (only when unused) and bulk-
-//delete every orphan in one click (with a confirm modal). HDR / EXR files
-//and software logos are excluded from the list since they're managed via
-//dedicated UIs (HDR tab in the model editor, SoftwareEditor in /settings).
+//count, lets the admin delete individual files (only when unused) and
+//bulk-delete every orphan in one click (with a confirm modal).
+//
+//Three sub-tabs:
+//  - Images: ordinary image uploads (project main / thumbnails / gallery).
+//            Software logos are NOT shown here - they're managed in
+//            SoftwareEditor.
+//  - 3D models: .glb / .gltf
+//  - HDRs: .hdr / .exr / .hdri
+//
+//Bulk delete only applies to the Images tab. HDRs and 3D models are KEPT
+//even when no project currently references them (the author wants to swap
+//between them in the editor without re-uploading every time).
 
 interface FileRow {
   id:               string
@@ -37,19 +46,40 @@ const softwareLogoIds = computed<Set<string>>(() => {
   return new Set(ids)
 })
 
-function isHdr(filename: string): boolean {
-  return /\.(hdr|exr|hdri)$/i.test(filename)
-}
+function isHdr(filename: string): boolean    { return /\.(hdr|exr|hdri)$/i.test(filename) }
+function isModel(filename: string): boolean  { return /\.(glb|gltf)$/i.test(filename) }
 
-//Visible list = all files minus HDR / EXR / HDRI and minus software logos.
-const visibleFiles = computed(() => files.value.filter((f) =>
-  !isHdr(f.originalFilename) && !softwareLogoIds.value.has(f.id)
-))
+type TabKey = "images" | "models" | "hdrs"
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "images", label: "Images" },
+  { key: "models", label: "3D models" },
+  { key: "hdrs",   label: "HDRs" },
+]
+const currentTab = ref<TabKey>("images")
 
-const orphans     = computed(() => visibleFiles.value.filter((f) => f.referenceCount === 0))
-const orphanCount = computed(() => orphans.value.length)
-const totalSize   = computed(() => visibleFiles.value.reduce((a, f) => a + f.sizeBytes, 0))
-const orphanSize  = computed(() => orphans.value.reduce((a, f) => a + f.sizeBytes, 0))
+//Bucket every file row into one of the three sub-tabs. Software logos
+//are kept out of the Images tab since SoftwareEditor manages them.
+const filesByTab = computed<Record<TabKey, FileRow[]>>(() => {
+  const out: Record<TabKey, FileRow[]> = { images: [], models: [], hdrs: [] }
+  for (const f of files.value) {
+    if (isHdr(f.originalFilename))                 out.hdrs.push(f)
+    else if (isModel(f.originalFilename))          out.models.push(f)
+    else if (!softwareLogoIds.value.has(f.id))     out.images.push(f)
+  }
+  return out
+})
+
+const visibleFiles = computed(() => filesByTab.value[currentTab.value])
+
+//Only the Images tab participates in bulk orphan delete - HDRs and
+//models are kept around for the editor's pickers even when unreferenced.
+const allowBulkDelete = computed(() => currentTab.value === "images")
+const orphans         = computed(() => allowBulkDelete.value ? visibleFiles.value.filter((f) => f.referenceCount === 0) : [])
+const orphanCount     = computed(() => orphans.value.length)
+const totalSize       = computed(() => visibleFiles.value.reduce((a, f) => a + f.sizeBytes, 0))
+const orphanSize      = computed(() => orphans.value.reduce((a, f) => a + f.sizeBytes, 0))
+
+function tabCount(key: TabKey): number { return filesByTab.value[key].length }
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -111,8 +141,10 @@ onMounted(load)
       <div>
         <h2 class="file-manager__title">Files</h2>
         <p class="file-manager__summary">
-          {{ visibleFiles.length }} total · {{ formatBytes(totalSize) }} ·
-          <strong>{{ orphanCount }} unreferenced</strong> ({{ formatBytes(orphanSize) }})
+          {{ visibleFiles.length }} total · {{ formatBytes(totalSize) }}
+          <template v-if="allowBulkDelete">
+            · <strong>{{ orphanCount }} unreferenced</strong> ({{ formatBytes(orphanSize) }})
+          </template>
         </p>
       </div>
       <div class="file-manager__actions">
@@ -121,6 +153,7 @@ onMounted(load)
           <span>Reload</span>
         </button>
         <button
+          v-if="allowBulkDelete"
           class="file-manager__bulk"
           :disabled="orphanCount === 0"
           @click="showBulkConfirm = true"
@@ -130,6 +163,23 @@ onMounted(load)
         </button>
       </div>
     </header>
+
+    <!--SUB-TAB strip: Images / 3D models / HDRs. Active count badge shows
+    how many rows each tab holds.-->
+    <nav class="file-manager__tabs" role="tablist">
+      <button
+        v-for="t in TABS"
+        :key="t.key"
+        type="button"
+        role="tab"
+        class="file-manager__tab"
+        :class="{ 'file-manager__tab--active': currentTab === t.key }"
+        @click="currentTab = t.key"
+      >
+        <span>{{ t.label }}</span>
+        <span class="file-manager__tab-count">{{ tabCount(t.key) }}</span>
+      </button>
+    </nav>
 
     <p v-if="error" class="file-manager__error">{{ error }}</p>
 
@@ -281,6 +331,46 @@ onMounted(load)
 .file-manager__reload:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/*SUB-TAB strip*/
+.file-manager__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: var(--border-width-sm) solid var(--color-gray-medium);
+  margin-bottom: calc(-1 * var(--spacing-md));
+}
+.file-manager__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: transparent;
+  border: none;
+  border-bottom: var(--border-width-md) solid transparent;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  margin-bottom: -1px;
+}
+.file-manager__tab:hover { color: var(--color-text-hover); }
+.file-manager__tab--active {
+  color: var(--color-text-hover);
+  border-bottom-color: var(--color-accent);
+}
+.file-manager__tab-count {
+  font-size: var(--font-size-xxs, 0.625rem);
+  padding: 0 var(--spacing-xs);
+  background-color: var(--color-background-gray-100);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.file-manager__tab--active .file-manager__tab-count {
+  background-color: hsl(var(--primary) / 0.18);
+  color: var(--color-text-hover);
 }
 
 .file-manager__error {

@@ -408,8 +408,14 @@ app.get("/api/files", requireAuth, requireAdmin, async (_req, res) => {
 //"/api/files/:id" so express doesn't match "orphans" as a uuid param.
 app.delete("/api/files/orphans", requireAuth, requireAdmin, async (req, res) => {
   if (await forwardFileOp(req, res, "/api/files/orphans")) return
+  //HDRs (.hdr/.exr/.hdri) and 3D models (.glb/.gltf) are KEPT even when
+  //unreferenced - the author swaps between them in the editor picker,
+  //so deleting them just because no project currently points at one
+  //would force a re-upload. The orphan sweep only nukes image-like
+  //files (and other random uploads).
   const result = await db.execute(sql`
     SELECT f.id, f.stored_filename FROM file f WHERE
+      f.original_filename !~* '\.(hdr|exr|hdri|glb|gltf)$' AND
       NOT EXISTS (SELECT 1 FROM main_project    WHERE main_image_file_id     = f.id) AND
       NOT EXISTS (SELECT 1 FROM main_project    WHERE main_wireframe_file_id = f.id) AND
       NOT EXISTS (SELECT 1 FROM main_project    WHERE video_file_id          = f.id) AND
