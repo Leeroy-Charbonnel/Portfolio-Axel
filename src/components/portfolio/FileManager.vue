@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
-import { Trash2, AlertTriangle, RefreshCw } from "lucide-vue-next"
+import { Trash2, RefreshCw } from "lucide-vue-next"
 import { usePortfolio } from "../../composables/usePortfolio"
 
 //Admin-only file manager. Lists every row in the file table with a usage
@@ -30,14 +30,11 @@ interface FileRow {
   url:              string
 }
 
-const { data: portfolioData } = usePortfolio()
+const { data: portfolioData, reload: reloadPortfolio } = usePortfolio()
 
 const files   = ref<FileRow[]>([])
 const loading = ref(false)
 const error   = ref<string | null>(null)
-
-const showBulkConfirm = ref(false)
-const bulkInFlight    = ref(false)
 
 //Software logo file ids - excluded from the file list so logos only live
 //in the SoftwareEditor.
@@ -71,13 +68,11 @@ const filesByTab = computed<Record<TabKey, FileRow[]>>(() => {
 
 const visibleFiles = computed(() => filesByTab.value[currentTab.value])
 
-//Only the Images tab participates in bulk orphan delete - HDRs and
-//models are kept around for the editor's pickers even when unreferenced.
-const allowBulkDelete = computed(() => currentTab.value === "images")
-const orphans         = computed(() => allowBulkDelete.value ? visibleFiles.value.filter((f) => f.referenceCount === 0) : [])
-const orphanCount     = computed(() => orphans.value.length)
-const totalSize       = computed(() => visibleFiles.value.reduce((a, f) => a + f.sizeBytes, 0))
-const orphanSize      = computed(() => orphans.value.reduce((a, f) => a + f.sizeBytes, 0))
+//Per-tab summary stats. No bulk delete - the author wants to inspect
+//and remove rows manually now that HDRs / 3D models can carry useful
+//orphans (alternate-pose variants etc.) that shouldn't be auto-killed.
+const orphanCount = computed(() => visibleFiles.value.filter((f) => f.referenceCount === 0).length)
+const totalSize   = computed(() => visibleFiles.value.reduce((a, f) => a + f.sizeBytes, 0))
 
 function tabCount(key: TabKey): number { return filesByTab.value[key].length }
 
@@ -92,7 +87,13 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const res = await fetch("/api/files", { credentials: "include" })
+    //Refresh /api/portfolio in parallel so softwareLogoIds stays in sync
+    //with whatever logos were just up/down-loaded - otherwise stale
+    //logoFileIds let the matching file row leak into the Images tab.
+    const [res] = await Promise.all([
+      fetch("/api/files", { credentials: "include" }),
+      reloadPortfolio(),
+    ])
     if (!res.ok) throw new Error(`GET /api/files -> ${res.status}`)
     files.value = await res.json()
   } catch (e) {
@@ -118,20 +119,6 @@ async function deleteOne(file: FileRow) {
   }
 }
 
-async function deleteOrphans() {
-  bulkInFlight.value = true
-  try {
-    const res = await fetch("/api/files/orphans", { method: "DELETE", credentials: "include" })
-    if (!res.ok) throw new Error(`DELETE /api/files/orphans -> ${res.status}`)
-    await load()
-    showBulkConfirm.value = false
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    bulkInFlight.value = false
-  }
-}
-
 onMounted(load)
 </script>
 
@@ -142,24 +129,13 @@ onMounted(load)
         <h2 class="file-manager__title">Files</h2>
         <p class="file-manager__summary">
           {{ visibleFiles.length }} total · {{ formatBytes(totalSize) }}
-          <template v-if="allowBulkDelete">
-            · <strong>{{ orphanCount }} unreferenced</strong> ({{ formatBytes(orphanSize) }})
-          </template>
+          · <strong>{{ orphanCount }} unreferenced</strong>
         </p>
       </div>
       <div class="file-manager__actions">
         <button class="file-manager__reload" :disabled="loading" @click="load">
           <RefreshCw :size="14" />
           <span>Reload</span>
-        </button>
-        <button
-          v-if="allowBulkDelete"
-          class="file-manager__bulk"
-          :disabled="orphanCount === 0"
-          @click="showBulkConfirm = true"
-        >
-          <Trash2 :size="14" />
-          <span>Delete {{ orphanCount }} unreferenced</span>
         </button>
       </div>
     </header>
@@ -235,31 +211,6 @@ onMounted(load)
     </table>
     <p v-else class="file-manager__loading">Loading...</p>
 
-    <!--BULK DELETE confirmation modal-->
-    <div v-if="showBulkConfirm" class="file-manager__modal-backdrop" @click.self="showBulkConfirm = false">
-      <div class="file-manager__modal">
-        <div class="file-manager__modal-icon">
-          <AlertTriangle :size="24" />
-        </div>
-        <h3 class="file-manager__modal-title">Delete {{ orphanCount }} unreferenced file{{ orphanCount > 1 ? "s" : "" }} ?</h3>
-        <p class="file-manager__modal-body">
-          This will permanently delete <strong>{{ orphanCount }} file{{ orphanCount > 1 ? "s" : "" }}</strong>
-          ({{ formatBytes(orphanSize) }}) from disk and from the database.
-          They aren't used anywhere in the portfolio.
-          <br><br>
-          <strong>This cannot be undone.</strong>
-        </p>
-        <div class="file-manager__modal-actions">
-          <button class="file-manager__modal-cancel" :disabled="bulkInFlight" @click="showBulkConfirm = false">
-            Cancel
-          </button>
-          <button class="file-manager__modal-confirm" :disabled="bulkInFlight" @click="deleteOrphans">
-            <Trash2 :size="14" />
-            <span>{{ bulkInFlight ? "Deleting..." : `Delete ${orphanCount} file${orphanCount > 1 ? "s" : ""}` }}</span>
-          </button>
-        </div>
-      </div>
-    </div>
   </section>
 </template>
 
@@ -300,8 +251,7 @@ onMounted(load)
   flex-wrap: wrap;
 }
 
-.file-manager__reload,
-.file-manager__bulk {
+.file-manager__reload {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
@@ -321,13 +271,6 @@ onMounted(load)
   border-color: var(--color-accent);
 }
 
-.file-manager__bulk:hover:not(:disabled) {
-  color: var(--color-text-hover);
-  border-color: hsl(var(--destructive));
-  background-color: hsl(var(--destructive) / 0.1);
-}
-
-.file-manager__bulk:disabled,
 .file-manager__reload:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -489,97 +432,6 @@ onMounted(load)
   color: var(--color-text-tertiary);
   font-size: var(--font-size-sm);
 }
-
-/*MODAL*/
-.file-manager__modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: hsl(var(--background) / 0.85);
-  backdrop-filter: blur(var(--filter-blur));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: var(--spacing-md);
-}
-
-.file-manager__modal {
-  max-width: 32rem;
-  width: 100%;
-  background-color: var(--color-background-secondary);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  padding: var(--spacing-xl);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.file-manager__modal-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--spacing-2xl);
-  height: var(--spacing-2xl);
-  background-color: hsl(var(--destructive) / 0.15);
-  color: hsl(var(--destructive));
-}
-
-.file-manager__modal-title {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-hover);
-  letter-spacing: var(--letter-spacing-tight);
-}
-
-.file-manager__modal-body {
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
-}
-
-.file-manager__modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-sm);
-}
-
-.file-manager__modal-cancel,
-.file-manager__modal-confirm {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-md);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.file-manager__modal-cancel {
-  background-color: transparent;
-  color: var(--color-text-secondary);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-}
-
-.file-manager__modal-cancel:hover:not(:disabled) {
-  color: var(--color-text-hover);
-  border-color: var(--color-text);
-}
-
-.file-manager__modal-confirm {
-  background-color: hsl(var(--destructive));
-  color: var(--color-text-hover);
-  border: var(--border-width-sm) solid hsl(var(--destructive));
-}
-
-.file-manager__modal-confirm:hover:not(:disabled) {
-  background-color: hsl(var(--destructive) / 0.85);
-}
-
-.file-manager__modal-cancel:disabled,
-.file-manager__modal-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
 
 @media (max-width: 600px) {
   .file-manager__uuid { display: none; }
