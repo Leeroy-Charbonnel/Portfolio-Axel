@@ -520,9 +520,14 @@ function patchMaterialForSweep(material: Material) {
         "#include <dithering_fragment>",
         "#include <dithering_fragment>\n" +
         "float wfT = (vWfWorldPos.x - uWfMin) / max(uWfRange, 0.0001);\n" +
-        //wfT is 0 at minX, 1 at maxX. The sweep advances left-to-right:
-        //a fragment is in "wireframe" state once uWfProgress >= wfT.
-        "float wfMask = smoothstep(uWfProgress - 0.02, uWfProgress + 0.02, 1.0 - wfT);\n" +
+        //wfT is 0 at the left edge of the model, 1 at the right. The
+        //sweep marches the line from x=0 to x=1: a fragment is "passed"
+        //(wireframe-tinted) when wfT < uWfProgress, untouched otherwise.
+        //We pad progress to [-0.02, 1.02] so progress=0 leaves the model
+        //completely untinted (no half-pixel tint on the very left edge)
+        //and progress=1 tints every fragment fully.
+        "float wfP = uWfProgress * 1.04 - 0.02;\n" +
+        "float wfMask = 1.0 - smoothstep(wfP - 0.02, wfP + 0.02, wfT);\n" +
         "gl_FragColor.rgb = mix(gl_FragColor.rgb, uWfTint, wfMask);\n",
       )
 
