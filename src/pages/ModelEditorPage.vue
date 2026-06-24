@@ -1953,12 +1953,12 @@ function syncGizmoTargetToData() {
 }
 
 //===========================================================================
-//WIREFRAME MODE - tab-coupled
+//WIREFRAME MODE
 //===========================================================================
-watch(tab, (next, prev) => {
-  if (next === "wireframe" && prev !== "wireframe") enableWireframeMode()
-  if (prev === "wireframe" && next !== "wireframe") disableWireframeMode()
-})
+//Wireframe is now toggled explicitly via the Grid button in the viewport
+//toolbar. Switching to the Wireframe tab no longer enables the preview -
+//the author was clobbering the live render every time they opened the
+//section to tune a slider.
 
 function ensureWfMaterials() {
   if (wfBaseMat && wfPickMat) return
