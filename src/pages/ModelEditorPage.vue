@@ -465,6 +465,45 @@ function refreshSweepTint() {
   for (const e of wfShaders) (e.shader.uniforms.uWfTint as { value: Color }).value.copy(tint)
 }
 
+//Pre-build EdgesGeometry per mesh so the wireframe-overlay sync at
+//toggle time just attaches pre-computed lines instead of recomputing
+//them. Keyed by mesh uuid; entries match the threshold the user has
+//configured. Rebuilt when the threshold changes via the slider.
+const precomputedEdges = new Map<string, EdgesGeometry>()
+let   precomputedEdgesThreshold = WIREFRAME_EDGE_THRESHOLD_DEG
+
+function buildPrecomputedEdges() {
+  for (const g of precomputedEdges.values()) g.dispose()
+  precomputedEdges.clear()
+  precomputedEdgesThreshold = wireframeEdgeThreshold.value
+  for (const sm of sceneMeshes.value) {
+    precomputedEdges.set(sm.mesh.uuid, new EdgesGeometry(sm.mesh.geometry, precomputedEdgesThreshold))
+  }
+}
+
+//Force the wireframe-base material's GLSL program into the renderer's
+//program cache by temporarily swapping every mesh's material to it and
+//calling renderer.compile. Avoids the multi-hundred-millisecond stall
+//on the first wireframe toggle.
+function precompileWireframeAssets() {
+  if (!scene || !renderer || !cameraRef) return
+  ensureWfMaterials()
+  buildPrecomputedEdges()
+  if (!wfBaseMat) return
+
+  const stash: { mesh: Mesh; orig: MeshPhysicalMaterial | MeshPhysicalMaterial[] }[] = []
+  for (const sm of sceneMeshes.value) {
+    stash.push({ mesh: sm.mesh, orig: sm.mesh.material as MeshPhysicalMaterial | MeshPhysicalMaterial[] })
+    sm.mesh.material = wfBaseMat
+  }
+  try {
+    renderer.compile(scene, cameraRef)
+  } catch (err) {
+    console.warn("[edit-3d] wireframe warmup compile failed:", err)
+  }
+  for (const { mesh, orig } of stash) mesh.material = orig
+}
+
 function advanceWfTransition() {
   if (!wfTransition) return
   const now = performance.now()
@@ -806,10 +845,8 @@ onMounted(() => {
       })
       sceneMeshes.value = meshes
 
-      //SWEEP shader prep - same machinery as ThreeViewer so the editor
-      //can preview the wipe animation directly when the user toggles
-      //wireframe. Patches each original material once, then we drive a
-      //shared uWfProgress uniform from the tick loop below.
+      //SWEEP shader prep - patches each original material once so the
+      //shared uWfProgress uniform drives the wipe later.
       for (const sm of meshes) {
         const mat = sm.mesh.material as Material | Material[]
         if (Array.isArray(mat)) for (const sub of mat) patchMaterialForSweep(sub)
@@ -820,6 +857,16 @@ onMounted(() => {
       recomputeSweepRange()
 
       scene!.add(gltf.scene)
+      //WIREFRAME WARMUP - precompiles the wireframe materials AND the
+      //edges geometry now, while the model is settling, instead of on
+      //the first wireframe toggle (where the GLSL compile + EdgesGeom
+      //computation produced a visible stall). Two heavy ops:
+      //  1) renderer.compile(scene, camera) with wfBaseMat temporarily
+      //     swapped onto every mesh forces its program into the cache.
+      //  2) EdgesGeometry is rebuilt + cached per mesh so syncWireframe-
+      //     Overlays can just attach pre-built geometry instead of
+      //     computing on the click frame.
+      precompileWireframeAssets()
 
       const tempBox = new Box3().setFromObject(gltf.scene)
       const center  = tempBox.getCenter(new Vector3())
@@ -2104,9 +2151,16 @@ function ensureOverlayForMesh(mesh: Mesh) {
   //Currently picked (orange-highlight) mesh also stays clean - the
   //overlay would compete visually with the pick highlight.
   if (pickedMeshIdx.value !== null && sceneMeshes.value[pickedMeshIdx.value]?.mesh.uuid === mesh.uuid) return
-  //threshold keeps "hard" edges only - triangulation diagonals (coplanar
-  //faces, angle = 0) are filtered out. See WIREFRAME_EDGE_THRESHOLD_DEG.
-  const edgesGeo = new EdgesGeometry(mesh.geometry, wireframeEdgeThreshold.value)
+  //Reuse the precomputed EdgesGeometry when the threshold hasn't
+  //changed since the warmup pass. Otherwise we'd pay the geometry
+  //computation again on the first toggle frame - that's the actual
+  //wireframe-toggle stall on complex models.
+  let edgesGeo: EdgesGeometry
+  if (precomputedEdges.has(mesh.uuid) && precomputedEdgesThreshold === wireframeEdgeThreshold.value) {
+    edgesGeo = precomputedEdges.get(mesh.uuid)!
+  } else {
+    edgesGeo = new EdgesGeometry(mesh.geometry, wireframeEdgeThreshold.value)
+  }
   //depthTest stays ON so the lines respect occlusion (no X-ray bleed
   //across other meshes). The wf base / pick materials carry a
   //polygonOffset that pushes the surface back, so the overlay lines
@@ -2127,7 +2181,9 @@ function removeOverlayForMesh(uuid: string) {
   const overlay = wfOverlays.get(uuid); if (!overlay) return
   if (overlay.parent) overlay.parent.remove(overlay)
   if (overlay.material instanceof LineBasicMaterial) overlay.material.dispose()
-  overlay.geometry.dispose()
+  //Only dispose the geometry if it isn't the cached pre-computed one
+  //(the cache survives toggles; the warmup is re-run on threshold change).
+  if (precomputedEdges.get(uuid) !== overlay.geometry) overlay.geometry.dispose()
   wfOverlays.delete(uuid)
 }
 
@@ -2171,15 +2227,19 @@ function onWireframeEdgeThreshold(deg: number) {
   wireframeEdgeThreshold.value = deg
   saveGlobalPref(WF_EDGE_THRESHOLD_KEY, String(deg), "Wireframe edge-threshold in degrees (shared across every project in the editor).")
   removeWireframeOverlays()
+  //Rebuild the precomputed edges cache against the new threshold so
+  //subsequent toggles stay free of the recompute stall.
+  buildPrecomputedEdges()
   syncWireframeOverlays()
   requestRender()
 }
 
 function removeWireframeOverlays() {
-  for (const overlay of wfOverlays.values()) {
+  for (const [uuid, overlay] of wfOverlays.entries()) {
     if (overlay.parent) overlay.parent.remove(overlay)
     if (overlay.material instanceof LineBasicMaterial) overlay.material.dispose()
-    overlay.geometry.dispose()  //EdgesGeometry was built per overlay
+    //preserve the pre-computed edges (re-used on next toggle).
+    if (precomputedEdges.get(uuid) !== overlay.geometry) overlay.geometry.dispose()
   }
   wfOverlays.clear()
 }

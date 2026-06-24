@@ -618,6 +618,45 @@ function setUWfProgressOnAll(v: number) {
   }
 }
 
+//Pre-built EdgesGeometry per mesh, keyed by uuid. Avoids the per-mesh
+//computation cost on the first wireframe toggle (visible stall on
+//complex models). Rebuilt when the edge-threshold changes.
+const precomputedEdges = new Map<string, EdgesGeometry>()
+let   precomputedEdgesThreshold = WIREFRAME_EDGE_THRESHOLD_DEG
+
+function buildPrecomputedEdges() {
+  for (const g of precomputedEdges.values()) g.dispose()
+  precomputedEdges.clear()
+  const t = props.settings?.wireframeMode?.edgeThresholdDeg ?? WIREFRAME_EDGE_THRESHOLD_DEG
+  precomputedEdgesThreshold = t
+  for (const sm of sceneMeshes) {
+    precomputedEdges.set(sm.mesh.uuid, new EdgesGeometry(sm.mesh.geometry, t))
+  }
+}
+
+//Force the wireframe-base material's program into the renderer's cache
+//by briefly swapping every mesh's material to wfBaseMat + calling
+//renderer.compile. Otherwise the GLSL compile happens on the click
+//frame.
+function precompileWireframeAssets() {
+  if (!scene || !renderer || !camera) return
+  ensureWfBaseMat()
+  buildPrecomputedEdges()
+  if (!wfBaseMat) return
+
+  const stash: { mesh: Mesh; orig: MeshPhysicalMaterial | MeshPhysicalMaterial[] }[] = []
+  for (const sm of sceneMeshes) {
+    stash.push({ mesh: sm.mesh, orig: sm.mesh.material as MeshPhysicalMaterial | MeshPhysicalMaterial[] })
+    sm.mesh.material = wfBaseMat
+  }
+  try {
+    renderer.compile(scene, camera)
+  } catch (err) {
+    console.warn("[ThreeViewer] wireframe warmup compile failed:", err)
+  }
+  for (const { mesh, orig } of stash) mesh.material = orig
+}
+
 function ensureWfBaseMat() {
   const matSpec = props.settings?.wireframeMode?.material
   if (wfBaseMat) {
@@ -654,8 +693,17 @@ function syncWireframeOverlays(on: boolean, color: string, emissiveUuidSet: Set<
     for (const sm of sceneMeshes) {
       if (wfOverlays.has(sm.mesh.uuid)) continue
       if (emissiveUuidSet.has(sm.mesh.uuid)) continue
+      //Reuse the precomputed EdgesGeometry when the threshold matches
+      //the warmup pass; falling back to a fresh compute only when the
+      //cache is stale (which shouldn't happen given props.settings is
+      //fixed across a project's lifetime in production).
       const threshold = props.settings?.wireframeMode?.edgeThresholdDeg ?? WIREFRAME_EDGE_THRESHOLD_DEG
-      const edgesGeo = new EdgesGeometry(sm.mesh.geometry, threshold)
+      let edgesGeo: EdgesGeometry
+      if (precomputedEdges.has(sm.mesh.uuid) && precomputedEdgesThreshold === threshold) {
+        edgesGeo = precomputedEdges.get(sm.mesh.uuid)!
+      } else {
+        edgesGeo = new EdgesGeometry(sm.mesh.geometry, threshold)
+      }
       const overlayMat = new LineBasicMaterial({
         color:       new Color(color),
         transparent: true,
@@ -668,10 +716,11 @@ function syncWireframeOverlays(on: boolean, color: string, emissiveUuidSet: Set<
       wfOverlays.set(sm.mesh.uuid, overlay)
     }
   } else {
-    for (const overlay of wfOverlays.values()) {
+    for (const [uuid, overlay] of wfOverlays.entries()) {
       if (overlay.parent) overlay.parent.remove(overlay)
       if (overlay.material instanceof LineBasicMaterial) overlay.material.dispose()
-      overlay.geometry.dispose()
+      //preserve the precomputed edges so the next toggle is still warm
+      if (precomputedEdges.get(uuid) !== overlay.geometry) overlay.geometry.dispose()
     }
     wfOverlays.clear()
   }
@@ -916,6 +965,11 @@ onMounted(() => {
 
       //apply saved material overrides
       if (props.settings?.materials) applyMaterialOverrides(props.settings.materials)
+
+      //WIREFRAME WARMUP - precompile wfBaseMat's program and pre-build
+      //EdgesGeometry per mesh now, while the model is settling, instead
+      //of paying the stall on the first wireframe toggle.
+      precompileWireframeAssets()
 
       //SPAWN LIGHTS - prefer the new shared shape, fall back to legacy
       //per-mode arrays for back-compat with pre-unification saves.
