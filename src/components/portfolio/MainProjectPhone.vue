@@ -7,6 +7,7 @@ import { useEffectiveViewerSettings } from "../../composables/useEffectiveViewer
 import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
+import { useWireframeSweep } from "../../composables/useWireframeSweep"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import EditableText from "./EditableText.vue"
 import ThreeViewer from "./ThreeViewer.vue"
@@ -38,6 +39,7 @@ const { data: portfolioData, updateMainProject } = usePortfolio()
 const effectiveViewerSettings = useEffectiveViewerSettings(toRef(props, "project"), portfolioData, { mobile: true })
 
 const containerRef = ref<{ $el: HTMLElement } | HTMLElement | null>(null)
+useWireframeSweep(containerRef)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
 
 const isInView    = ref(false)
@@ -183,8 +185,7 @@ async function onDescriptionSave(newVal: string) {
           :src="project.mainWireframeUrl"
           :alt="''"
           aria-hidden="true"
-          class="mp-phone__viewer-image mp-phone__wf-layer"
-          :style="{ '--wf-delay': '0ms' }"
+          class="mp-phone__viewer-image mp-phone__wf-layer wf-layer"
         />
       </template>
       <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
@@ -230,8 +231,7 @@ async function onDescriptionSave(newVal: string) {
           :src="thumb.wireframeUrl"
           :alt="''"
           aria-hidden="true"
-          class="mp-phone__thumb-img mp-phone__wf-layer"
-          :style="{ '--wf-delay': `${(i + 1) * 220}ms` }"
+          class="mp-phone__thumb-img mp-phone__wf-layer wf-layer"
         />
       </div>
     </div>
@@ -308,26 +308,47 @@ and for the next project's header to peek from below.------------------*/
   background: transparent;
 }
 
-/*=== WIREFRAME OVERLAY - diagonal-sweep reveal =========================
-The wireframe variant of every image is rendered at mount-time and stays
-in the DOM; we just clip it. clip-path with a 3-point polygon is a
-right-triangle anchored at the top-left corner; we grow its other two
-vertices from (0%,0%) to (200%, 0%) and (0%, 200%) so the hypotenuse
-passes diagonally through the element from the top-left corner to the
-bottom-right.
+/*=== WIREFRAME OVERLAY - shared diagonal sweep ========================
+ONE diagonal line passes across the whole card. Mechanism:
 
-The per-element --wf-delay staggers each overlay so the sweep
-propagates from the main image through to the last thumb as a SINGLE
-wave instead of four independent wipes. Duration intentionally long
-(1200ms) so the sweep is actually perceptible - shorter than that and
-it just reads as a snap.*/
-.mp-phone__wf-layer {
-  clip-path: polygon(0% 0%, 0% 0%, 0% 0%);
-  transition: clip-path 1200ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms);
-  pointer-events: none;
+  - @property --wipe is a smoothly-interpolatable 0..1 progress.
+    Setting it on the card root and transitioning it broadcasts a SINGLE
+    motion to every wireframe layer inside.
+  - The card itself exposes its own pixel size as --card-w / --card-h.
+  - Each wf-layer carries its own offset + size as --my-x / --my-y /
+    --my-w / --my-h (written by useWireframeSweep on mount + resize).
+  - Each layer computes a per-element "threshold" t in pixels:
+      t = (card_w + card_h) * wipe - my_x - my_y
+    Then its clip-path is the right-triangle (0,0), (t,0), (0,t) -
+    expressed as percentages of the layer's own size. As `wipe` grows,
+    every layer's triangle advances in lockstep, so the hypotenuses
+    align into one continuous diagonal walking across the card.
+
+Result: tap the wireframe button and a single 1.4s sweep crosses the
+header, the viewer image, the thumbs - all anchored on the same line.*/
+@property --wipe {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
 }
-.mp-phone--wireframe .mp-phone__wf-layer {
-  clip-path: polygon(0% 0%, 200% 0%, 0% 200%);
+
+.mp-phone {
+  --wipe: 0;
+  transition: --wipe 1400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.mp-phone--wireframe { --wipe: 1; }
+
+.mp-phone__wf-layer {
+  --t: calc(
+    (var(--card-w, 1) + var(--card-h, 1)) * var(--wipe)
+    - var(--my-x, 0) - var(--my-y, 0)
+  );
+  clip-path: polygon(
+    0% 0%,
+    calc(var(--t, 0) * 100% / var(--my-w, 1)) 0%,
+    0% calc(var(--t, 0) * 100% / var(--my-h, 1))
+  );
+  pointer-events: none;
 }
 .mp-phone__viewer-embed--hidden { display: none; }
 

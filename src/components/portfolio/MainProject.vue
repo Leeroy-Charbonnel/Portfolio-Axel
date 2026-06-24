@@ -8,6 +8,7 @@ import { useEffectiveViewerSettings } from "../../composables/useEffectiveViewer
 import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
+import { useWireframeSweep } from "../../composables/useWireframeSweep"
 import { pickImageFile, statLetter, statName } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import AnimatedCounter from "./AnimatedCounter.vue"
@@ -56,6 +57,7 @@ async function toggleSoftware(softwareId: number) {
 }
 
 const containerRef = ref<HTMLElement | null>(null)
+useWireframeSweep(containerRef)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
 
 const isInView    = ref(false)
@@ -337,8 +339,7 @@ async function replaceThumbnailWireframe(idx: number) {
               :src="project.mainWireframeUrl"
               :alt="''"
               aria-hidden="true"
-              class="main-project__viewer-image main-project__wf-layer"
-              :style="{ '--wf-delay': '0ms' }"
+              class="main-project__viewer-image main-project__wf-layer wf-layer"
             />
           </template>
           <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="main-project__viewer-empty">
@@ -383,8 +384,7 @@ async function replaceThumbnailWireframe(idx: number) {
               :src="thumb.wireframeUrl"
               :alt="''"
               aria-hidden="true"
-              class="main-project__wf-layer"
-              :style="{ '--wf-delay': `${(i + 1) * 220}ms` }"
+              class="main-project__wf-layer wf-layer"
             />
             <RemoveButton v-if="editMode" label="Remove thumbnail" @click.stop="removeThumbnail(i)" />
             <ReplaceImageButton v-if="editMode" @click.stop="isWireframe ? replaceThumbnailWireframe(i) : replaceThumbnailImage(i)" />
@@ -802,34 +802,48 @@ column (left edge, bottom row, hidden entirely).*/
 .main-project__viewer-image--clickable,
 .main-project__thumbnail--clickable { cursor: zoom-in; }
 
-/*=== WIREFRAME OVERLAY - diagonal-sweep reveal =========================
-Both the normal and the wireframe variants live in the DOM at all times
-so the wireframe is already cached when the visitor toggles. We then
-clip the wireframe layer with a 3-point polygon that grows from the
-top-left corner outwards: vertices at (0%,0%) all collapsed to a point
-(hidden), then to (0%,0%), (200%,0%), (0%,200%) (a right-triangle whose
-hypotenuse sweeps from the top-left to the bottom-right corner). The
-per-element --wf-delay staggers each overlay so the sweep propagates
-through the card as ONE continuous wave (main image -> thumb 1 ->
-thumb 2 -> thumb 3) rather than four independent wipes. Duration is
-intentionally long (1200ms) so the diagonal is actually perceptible -
-anything shorter just reads as a snap.*/
+/*=== WIREFRAME OVERLAY - shared diagonal sweep ========================
+ONE single diagonal line sweeps across the whole card, passing through
+every wireframe layer in lockstep. Driven by @property --wipe (0..1) on
+the article root, which is smoothly transitioned by CSS. Each .wf-layer
+carries --my-x/--my-y/--my-w/--my-h (offsets + size relative to the
+article) written by useWireframeSweep; the article exposes --card-w
+and --card-h. Each layer computes its own pixel threshold:
+  t = (card_w + card_h) * wipe - my_x - my_y
+and clip-paths a right-triangle (0,0), (t,0), (0,t) expressed in its
+own coordinate space. As `wipe` grows, every layer's hypotenuse aligns
+into one continuous diagonal walking across the card.*/
+@property --wipe {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.main-project__article {
+  --wipe: 0;
+  transition: --wipe 1400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.main-project__article--wireframe { --wipe: 1; }
+
 .main-project__wf-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: inherit;
-  clip-path: polygon(0% 0%, 0% 0%, 0% 0%);
-  transition: clip-path 1200ms cubic-bezier(0.22, 0.61, 0.36, 1) var(--wf-delay, 0ms);
   pointer-events: none;
+  --t: calc(
+    (var(--card-w, 1) + var(--card-h, 1)) * var(--wipe)
+    - var(--my-x, 0) - var(--my-y, 0)
+  );
+  clip-path: polygon(
+    0% 0%,
+    calc(var(--t, 0) * 100% / var(--my-w, 1)) 0%,
+    0% calc(var(--t, 0) * 100% / var(--my-h, 1))
+  );
 }
 img.main-project__wf-layer { object-fit: cover; }
 img.main-project__viewer-image.main-project__wf-layer { object-fit: contain; }
-
-.main-project__article--wireframe .main-project__wf-layer {
-  clip-path: polygon(0% 0%, 200% 0%, 0% 200%);
-}
 
 .main-project__thumbnail {
   position: relative;
