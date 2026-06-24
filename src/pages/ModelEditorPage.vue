@@ -7,6 +7,7 @@ import {
   Box3,
   BufferGeometry,
   Color,
+  type Material,
   DataTexture,
   DirectionalLight,
   EquirectangularReflectionMapping,
@@ -368,6 +369,119 @@ const wfMatParams = ref<WfMaterialParams>(parseWfMatParams(getString(WF_MAT_PARA
 let wfBaseMat: MeshPhysicalMaterial | null = null
 let wfPickMat: MeshPhysicalMaterial | null = null
 
+//=== SWEEP machinery - mirror of ThreeViewer's so the editor can preview
+//the animation when the wireframe toggle fires. Same shader injection
+//(uWfProgress, uWfTint, uWfAxis, uWfMin, uWfRange) and same world-bbox
+//projection routine.
+const WF_SWEEP_DURATION_MS = 1500
+const wfPatchedMaterials = new Set<string>()
+const wfShaders: { mat: Material; shader: { uniforms: Record<string, { value: unknown }> } }[] = []
+let   wfBox: Box3 | null = null
+let   wfMin   = 0
+let   wfRange = 1
+let   wfAxis  = new Vector3(1, 0, 0)
+let   wfTransition: { startTime: number; from: number; to: number; duration: number; phase: "enter" | "leave" } | null = null
+
+function patchMaterialForSweep(material: Material) {
+  if (wfPatchedMaterials.has(material.uuid)) return
+  wfPatchedMaterials.add(material.uuid)
+  const prev = material.onBeforeCompile?.bind(material)
+  material.onBeforeCompile = (shader, renderer) => {
+    if (prev) prev(shader, renderer)
+    shader.uniforms.uWfProgress = { value: wireframeMode.value ? 1 : 0 }
+    shader.uniforms.uWfTint     = { value: new Color(wfMatParams.value.color) }
+    shader.uniforms.uWfAxis     = { value: wfAxis.clone() }
+    shader.uniforms.uWfMin      = { value: wfMin }
+    shader.uniforms.uWfRange    = { value: wfRange }
+
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vWfWorldPos;")
+      .replace(
+        "#include <project_vertex>",
+        "#include <project_vertex>\nvWfWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;",
+      )
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying vec3 vWfWorldPos;\nuniform float uWfProgress;\nuniform vec3 uWfTint;\nuniform vec3 uWfAxis;\nuniform float uWfMin;\nuniform float uWfRange;",
+      )
+      .replace(
+        "#include <dithering_fragment>",
+        "#include <dithering_fragment>\n" +
+        "float wfT = (dot(vWfWorldPos, uWfAxis) - uWfMin) / max(uWfRange, 0.0001);\n" +
+        "float wfP = uWfProgress * 1.04 - 0.02;\n" +
+        "float wfMask = 1.0 - smoothstep(wfP - 0.02, wfP + 0.02, wfT);\n" +
+        "gl_FragColor.rgb = mix(gl_FragColor.rgb, uWfTint, wfMask);\n",
+      )
+
+    wfShaders.push({ mat: material, shader: shader as unknown as { uniforms: Record<string, { value: unknown }> } })
+  }
+  material.needsUpdate = true
+}
+
+function recomputeSweepRange() {
+  if (!wfBox) return
+  const ax = new Vector3(sweepAxis.value[0], sweepAxis.value[1], sweepAxis.value[2])
+  if (ax.lengthSq() < 0.0001) ax.set(1, 0, 0)
+  ax.normalize()
+  wfAxis = ax
+  const corners = [
+    new Vector3(wfBox.min.x, wfBox.min.y, wfBox.min.z),
+    new Vector3(wfBox.min.x, wfBox.min.y, wfBox.max.z),
+    new Vector3(wfBox.min.x, wfBox.max.y, wfBox.min.z),
+    new Vector3(wfBox.min.x, wfBox.max.y, wfBox.max.z),
+    new Vector3(wfBox.max.x, wfBox.min.y, wfBox.min.z),
+    new Vector3(wfBox.max.x, wfBox.min.y, wfBox.max.z),
+    new Vector3(wfBox.max.x, wfBox.max.y, wfBox.min.z),
+    new Vector3(wfBox.max.x, wfBox.max.y, wfBox.max.z),
+  ]
+  let pmin = Infinity, pmax = -Infinity
+  for (const c of corners) {
+    const p = c.dot(ax)
+    if (p < pmin) pmin = p
+    if (p > pmax) pmax = p
+  }
+  const span = Math.max(0.0001, pmax - pmin)
+  wfMin   = pmin + span * (sweepStart.value / 100)
+  wfRange = Math.max(0.0001, span * ((sweepEnd.value - sweepStart.value) / 100))
+  for (const e of wfShaders) {
+    ;(e.shader.uniforms.uWfAxis  as { value: Vector3 }).value.copy(wfAxis)
+    ;(e.shader.uniforms.uWfMin   as { value: number  }).value = wfMin
+    ;(e.shader.uniforms.uWfRange as { value: number  }).value = wfRange
+  }
+}
+
+function setUWfProgressOnAll(v: number) {
+  for (const e of wfShaders) (e.shader.uniforms.uWfProgress as { value: number }).value = v
+}
+
+function refreshSweepTint() {
+  const tint = new Color(wfMatParams.value.color)
+  for (const e of wfShaders) (e.shader.uniforms.uWfTint as { value: Color }).value.copy(tint)
+}
+
+function advanceWfTransition() {
+  if (!wfTransition) return
+  const now = performance.now()
+  const t   = Math.min(1, (now - wfTransition.startTime) / wfTransition.duration)
+  const eased = 1 - Math.pow(1 - t, 3)
+  const v = wfTransition.from + (wfTransition.to - wfTransition.from) * eased
+  setUWfProgressOnAll(v)
+  if (t >= 1) {
+    if (wfTransition.phase === "enter") finalizeEnterWireframe()
+    wfTransition = null
+  }
+  requestRender()
+}
+
+//Sweep sliders + wireframe-tint colour rewrite the uniforms live so the
+//user sees the change instantly without a save/reload round-trip.
+watch(sweepAxis,  recomputeSweepRange, { deep: true })
+watch(sweepStart, recomputeSweepRange)
+watch(sweepEnd,   recomputeSweepRange)
+watch(() => wfMatParams.value.color, refreshSweepTint)
+
 //Wireframe overlays are LineSegments (one per scene mesh) drawn from
 //EdgesGeometry, which keeps only edges where the angle between adjacent
 //faces is greater than the threshold - so the triangulation diagonals
@@ -683,6 +797,19 @@ onMounted(() => {
       })
       sceneMeshes.value = meshes
 
+      //SWEEP shader prep - same machinery as ThreeViewer so the editor
+      //can preview the wipe animation directly when the user toggles
+      //wireframe. Patches each original material once, then we drive a
+      //shared uWfProgress uniform from the tick loop below.
+      for (const sm of meshes) {
+        const mat = sm.mesh.material as Material | Material[]
+        if (Array.isArray(mat)) for (const sub of mat) patchMaterialForSweep(sub)
+        else                    patchMaterialForSweep(mat)
+      }
+      gltf.scene.updateMatrixWorld(true)
+      wfBox = new Box3().setFromObject(gltf.scene)
+      recomputeSweepRange()
+
       scene!.add(gltf.scene)
 
       const tempBox = new Box3().setFromObject(gltf.scene)
@@ -787,6 +914,9 @@ onMounted(() => {
       //snap at the end of the animation: OrbitControls re-clamped phi
       //away from 0, shifting the camera off the axis.
       if (!cameraAnim) controls!.update()
+      //Wireframe sweep tick - mutates uniforms on the patched materials
+      //and calls requestRender so the composer keeps painting until done.
+      if (wfTransition) advanceWfTransition()
       composer!.render()
       if (viewHelper && renderer) {
         renderer.autoClear = false
@@ -1907,27 +2037,41 @@ function setMaterialFor(mesh: Mesh) {
   }
 }
 
-function enableWireframeMode() {
+//Apply the actual wireframe materials (wfBaseMat + per-pick emissives).
+//Called at the END of the enter sweep so the tint reveal can run on the
+//originals first, then we land on the proper PBR.
+function finalizeEnterWireframe() {
   if (!scene) return
-  wireframeMode.value = true
   ensureWfMaterials()
-
   meshMatSnapshots.clear()
   for (const sm of sceneMeshes.value) {
     meshMatSnapshots.set(sm.mesh.uuid, sm.mesh.material as MeshPhysicalMaterial)
     setMaterialFor(sm.mesh)
   }
   syncWireframeOverlays()
-  //Lights are SHARED between modes - we just swap their intensity+color
-  //pair to the wireframe set (or leave them alone if the entry has no wf
-  //overrides). Position/range stay the same.
+}
+
+function enableWireframeMode() {
+  if (!scene) return
+  wireframeMode.value = true
+  //Refresh the sweep uniforms to whatever the user has dialled in right
+  //now - axis/start/end and the material colour - so the preview reflects
+  //unsaved edits too.
+  refreshSweepTint()
+  recomputeSweepRange()
+  //Lights + HDR snap to wireframe mode immediately (HDR cache makes the
+  //hot path free when the URL doesn't change between modes).
   applyLightsForMode()
   syncEnvForCurrentMode()
-  requestRender(800)
+  //Run the tint reveal on the originals. finalizeEnterWireframe() at the
+  //end swaps to wfBaseMat / picks so the user's PBR settings land.
+  wfTransition = { startTime: performance.now(), from: 0, to: 1, duration: WF_SWEEP_DURATION_MS, phase: "enter" }
+  requestRender(WF_SWEEP_DURATION_MS + 200)
 }
 
 function disableWireframeMode() {
   wireframeMode.value = false
+  //Drop back to originals NOW so the sweep can drag the tint backwards.
   for (const sm of sceneMeshes.value) {
     const orig = meshMatSnapshots.get(sm.mesh.uuid)
     if (orig) sm.mesh.material = orig
@@ -1936,9 +2080,9 @@ function disableWireframeMode() {
   removeWireframeOverlays()
   applyLightsForMode()
   syncEnvForCurrentMode()
-  //clear any in-progress pick
   pickedMeshIdx.value = null
-  requestRender(800)
+  wfTransition = { startTime: performance.now(), from: 1, to: 0, duration: WF_SWEEP_DURATION_MS, phase: "leave" }
+  requestRender(WF_SWEEP_DURATION_MS + 200)
 }
 
 function ensureOverlayForMesh(mesh: Mesh) {
