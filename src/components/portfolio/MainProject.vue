@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, toRef, watch } from "vue"
-import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink, Box } from "lucide-vue-next"
+import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink, Box, LayoutTemplate } from "lucide-vue-next"
 import { useRouter } from "vue-router"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
@@ -41,6 +41,11 @@ const router = useRouter()
 
 function openModelEditor() {
   router.push(`/edit-3d/${props.project.id}`)
+}
+//Single button for both view + edit - the detail page route shows the
+//editor UI automatically when editMode is on, view otherwise.
+function openDetailPage() {
+  router.push(`/project/${props.project.id}`)
 }
 
 //Software catalog for the edit-mode picker - read from the same shared
@@ -366,6 +371,18 @@ async function replaceThumbnailWireframe(idx: number) {
           >
             <Box :size="14" />
             <span>Edit 3D</span>
+          </button>
+          <!--PROJECT DETAIL PAGE - one button for both modes. The page
+          itself reads useAdmin().editMode and swaps to the bento-grid
+          editor when the admin has Edit Content on.-->
+          <button
+            type="button"
+            class="main-project__edit-3d"
+            :title="editMode ? 'Edit the project detail page' : 'Open the project detail page'"
+            @click="openDetailPage"
+          >
+            <LayoutTemplate :size="14" />
+            <span>{{ editMode ? "Edit page" : "View page" }}</span>
           </button>
         </div>
 

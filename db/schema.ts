@@ -95,6 +95,27 @@ export const mainProject = pgTable("main_project", {
                           lightsOverwrite:             { index: number; intensity?: number; color: string }[]
                           emissiveMaterialsOverwrite:  string[]
                         }>().notNull(),
+  //DETAIL PAGE - bento-style grid of content blocks for the per-project
+  //detail page (text, image, video, carousel, etc.). 3-col grid on
+  //desktop, 1-col stack on mobile (forced). Authored via the page
+  //editor; the public detail page route renders the same data.
+  //Mobile layout is independent: mobileY orders blocks vertically and
+  //mobileH sets the row span. No mobileX/mobileW because mobile is
+  //single column - every block fills the width. Both are optional;
+  //when absent, view rendering falls back to desktop y / h.
+  detailPage:           jsonb("detail_page").$type<{
+                          blocks: Array<{
+                            id:       string
+                            type:     "text" | "image"
+                            x:        number   //grid col start (0..2)
+                            y:        number   //grid row start
+                            w:        number   //col span (1..3)
+                            h:        number   //row span (>=1)
+                            mobileY?: number   //mobile row start (single col)
+                            mobileH?: number   //mobile row span
+                            content:  Record<string, unknown>
+                          }>
+                        }>().notNull().default({ blocks: [] }),
   stats:                jsonb("stats").$type<{ vertices: number; edges: number; faces?: number; triangles?: number }>().notNull(),
   sortOrder:            integer("sort_order").notNull().default(0),
   createdAt:            timestamp("created_at").notNull().defaultNow(),

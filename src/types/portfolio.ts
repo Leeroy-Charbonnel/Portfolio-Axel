@@ -51,6 +51,37 @@ export const MAIN_PROJECT_LAYOUTS: { key: MainProjectLayout; label: string }[] =
   { key: "viewer-only",   label: "Viewer only" },
 ]
 
+//DETAIL PAGE - per-project content grid (bento-style). Authored via the
+//page editor, rendered on the public detail page route.
+export type DetailBlockType = "text" | "image"
+
+export interface DetailBlock {
+  id:       string
+  type:     DetailBlockType
+  //Grid coords on the 3-col desktop layout. Each unit = 1 column wide.
+  //Row units = 1 grid row of fixed height (set in CSS, ~200px).
+  x:        number    //0..2
+  y:        number    //0..N
+  w:        number    //1..3
+  h:        number    //>=1
+  //Mobile layout is a separate, single-column stack. mobileY = row index,
+  //mobileH = row span. No mobileX/mobileW because every block spans the
+  //full width on mobile. When undefined, mobile rendering falls back to
+  //the desktop y / h.
+  mobileY?: number
+  mobileH?: number
+  content:  DetailBlockContent
+}
+
+//Per-type content. Union narrowed by DetailBlock.type at usage sites.
+export type DetailBlockContent =
+  | { text:   Bilingual }                                       //type: "text"
+  | { fileId: string | null; url: string | null; alt?: Bilingual }  //type: "image"
+
+export interface DetailPage {
+  blocks: DetailBlock[]
+}
+
 export interface MainProjectDto {
   id:                  number
   modelId:             string
@@ -65,6 +96,7 @@ export interface MainProjectDto {
   viewerSettings:      unknown | null
   thumbnails:          ThumbnailDto[]
   wireframeParameters: WireframeParameters
+  detailPage:          DetailPage
   stats:               ProjectStats
   software:            SoftwareDto[]
 }

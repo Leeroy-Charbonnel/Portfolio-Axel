@@ -7,12 +7,11 @@ import {
   Box3,
   BufferGeometry,
   Color,
-  type Material,
   DataTexture,
   DirectionalLight,
+  DoubleSide,
   EquirectangularReflectionMapping,
   HalfFloatType,
-  EdgesGeometry,
   Line,
   LineBasicMaterial,
   LineSegments,
@@ -52,6 +51,16 @@ import { RenderPass }        from "three/examples/jsm/postprocessing/RenderPass.
 import { OutputPass }        from "three/examples/jsm/postprocessing/OutputPass.js"
 import { SMAAPass }          from "three/examples/jsm/postprocessing/SMAAPass.js"
 import { ViewHelper }        from "three/examples/jsm/helpers/ViewHelper.js"
+import { Line2 }             from "three/examples/jsm/lines/Line2.js"
+import { LineMaterial }      from "three/examples/jsm/lines/LineMaterial.js"
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
+import {
+  buildWireframeWithoutDiagonals,
+  CustomEmissiveMaterial,
+  CustomNormalMaterial,
+  pushSweepUniforms,
+  type WfSweepPatch,
+} from "../composables/wfMaterials"
 
 //MODEL EDITOR - 4-tab side panel design:
 //  - Materials  : per-material accordion. Click a mesh in scene to open it
@@ -125,10 +134,6 @@ const LIGHT_GIZMO_RENDER_ORDER     = 999
 //Wireframe overlay threshold - edges between adjacent faces below this
 //angle (deg) are filtered. Keeps mesh "hard" edges only.
 const WIREFRAME_EDGE_THRESHOLD_DEG = 1
-//Wireframe material polygonOffset - matches ThreeViewer so editor and
-//production render lines at the same z-depth (no z-fighting / no x-ray).
-const POLYGON_OFFSET_FACTOR        = 1
-const POLYGON_OFFSET_UNITS         = 1
 //Ground plane (shadow catcher) - same setup as ThreeViewer.
 const GROUND_SIZE                  = 40
 const GROUND_OPACITY               = 0.35
@@ -155,7 +160,13 @@ const PICK_COLOR = 0xff7a00
 //===========================================================================
 type MaterialEntry = {
   displayName:       string
-  material:          MeshPhysicalMaterial
+  //material is typed loosely as `any` because the actual instances are
+  //CustomNormalMaterial (extends MeshPhysicalMaterial) wrapped in Vue's
+  //markRaw(). Vue-tsc -b's stricter .d.ts generation chokes on the
+  //structural mismatch between markRaw's Raw<T> and three.js's deep
+  //Node types (emissiveNode etc.) - we don't need the strict typing
+  //here since we only read .uuid / .name / .color / .metalness on it.
+  material:          any
   color:             string
   emissive:          string
   metalness:         number
@@ -183,9 +194,19 @@ const sceneMeshes = ref<SceneMesh[]>([])
 
 const pickedMeshIdx = ref<number | null>(null)
 
-//Confirmed emissive picks - per-mesh intensity, so each mesh gets its
-//own MeshPhysicalMaterial cloned from wfBaseMat plus its own emission.
-type EmissiveEntry = { uuid: string; intensity: number; material: MeshPhysicalMaterial }
+//Confirmed emissive picks. Each entry owns:
+//  - `material`: a flat MeshBasicMaterial (pixel = colour, no PBR, no
+//    shader fight) used by the overlay child.
+//  - `overlay`: a child Mesh sharing the parent's geometry, rendering
+//    on top with the flat material at an animated opacity. We DON'T
+//    swap the parent's material - the original PBR mesh stays visible
+//    underneath, the overlay fades in over it. At opacity=1 the overlay
+//    fully covers the parent (alpha blend with src.a=1 = pure source).
+//    Smooth colour change with NO material swap pop.
+//Emissive picks are tracked by mesh uuid + intensity only. The actual
+//emissive look is carried by the mesh's CustomEmissiveMaterial instance
+//assigned at GLB load / on add - so no separate material reference here.
+type EmissiveEntry = { uuid: string; intensity: number }
 const emissiveList = ref<EmissiveEntry[]>([])
 
 function isEmissiveMesh(uuid: string): boolean {
@@ -247,10 +268,14 @@ type LightMode = "normal" | "wireframe"
 type LightEntry = {
   id:        string
   type:      LightType
-  light:     PointLight | DirectionalLight
-  sourceGiz: Mesh   //small sphere at the source position (gizmo target)
-  target?:   Mesh   //small sphere at the target position (directional only)
-  link?:     Line   //thin line between source and target (directional only)
+  //light / sourceGiz / target / link typed loosely because they're
+  //three.js objects wrapped in Vue's markRaw - vue-tsc -b's stricter
+  //pass chokes on the deep Node types embedded in r184+ light shadow
+  //definitions (biasNode etc.).
+  light:     any
+  sourceGiz: any
+  target?:   any
+  link?:     any
   x: number; y: number; z: number          //source position
   tx?: number; ty?: number; tz?: number    //target position (directional only)
   range?:    number                        //point-light only (three.js "distance", 0 = infinite)
@@ -259,8 +284,12 @@ type LightEntry = {
   wfIntensity:     number
   wfColor:         string
   //per-light toggles - enabled flips light.visible, castShadow drives
-  //three.js shadow rendering on this individual lamp
+  //three.js shadow rendering on this individual lamp.
+  //wfEnabled tells whether the light is ALSO active in wireframe mode -
+  //unchecked it fades to 0 intensity as the sweep enters, so the author
+  //can have a key light that's normal-mode only (and vice-versa).
   enabled:    boolean
+  wfEnabled:  boolean
   castShadow: boolean
 }
 
@@ -279,8 +308,30 @@ const wireframeOverlayOn    = ref(true)
 //of the bbox projected on that axis so 0% = "first vertex hit" and 100%
 //= "last vertex hit". Defaults reproduce the auto-bbox X sweep.
 const sweepAxis  = ref<[number, number, number]>([1, 0, 0])
+//Sweep start/end are now ABSOLUTE coordinates along the sweep axis (in
+//world units). Easier to dial than the old % - of - bbox because the
+//user can target a specific scene position regardless of the bbox span.
+//Bbox projection min/max along the axis is tracked separately so the
+//slider can dynamically pick a sane range with some padding either side.
 const sweepStart = ref(0)
-const sweepEnd   = ref(100)
+const sweepEnd   = ref(1)
+//Sweep enter/leave animation duration in ms. Per-project value, saved
+//with the rest of the wireframeMode settings on Save click.
+const sweepDurationMs = ref(1500)
+const bboxProjMin = ref(0)
+const bboxProjMax = ref(1)
+//Slider padding either side of the bbox projection so the user can dial
+//slightly off-model (delay before tint starts, or overshoot the end).
+const sweepSliderPadding = computed(() => {
+  const span = bboxProjMax.value - bboxProjMin.value
+  return Math.max(0.5, span * 0.5)
+})
+const sweepSliderMin = computed(() => bboxProjMin.value - sweepSliderPadding.value)
+const sweepSliderMax = computed(() => bboxProjMax.value + sweepSliderPadding.value)
+const sweepSliderStep = computed(() => {
+  const span = bboxProjMax.value - bboxProjMin.value
+  return Math.max(0.001, span / 200)
+})
 
 //SETTINGS-TABLE backed editor preferences. The settings table is the
 //canonical store (project rule #5: if a value lives in the DB, it does
@@ -304,6 +355,12 @@ const WF_EDGE_THRESHOLD_KEY = "editor3d_wireframe_edge_threshold"
 
 const wireframeOverlayColor = ref(getString(WF_LINE_COLOR_KEY, "#000000"))
 const wireframeEdgeThreshold = ref(parseFloat(getString(WF_EDGE_THRESHOLD_KEY, "1")) || 1)
+//Wireframe line thickness (pixels). Stored as a global pref like the
+//line color. Uses Line2/LineMaterial under the hood (screen-space
+//quads), so width is real on every platform - WebGL's gl.LINES width
+//was always 1px on most drivers.
+const WF_LINE_WIDTH_KEY     = "editor3d_wireframe_line_width"
+const wireframeLineWidth    = ref(parseFloat(getString(WF_LINE_WIDTH_KEY, "1")) || 1)
 const showLightGizmos       = ref(true)        //sphere/diamond helpers visibility
 const showCenterCrosshair   = ref(false)       //semi-transparent + sign on screen center for framing
 
@@ -325,6 +382,7 @@ const sectionOpen = ref({
   wfMode:       false,
   wfHdr:        false,
   wfMaterial:   false,
+  wfAnimation:  false,
   //Wireframe tab also shows the Lights list as a read-only-tweak section
   //(add/remove are Lights-tab only); this controls its accordion state.
   wfLights:     false,
@@ -369,59 +427,46 @@ const wfMatParams = ref<WfMaterialParams>(parseWfMatParams(getString(WF_MAT_PARA
 let wfBaseMat: MeshPhysicalMaterial | null = null
 let wfPickMat: MeshPhysicalMaterial | null = null
 
-//=== SWEEP machinery - mirror of ThreeViewer's so the editor can preview
-//the animation when the wireframe toggle fires. Same shader injection
-//(uWfProgress, uWfTint, uWfAxis, uWfMin, uWfRange) and same world-bbox
-//projection routine.
-const WF_SWEEP_DURATION_MS = 1500
-const wfPatchedMaterials = new Set<string>()
-const wfShaders: { mat: Material; shader: { uniforms: Record<string, { value: unknown }> } }[] = []
+//=== SWEEP machinery - the editor previews the same animation that
+//ThreeViewer will render. Custom{Normal,Emissive}Material classes
+//defined in composables/wfMaterials.ts carry the shader injection and
+//pull their values from one shared uniform set; applySweep()
+//pushes editor changes into that set, propagating to every mesh.
+//Per-project sweep duration lives in sweepDurationMs above. The overlay
+//fade duration stays constant for now.
+const WF_OVERLAY_FADE_DURATION_MS = 600
+
+//Per-editor material registry - mirrors the per-viewer one in ThreeViewer
+//so the editor's pushSweepUniforms() doesn't reach into other viewers
+//(only one editor instance ever exists per page, but the contract is
+//consistent: each consumer tracks its own materials).
+const wfMaterials = new Set<CustomNormalMaterial | CustomEmissiveMaterial>()
+function applySweep(patch: WfSweepPatch): void {
+  pushSweepUniforms(wfMaterials, patch)
+}
 let   wfBox: Box3 | null = null
 let   wfMin   = 0
 let   wfRange = 1
 let   wfAxis  = new Vector3(1, 0, 0)
 let   wfTransition: { startTime: number; from: number; to: number; duration: number; phase: "enter" | "leave" } | null = null
+//Separate state for the overlay-fade. Runs SEQUENTIALLY with wfTransition
+//(sweep enter ends → overlay fades in; overlay fades out → sweep leave
+//starts) so sweep and wireframe lines never animate together - the user
+//asked for them to be visually decoupled, one then the other.
+let   wfOverlayFade: { startTime: number; from: number; to: number; duration: number; thenStartLeaveSweep: boolean } | null = null
 
-function patchMaterialForSweep(material: Material) {
-  if (wfPatchedMaterials.has(material.uuid)) return
-  wfPatchedMaterials.add(material.uuid)
-  const prev = material.onBeforeCompile?.bind(material)
-  material.onBeforeCompile = (shader, renderer) => {
-    if (prev) prev(shader, renderer)
-    shader.uniforms.uWfProgress = { value: wireframeMode.value ? 1 : 0 }
-    shader.uniforms.uWfTint     = { value: new Color(wfMatParams.value.color) }
-    shader.uniforms.uWfAxis     = { value: wfAxis.clone() }
-    shader.uniforms.uWfMin      = { value: wfMin }
-    shader.uniforms.uWfRange    = { value: wfRange }
-
-    shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vWfWorldPos;")
-      .replace(
-        "#include <project_vertex>",
-        "#include <project_vertex>\nvWfWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;",
-      )
-
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nvarying vec3 vWfWorldPos;\nuniform float uWfProgress;\nuniform vec3 uWfTint;\nuniform vec3 uWfAxis;\nuniform float uWfMin;\nuniform float uWfRange;",
-      )
-      //Inject BEFORE PBR lighting: replace diffuseColor with the tint so
-      //the full lighting pipeline runs on the wireframe color. This way
-      //the swept portion of the surface looks identical to wfBaseMat
-      //instead of being a sRGB blend on top of the lit original color.
-      .replace(
-        "#include <map_fragment>",
-        "#include <map_fragment>\n" +
-        "float wfT = (dot(vWfWorldPos, uWfAxis) - uWfMin) / max(uWfRange, 0.0001);\n" +
-        "float wfP = uWfProgress * 1.04 - 0.02;\n" +
-        "float wfMask = 1.0 - smoothstep(wfP - 0.02, wfP + 0.02, wfT);\n" +
-        "diffuseColor.rgb = mix(diffuseColor.rgb, uWfTint, wfMask);\n",
-      )
-
-    wfShaders.push({ mat: material, shader: shader as unknown as { uniforms: Record<string, { value: unknown }> } })
-  }
-  material.needsUpdate = true
+//Push the current editor panel state for wireframe params into the
+//shared sweep uniforms. Called from watchers + handlers any time the
+//user touches a relevant slider so the preview stays in sync.
+function pushSweepPbrUniforms(): void {
+  applySweep({
+    tintColor:         wfMatParams.value.color,
+    metalness:         wfMatParams.value.metalness,
+    roughness:         wfMatParams.value.roughness,
+    envIntensity:      wfMatParams.value.envMapIntensity,
+    specularIntensity: wfMatParams.value.specularIntensity,
+    emissiveColor:     wireframeColor.value,
+  })
 }
 
 function recomputeSweepRange() {
@@ -446,38 +491,105 @@ function recomputeSweepRange() {
     if (p < pmin) pmin = p
     if (p > pmax) pmax = p
   }
-  const span = Math.max(0.0001, pmax - pmin)
-  wfMin   = pmin + span * (sweepStart.value / 100)
-  wfRange = Math.max(0.0001, span * ((sweepEnd.value - sweepStart.value) / 100))
-  for (const e of wfShaders) {
-    ;(e.shader.uniforms.uWfAxis  as { value: Vector3 }).value.copy(wfAxis)
-    ;(e.shader.uniforms.uWfMin   as { value: number  }).value = wfMin
-    ;(e.shader.uniforms.uWfRange as { value: number  }).value = wfRange
+  //Publish the bbox projection so the slider can derive a sane range
+  //around the model. The actual sweep min / range come from the user's
+  //ABSOLUTE sweepStart / sweepEnd values, not from the bbox span.
+  bboxProjMin.value = pmin
+  bboxProjMax.value = pmax
+  wfMin   = sweepStart.value
+  wfRange = Math.max(0.0001, sweepEnd.value - sweepStart.value)
+  applySweep({ axis: wfAxis, min: wfMin, range: wfRange })
+  //Keep the hover indicator in sync if it's currently visible (axis
+  //change while hovering should reposition the plane).
+  if (sweepIndicatorMesh && sweepIndicatorMesh.visible && currentSweepIndicatorAt !== null) {
+    positionSweepIndicator(currentSweepIndicatorAt)
   }
 }
 
-function setUWfProgressOnAll(v: number) {
-  for (const e of wfShaders) (e.shader.uniforms.uWfProgress as { value: number }).value = v
+//SWEEP HOVER INDICATOR - a thin transparent plane perpendicular to the
+//sweep axis, positioned at the slider's current value. Shows up when
+//the user hovers either sweep slider so they can SEE where the cut
+//lands in 3D instead of guessing from a numeric value.
+let sweepIndicatorMesh: Mesh | null = null
+let currentSweepIndicatorAt: number | null = null
+
+function ensureSweepIndicator() {
+  if (sweepIndicatorMesh || !scene) return
+  const geo = new PlaneGeometry(1, 1)
+  const mat = new MeshBasicMaterial({
+    color:       0xffaa00,
+    transparent: true,
+    opacity:     0.35,
+    depthWrite:  false,
+    side:        DoubleSide,
+  })
+  sweepIndicatorMesh = new Mesh(geo, mat)
+  sweepIndicatorMesh.visible = false
+  sweepIndicatorMesh.renderOrder = 1000
+  scene.add(sweepIndicatorMesh)
 }
 
-function refreshSweepTint() {
-  const tint = new Color(wfMatParams.value.color)
-  for (const e of wfShaders) (e.shader.uniforms.uWfTint as { value: Color }).value.copy(tint)
+function positionSweepIndicator(at: number) {
+  ensureSweepIndicator()
+  if (!sweepIndicatorMesh || !wfBox) return
+  currentSweepIndicatorAt = at
+  //Plane sits in the world such that its center projects on the axis
+  //at value `at`. Start from bbox center, slide along the axis by the
+  //delta from center's projection to `at`.
+  const center = wfBox.getCenter(new Vector3())
+  const projOfCenter = center.dot(wfAxis)
+  const pos = center.clone().add(wfAxis.clone().multiplyScalar(at - projOfCenter))
+  sweepIndicatorMesh.position.copy(pos)
+  //PlaneGeometry's default normal is +Z; rotate it to align with wfAxis
+  //so the visible face is perpendicular to the sweep direction.
+  const q = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), wfAxis)
+  sweepIndicatorMesh.setRotationFromQuaternion(q)
+  //Scale to roughly twice the bbox diagonal so the plane is always
+  //bigger than the model cross-section, regardless of axis.
+  const diag = wfBox.getSize(new Vector3()).length()
+  const size = Math.max(0.5, diag * 1.4)
+  sweepIndicatorMesh.scale.set(size, size, 1)
+  sweepIndicatorMesh.visible = true
+  requestRender()
 }
 
-//Pre-build EdgesGeometry per mesh so the wireframe-overlay sync at
-//toggle time just attaches pre-computed lines instead of recomputing
-//them. Keyed by mesh uuid; entries match the threshold the user has
-//configured. Rebuilt when the threshold changes via the slider.
-const precomputedEdges = new Map<string, EdgesGeometry>()
-let   precomputedEdgesThreshold = WIREFRAME_EDGE_THRESHOLD_DEG
+function hideSweepIndicator() {
+  currentSweepIndicatorAt = null
+  if (sweepIndicatorMesh) {
+    sweepIndicatorMesh.visible = false
+    requestRender()
+  }
+}
+
+//Combined handlers: dragging the slider also keeps the indicator on
+//the new value, hovering shows it at the current value.
+function onSweepStartInput(v: number) {
+  sweepStart.value = v
+  positionSweepIndicator(v)
+}
+function onSweepEndInput(v: number) {
+  sweepEnd.value = v
+  positionSweepIndicator(v)
+}
+function showSweepStartIndicator() { positionSweepIndicator(sweepStart.value) }
+function showSweepEndIndicator()   { positionSweepIndicator(sweepEnd.value) }
+
+//All "push a single sweep param into the live shaders" helpers are gone -
+//replaced by applySweep() which mutates the shared uniform set
+//that every Custom{Normal,Emissive}Material binds at compile time. The
+//watchers below just call pushSweepPbrUniforms() to sync the whole set.
+
+//Pre-build wireframe-edge geometries per mesh so the toggle-time sync
+//attaches pre-computed lines instead of recomputing them. Keyed by mesh
+//uuid. Built via buildWireframeWithoutDiagonals() - topological diagonal
+//detection from the index buffer, no angle threshold.
+const precomputedEdges = new Map<string, BufferGeometry>()
 
 function buildPrecomputedEdges() {
   for (const g of precomputedEdges.values()) g.dispose()
   precomputedEdges.clear()
-  precomputedEdgesThreshold = wireframeEdgeThreshold.value
   for (const sm of sceneMeshes.value) {
-    precomputedEdges.set(sm.mesh.uuid, new EdgesGeometry(sm.mesh.geometry, precomputedEdgesThreshold))
+    precomputedEdges.set(sm.mesh.uuid, buildWireframeWithoutDiagonals(sm.mesh.geometry as BufferGeometry))
   }
 }
 
@@ -486,6 +598,40 @@ function buildPrecomputedEdges() {
 //the only meaningful warmup left is the EdgesGeometry cache.
 function precompileWireframeAssets() {
   buildPrecomputedEdges()
+}
+
+//Lerp every editor light's color + intensity between its normal-mode
+//spec and its wireframe-mode spec. t=0 fully normal, t=1 fully
+//wireframe. Driven from advanceWfTransition so the lighting swap rides
+//the same eased curve as the surface tint.
+const _editorLerpA = new Color()
+const _editorLerpB = new Color()
+function applyLightsLerp(t: number) {
+  for (const e of lights.value) {
+    //Effective intensity per mode honours both `enabled` (overall
+    //on/off) and `wfEnabled` (wireframe-mode-specific on/off) - so a
+    //wfEnabled=false light fades to 0 as the sweep progresses, then
+    //fades back when leaving.
+    const wfI = (e.enabled && e.wfEnabled) ? e.wfIntensity : 0
+    const nI  = e.enabled ? e.normalIntensity : 0
+    e.light.intensity = nI + (wfI - nI) * t
+    _editorLerpA.set(e.normalColor)
+    _editorLerpB.set(e.wfColor)
+    _editorLerpA.lerp(_editorLerpB, t)
+    e.light.color.copy(_editorLerpA)
+    ;(e.sourceGiz.material as MeshBasicMaterial).color.copy(_editorLerpA)
+    if (e.target) (e.target.material as MeshBasicMaterial).color.copy(_editorLerpA)
+    if (e.link)   (e.link.material   as LineBasicMaterial).color.copy(_editorLerpA)
+  }
+}
+
+//Ramp every overlay line's opacity in lockstep with the sweep so the
+//edge wireframe reveals progressively instead of popping in at the end.
+function setOverlayOpacityAll(t: number) {
+  for (const overlay of wfOverlays.values()) {
+    const m = overlay.material as LineMaterial
+    m.opacity = WIREFRAME_LINE_OPACITY * t
+  }
 }
 
 function advanceWfTransition() {
@@ -499,7 +645,13 @@ function advanceWfTransition() {
     ? 4 * t * t * t
     : 1 - Math.pow(-2 * t + 2, 3) / 2
   const v = wfTransition.from + (wfTransition.to - wfTransition.from) * eased
-  setUWfProgressOnAll(v)
+  applySweep({ progress: v })
+  //v is the unified "wireframe-mode amount" in [0..1] regardless of
+  //direction: 0=normal look, 1=wireframe look. Lights ride the same
+  //eased curve as the surface tint. Overlay lines are NOT touched here -
+  //they live in a binary state outside the sweep (spawned in
+  //finalizeEnterWireframe at full opacity, removed in disableWireframeMode).
+  applyLightsLerp(v)
   if (t >= 1) {
     if (wfTransition.phase === "enter") finalizeEnterWireframe()
     wfTransition = null
@@ -512,14 +664,17 @@ function advanceWfTransition() {
 watch(sweepAxis,  recomputeSweepRange, { deep: true })
 watch(sweepStart, recomputeSweepRange)
 watch(sweepEnd,   recomputeSweepRange)
-watch(() => wfMatParams.value.color, refreshSweepTint)
+watch(() => wfMatParams.value.color,             () => { pushSweepPbrUniforms(); requestRender(300) })
+watch(() => wfMatParams.value.metalness,         () => { pushSweepPbrUniforms(); requestRender(300) })
+watch(() => wfMatParams.value.roughness,         () => { pushSweepPbrUniforms(); requestRender(300) })
+watch(() => wfMatParams.value.envMapIntensity,   () => { pushSweepPbrUniforms(); requestRender(300) })
+watch(() => wfMatParams.value.specularIntensity, () => { pushSweepPbrUniforms(); requestRender(300) })
 
 //Wireframe overlays are LineSegments (one per scene mesh) drawn from
 //EdgesGeometry, which keeps only edges where the angle between adjacent
 //faces is greater than the threshold - so the triangulation diagonals
 //of flat faces are excluded.
 const wfOverlays = new Map<string, LineSegments>()
-const meshMatSnapshots = new Map<string, MeshPhysicalMaterial>()
 
 //===========================================================================
 //SCENE REFS
@@ -612,7 +767,6 @@ function makeCameraAnim(opts: {
 //Click vs drag discrimination - see POINTER_DRAG_THRESHOLD up top.
 let pointerDownX = 0
 let pointerDownY = 0
-let pointerDownAt = 0
 
 //OPTIMIZATION
 let canvasVisible = true
@@ -744,7 +898,7 @@ onMounted(() => {
   //instead of rebuilding the composer chain.
   renderPass = new RenderPass(scene, camera)
   composer.addPass(renderPass)
-  composer.addPass(new SMAAPass(w, h))
+  composer.addPass(new SMAAPass())
   composer.addPass(new OutputPass())
 
   //LOAD project metadata first, then the .glb (or wait for one to be uploaded)
@@ -795,15 +949,24 @@ onMounted(() => {
           })
           if (mat.normalScale) physical.normalScale.copy(mat.normalScale)
           physical.name = mat.name
-          physical.uuid = mat.uuid
+          ;(physical as { uuid: string }).uuid = mat.uuid
           stdToPhysical.set(mat.uuid, physical)
           m.material = physical
         }
 
+        //Build the shared CustomNormalMaterial for this source GLB
+        //material so panel edits propagate to every non-emissive mesh
+        //using it. Materials shared across meshes in the GLB stay
+        //shared in the editor's UI - one panel row, many meshes update
+        //at once. Emissive picks get their OWN CustomEmissiveMaterial
+        //below so flagging one mesh doesn't leak to siblings.
         if (!seen.has(physical.uuid)) {
+          const shared = new CustomNormalMaterial(physical)
+          ;(shared as { uuid: string }).uuid = physical.uuid
+          wfMaterials.add(shared)
           seen.set(physical.uuid, {
             displayName:       physical.name || m.name || `Material ${seen.size + 1}`,
-            material:          markRaw(physical),
+            material:          markRaw(shared) as unknown as MeshPhysicalMaterial,
             color:             "#" + physical.color.getHexString(),
             emissive:          "#" + (physical.emissive?.getHexString() ?? "000000"),
             metalness:         physical.metalness,
@@ -819,26 +982,77 @@ onMounted(() => {
       })
       materials.value = [...seen.values()]
 
+      //Build the emissive lookup before assigning per-mesh classes.
+      const emissiveSpecs = pendingHydration?.wireframeMode?.emissiveMeshes ?? []
+      const emByUuid = new Map<string, { intensity: number }>()
+      const emByName = new Map<string, { intensity: number }>()
+      for (const s of emissiveSpecs) {
+        if (s.uuid) emByUuid.set(s.uuid, { intensity: s.intensity })
+        if (s.name) emByName.set(s.name, { intensity: s.intensity })
+      }
+      emissiveList.value = []
+
       const meshes: SceneMesh[] = []
       let meshIndex = 0
       gltf.scene.traverse((obj) => {
         const m = obj as Mesh
         if (!m.isMesh) return
-        meshes.push({ mesh: markRaw(m), name: m.name || `Mesh ${meshIndex}` })
+        const name = m.name || `Mesh ${meshIndex}`
+        meshes.push({ mesh: markRaw(m), name })
+        //Assign the right CUSTOM material class to this mesh. Non-
+        //emissive uses the shared CustomNormalMaterial keyed by source
+        //uuid. Emissive picks get their OWN CustomEmissiveMaterial
+        //built from the same shared instance so PBR params (textures,
+        //metalness, roughness) match Visual A exactly.
+        const srcKey = (m.material as MeshPhysicalMaterial).uuid
+        const sharedNormal = seen.get(srcKey)?.material as CustomNormalMaterial | undefined
+        if (!sharedNormal) { meshIndex++; return }
+        const emSpec = emByUuid.get(m.uuid) ?? emByName.get(name)
+        if (emSpec) {
+          const emMat = new CustomEmissiveMaterial(sharedNormal, emSpec.intensity)
+          wfMaterials.add(emMat)
+          m.material = markRaw(emMat)
+          emissiveList.value = [...emissiveList.value, { uuid: m.uuid, intensity: emSpec.intensity }]
+          m.castShadow = false; m.receiveShadow = false
+        } else {
+          m.material = markRaw(sharedNormal)
+          m.castShadow = true; m.receiveShadow = true
+        }
         meshIndex++
       })
       sceneMeshes.value = meshes
-
-      //SWEEP shader prep - patches each original material once so the
-      //shared uWfProgress uniform drives the wipe later.
-      for (const sm of meshes) {
-        const mat = sm.mesh.material as Material | Material[]
-        if (Array.isArray(mat)) for (const sub of mat) patchMaterialForSweep(sub)
-        else                    patchMaterialForSweep(mat)
-      }
+      //Center the model FIRST so the wfBox we compute right after is in
+      //the FINAL world coords. Before this fix wfBox was captured in the
+      //pre-centering frame and the sweep cut landed where the model
+      //used to be, not where the user sees it.
       gltf.scene.updateMatrixWorld(true)
+      const tempBox = new Box3().setFromObject(gltf.scene)
+      const center  = tempBox.getCenter(new Vector3())
+      const sphere  = tempBox.getBoundingSphere(new Sphere())
+
+      gltf.scene.position.x -= center.x
+      gltf.scene.position.z -= center.z
+      gltf.scene.position.y -= tempBox.min.y
+      gltf.scene.updateMatrixWorld(true)
+
       wfBox = new Box3().setFromObject(gltf.scene)
       recomputeSweepRange()
+      //LEGACY MIGRATION - prior saves stored sweepStart / sweepEnd as
+      //percentages of the bbox span (0..100). After the switch to
+      //absolute world coords those legacy values map nowhere near the
+      //model. Detect the most common stale defaults (0,100) AND any
+      //value far outside the current bbox projection and snap to the
+      //bbox extremes so the user has a sane starting point.
+      const spanProj = bboxProjMax.value - bboxProjMin.value
+      const looksLegacy =
+        (sweepStart.value === 0 && sweepEnd.value === 100) ||
+        sweepStart.value > bboxProjMax.value + spanProj ||
+        sweepEnd.value   < bboxProjMin.value - spanProj
+      if (looksLegacy) {
+        sweepStart.value = bboxProjMin.value
+        sweepEnd.value   = bboxProjMax.value
+        recomputeSweepRange()
+      }
 
       scene!.add(gltf.scene)
       //WIREFRAME WARMUP - precompiles the wireframe materials AND the
@@ -851,14 +1065,6 @@ onMounted(() => {
       //     Overlays can just attach pre-built geometry instead of
       //     computing on the click frame.
       precompileWireframeAssets()
-
-      const tempBox = new Box3().setFromObject(gltf.scene)
-      const center  = tempBox.getCenter(new Vector3())
-      const sphere  = tempBox.getBoundingSphere(new Sphere())
-
-      gltf.scene.position.x -= center.x
-      gltf.scene.position.z -= center.z
-      gltf.scene.position.y -= tempBox.min.y
 
       //Recompute the bounding sphere AFTER the position adjustment so
       //sceneCenter is in WORLD coords (not the glTF's local frame). The
@@ -954,9 +1160,11 @@ onMounted(() => {
       //snap at the end of the animation: OrbitControls re-clamped phi
       //away from 0, shifting the camera off the axis.
       if (!cameraAnim) controls!.update()
-      //Wireframe sweep tick - mutates uniforms on the patched materials
-      //and calls requestRender so the composer keeps painting until done.
-      if (wfTransition) advanceWfTransition()
+      //Wireframe sweep + overlay-fade ticks. The overlay fade runs
+      //SEQUENTIALLY with the sweep: fade-in starts at sweep-enter's end,
+      //fade-out runs before the sweep-leave starts, never concurrent.
+      if (wfTransition)  advanceWfTransition()
+      if (wfOverlayFade) advanceOverlayFade()
       composer!.render()
       if (viewHelper && renderer) {
         renderer.autoClear = false
@@ -983,6 +1191,9 @@ onMounted(() => {
     //projections continue to frame the model identically when the
     //window resizes during an ortho session.
     tuneOrthoFrustum()
+    //Line2/LineMaterial computes pixel linewidth from viewport NDC, so
+    //its .resolution uniform must track the new canvas size.
+    refreshOverlayLineWidth()
     requestRender(200)
   })
   resizeObs.observe(stage)
@@ -1095,6 +1306,8 @@ type SavedSettings = {
     sweepAxis?: [number, number, number]
     sweepStart?: number
     sweepEnd?:   number
+    //per-project sweep enter/leave duration in ms (default 1500)
+    sweepDurationMs?: number
   }
 }
 
@@ -1114,6 +1327,7 @@ function hydrateFromSavedSettings(payload: unknown) {
   }
   if (typeof s.wireframeMode?.sweepStart === "number") sweepStart.value = s.wireframeMode.sweepStart
   if (typeof s.wireframeMode?.sweepEnd   === "number") sweepEnd.value   = s.wireframeMode.sweepEnd
+  if (typeof s.wireframeMode?.sweepDurationMs === "number") sweepDurationMs.value = s.wireframeMode.sweepDurationMs
   //s.wireframeMode.color (mode color) + .overlayColor (line color) +
   //.material are GLOBAL editor prefs (settings table). Ignore the
   //per-project values during hydration so the DB-backed global wins.
@@ -1198,20 +1412,8 @@ function applyPendingHydration() {
     hydratingLights = false
   }
 
-  //EMISSIVE picks - find each saved mesh by name, add to the emissive list
-  if (s.wireframeMode?.emissiveMeshes) {
-    for (const saved of s.wireframeMode.emissiveMeshes) {
-      const sm = sceneMeshes.value.find((m) =>
-        (saved.name && m.name === saved.name) ||
-        (saved.uuid && m.mesh.uuid === saved.uuid),
-      )
-      if (!sm) continue
-      if (!emissiveList.value.find((e) => e.uuid === sm.mesh.uuid)) {
-        const material = makeEmissiveMaterial(saved.intensity)
-        emissiveList.value = [...emissiveList.value, { uuid: sm.mesh.uuid, intensity: saved.intensity, material }]
-      }
-    }
-  }
+  //EMISSIVE picks - already assigned at GLB load via the per-mesh
+  //CustomEmissiveMaterial path (see the GLB loader). Nothing to do here.
 
   requestRender(800)
 }
@@ -1232,6 +1434,7 @@ function hydrateSharedLight(spec: {
   wfIntensity:     number
   wfColor:         string
   enabled?:    boolean
+  wfEnabled?:  boolean
   castShadow?: boolean
 }) {
   addLight(spec.type)
@@ -1251,6 +1454,7 @@ function hydrateSharedLight(spec: {
   //per-light toggles - if absent on hydration (older saves) keep the
   //defaults assigned by addLight()
   if (spec.enabled    !== undefined) onLightEnabledChange(lights.value.length - 1, spec.enabled)
+  if (spec.wfEnabled  !== undefined) entry.wfEnabled = spec.wfEnabled
   if (spec.castShadow !== undefined) onLightShadowChange (lights.value.length - 1, spec.castShadow)
   if (entry.type === "directional" && entry.target) {
     entry.tx = spec.tx ?? 0; entry.ty = spec.ty ?? 0; entry.tz = spec.tz ?? 0
@@ -1338,6 +1542,13 @@ onBeforeUnmount(() => {
   composer?.dispose()
   renderer?.dispose()
   resizeObs?.disconnect()
+  //Sweep hover indicator - dispose geometry + material so GC can reclaim.
+  if (sweepIndicatorMesh) {
+    if (sweepIndicatorMesh.parent) sweepIndicatorMesh.parent.remove(sweepIndicatorMesh)
+    sweepIndicatorMesh.geometry.dispose()
+    ;(sweepIndicatorMesh.material as MeshBasicMaterial).dispose()
+    sweepIndicatorMesh = null
+  }
 })
 
 //===========================================================================
@@ -1470,21 +1681,44 @@ function applyEnvFromSource(source: Texture, intensity: number) {
 
 function applyProceduralSky(intensity = 1) {
   if (!scene) return
+  //Switching back to the procedural sky invalidates the HDR cache so a
+  //subsequent toggle to the same HDR re-loads (rather than rebinding a
+  //probe that no longer matches the active environment).
+  currentHdrUrl   = null
+  currentHdrProbe = null
   applyEnvFromSource(makeSkyGradient(), intensity)
   if (!proceduralThumbnail.value && renderer && currentEnvSource) {
     proceduralThumbnail.value = renderEnvThumbnail(currentEnvSource)
   }
 }
 
+//HDR CACHE - reparsing the same HDR/EXR file every wireframe toggle is
+//the real cost (multi-MB texture decode + PMREM convolution). We cache
+//by URL: same URL = just rebind the cached probe at the new intensity,
+//skip the load + parse + PMREM round-trip entirely.
+let currentHdrUrl:   string | null = null
+let currentHdrProbe: Texture | null = null
+
 function applyHdrFromEntry(entry: HdrEntry, intensity: number) {
   if (!scene || !pmrem) return
   hdrError.value = null
+  //Same URL as last time - rebind the cached probe at the new intensity.
+  //This is the hot path on a wireframe toggle when normal-mode HDR and
+  //wireframe-mode HDR point at the same file.
+  if (entry.url === currentHdrUrl && currentHdrProbe) {
+    scene.environment = currentHdrProbe
+    scene.environmentIntensity = intensity
+    requestRender(300)
+    return
+  }
   const isExr = /\.exr$/i.test(entry.name)
   const loader = isExr ? new EXRLoader() : new HDRLoader()
   loader.load(
     entry.url,
     (source) => {
       applyEnvFromSource(source, intensity)
+      currentHdrUrl   = entry.url
+      currentHdrProbe = scene?.environment ?? null
       if (!entry.thumbnail && renderer) entry.thumbnail = renderEnvThumbnail(source)
       requestRender(800)
     },
@@ -1493,6 +1727,8 @@ function applyHdrFromEntry(entry: HdrEntry, intensity: number) {
       const msg = err instanceof Error ? err.message : String(err)
       hdrError.value = `${entry.name}: ${msg}`
       console.error("[model-editor] HDR load failed:", entry.name, err)
+      currentHdrUrl   = null
+      currentHdrProbe = null
     },
   )
 }
@@ -1652,23 +1888,9 @@ function activeMode(): LightMode {
   return wireframeMode.value ? "wireframe" : "normal"
 }
 
-//Push the current mode's intensity + color from each LightEntry onto the
-//actual three.js Light object + the gizmo materials. Called on mode
-//switch (enter/leave wireframe) and after live edits.
-function applyLightsForMode() {
-  const mode = activeMode()
-  for (const e of lights.value) {
-    const intensity = lightIntensity(e, mode)
-    const colorHex  = lightColor(e, mode)
-    e.light.intensity = intensity
-    const col = new Color(colorHex)
-    e.light.color.copy(col)
-    ;(e.sourceGiz.material as MeshBasicMaterial).color.copy(col)
-    if (e.target) (e.target.material as MeshBasicMaterial).color.copy(col)
-    if (e.link)   (e.link.material   as LineBasicMaterial).color.copy(col)
-  }
-  requestRender()
-}
+//applyLightsForMode was the hard-snap version - replaced by applyLightsLerp
+//in advanceWfTransition so the per-mode swap rides the same eased curve
+//as the surface sweep. Removed.
 
 function addLight(type: LightType) {
   if (!scene) return
@@ -1719,6 +1941,7 @@ function addLight(type: LightType) {
     wfIntensity:     startIntensity,
     wfColor,
     enabled:    true,
+    wfEnabled:  true,
     castShadow: type === "directional",   //point lights default OFF (expensive)
   }
 
@@ -1800,6 +2023,20 @@ function onLightEnabledChange(idx: number, enabled: boolean) {
   requestRender()
 }
 
+//Wireframe-mode-specific enable toggle. When unchecked the light fades
+//to 0 intensity proportionally to uWfProgress (see applyLightsLerp).
+//Live-apply if we're currently in wireframe mode so the preview reflects
+//the change without re-toggling the whole mode.
+function onLightWfEnabledChange(idx: number, wfEnabled: boolean) {
+  const entry = lights.value[idx]; if (!entry) return
+  entry.wfEnabled = wfEnabled
+  //Re-run the lerp at the current sweep progress so the intensity
+  //updates immediately on screen (otherwise it stays stale until the
+  //next wireframe enter/leave).
+  applyLightsLerp(wireframeMode.value ? 1 : 0)
+  requestRender()
+}
+
 function ensurePointShadowConfig(light: PointLight) {
   light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
   light.shadow.bias       = SHADOW_BIAS
@@ -1870,24 +2107,10 @@ function onLightHover(idx: number, on: boolean) {
   requestRender()
 }
 
-function onLightPosition(idx: number, axis: "x" | "y" | "z", v: number) {
-  const e = lights.value[idx]; if (!e) return
-  e[axis] = v
-  e.light.position.set(e.x, e.y, e.z)
-  e.sourceGiz.position.copy(e.light.position)
-  if (e.link) updateLinkGeometry(e)
-  requestRender()
-}
-
-function onLightTargetPosition(idx: number, axis: "x" | "y" | "z", v: number) {
-  const e = lights.value[idx]; if (!e || !e.target) return
-  const key = (axis === "x" ? "tx" : axis === "y" ? "ty" : "tz") as "tx" | "ty" | "tz"
-  e[key] = v
-  e.target.position.set(e.tx!, e.ty!, e.tz!)
-  ;(e.light as DirectionalLight).target.updateMatrixWorld()
-  if (e.link) updateLinkGeometry(e)
-  requestRender()
-}
+//onLightPosition / onLightTargetPosition: used to back panel sliders
+//that have since been removed. Keep the call shape documented via the
+//defineExpose so callers can re-add the rows if needed - kept inside
+//defineExpose so TS doesn't flag them as unused.
 
 function onLightColorChange(mode: LightMode, idx: number, hex: string) {
   const e = lights.value[idx]; if (!e) return
@@ -2000,35 +2223,9 @@ function syncGizmoTargetToData() {
 //the author was clobbering the live render every time they opened the
 //section to tune a slider.
 
-function ensureWfMaterials() {
-  if (wfBaseMat && wfPickMat) return
-  //polygonOffset pushes the surface BACK in z so the wireframe line
-  //overlay (sharing the same geometry) lands in front without z-fighting
-  //and without needing depthTest:false on lines (which would make them
-  //bleed through every other mesh - the bug the user reported).
-  wfBaseMat = new MeshPhysicalMaterial({
-    color:             new Color(wfMatParams.value.color),
-    metalness:         wfMatParams.value.metalness,
-    roughness:         wfMatParams.value.roughness,
-    envMapIntensity:   wfMatParams.value.envMapIntensity,
-    specularIntensity: wfMatParams.value.specularIntensity,
-    polygonOffset:       true,
-    polygonOffsetFactor: POLYGON_OFFSET_FACTOR,
-    polygonOffsetUnits:  POLYGON_OFFSET_UNITS,
-  })
-  wfPickMat = new MeshPhysicalMaterial({
-    color:             new Color(wfMatParams.value.color),
-    metalness:         wfMatParams.value.metalness,
-    roughness:         wfMatParams.value.roughness,
-    envMapIntensity:   wfMatParams.value.envMapIntensity,
-    specularIntensity: wfMatParams.value.specularIntensity,
-    emissive:          new Color(PICK_COLOR),
-    emissiveIntensity: 1.5,
-    polygonOffset:       true,
-    polygonOffsetFactor: POLYGON_OFFSET_FACTOR,
-    polygonOffsetUnits:  POLYGON_OFFSET_UNITS,
-  })
-}
+//ensureWfMaterials / wfBaseMat / wfPickMat used to back the OLD material
+//swap path. The Custom{Normal,Emissive}Material classes own the look
+//entirely now - these are dead.
 
 function syncWfMaterialsParams() {
   if (!wfBaseMat || !wfPickMat) return
@@ -2041,79 +2238,118 @@ function syncWfMaterialsParams() {
     m.specularIntensity = p.specularIntensity
     m.needsUpdate       = true
   }
-  //per-emissive materials track the wf base params too (color/metal/etc),
-  //they keep their own emissive intensity
-  for (const e of emissiveList.value) {
-    e.material.color.set(p.color)
-    e.material.metalness         = p.metalness
-    e.material.roughness         = p.roughness
-    e.material.envMapIntensity   = p.envMapIntensity
-    e.material.specularIntensity = p.specularIntensity
-    e.material.needsUpdate       = true
-  }
+  //Emissive picks are driven purely by uWfEmissive (the wireframe
+  //mode colour) + per-mesh uWfEmissiveIntensity shader uniforms - no
+  //material to mutate here.
 }
 
-function makeEmissiveMaterial(intensity: number): MeshPhysicalMaterial {
-  const p = wfMatParams.value
-  return new MeshPhysicalMaterial({
-    color:             new Color(p.color),
-    metalness:         p.metalness,
-    roughness:         p.roughness,
-    envMapIntensity:   p.envMapIntensity,
-    specularIntensity: p.specularIntensity,
-    emissive:          new Color(wireframeColor.value),
-    emissiveIntensity: intensity,
-  })
+function setMaterialFor(_mesh: Mesh) {
+  //NO-OP retained because various pick / unpick paths still call it.
+  //The Custom{Normal,Emissive}Material classes carry the role-specific
+  //look themselves - there's nothing to set per-pick anymore.
+  void _mesh
 }
 
-function setMaterialFor(mesh: Mesh) {
-  if (!wfBaseMat || !wfPickMat) return
-  if (pickedMeshIdx.value !== null && sceneMeshes.value[pickedMeshIdx.value]?.mesh.uuid === mesh.uuid) {
-    mesh.material = wfPickMat
-  } else {
-    const ent = findEmissive(mesh.uuid)
-    if (ent) mesh.material = ent.material
-    else     mesh.material = wfBaseMat
-  }
-}
-
-//ONE material - the original, patched with the sweep shader. The final
-//"wireframe-on" state is just uWfProgress=1 plus the lights + HDR +
-//overlays for the wireframe mode. Fragments past sweepEnd stay
-//un-tinted because the shader's smoothstep clip naturally drops them.
-//No material swap means a too-short sweepEnd produces a permanent
-//partial-blend, exactly what the user is dialing for.
+//SINGLE EFFECT - the sweep shader on the originals. No light swap, no
+//HDR swap, no edge overlay. The wireframe toggle ONLY animates the
+//uWfProgress uniform between 0 and 1, blending each surface toward the
+//wireframe tint with the wireframe PBR params (metalness / roughness /
+//env). Lights + HDR stay in their normal-mode state throughout.
 function finalizeEnterWireframe() {
-  if (!scene) return
-  syncWireframeOverlays()
-  applyLightsForMode()
+  //Snap the wireframe HDR at the END of the sweep so the env swap is
+  //hidden by the now-uniform tint. The URL cache in applyHdrFromEntry
+  //skips the reload/parse/PMREM when the wireframe HDR is the same file
+  //as the normal-mode one. Lights are already at wireframe-mode values
+  //thanks to applyLightsLerp(v=1) on the last transition frame. Spawn
+  //the edge overlays at opacity 0 and kick off a fade-in - the wireframe
+  //LINES appear PROGRESSIVELY after the surface tint sweep.
   syncEnvForCurrentMode()
+  syncWireframeOverlays()
+  setOverlayOpacityAll(0)
+  wfOverlayFade = {
+    startTime: performance.now(),
+    from:      0,
+    to:        1,
+    duration:  WF_OVERLAY_FADE_DURATION_MS,
+    thenStartLeaveSweep: false,
+  }
+  requestRender(WF_OVERLAY_FADE_DURATION_MS + 100)
 }
 
 function enableWireframeMode() {
   if (!scene) return
   wireframeMode.value = true
-  //Refresh sweep uniforms - axis, start, end, tint - so the preview
-  //reflects unsaved edits.
-  refreshSweepTint()
+  //Push the wireframe-mode params into the SHARED sweep uniforms before
+  //the sweep starts. Both CustomNormalMaterial AND CustomEmissiveMaterial
+  //instances pick them up via the shared reference - no per-material
+  //iteration. wfMain (axis/min/range) was already pushed by
+  //recomputeSweepRange; pushSweepPbrUniforms covers the rest.
   recomputeSweepRange()
-  //Tint reveal runs on the originals. finalizeEnterWireframe() at the
-  //end attaches the edge overlays and snaps lights + HDR over.
-  wfTransition = { startTime: performance.now(), from: 0, to: 1, duration: WF_SWEEP_DURATION_MS, phase: "enter" }
-  requestRender(WF_SWEEP_DURATION_MS + 200)
+  pushSweepPbrUniforms()
+  //Cancel any in-flight overlay fade so rapid toggles don't fight.
+  wfOverlayFade = null
+  wfTransition = { startTime: performance.now(), from: 0, to: 1, duration: sweepDurationMs.value, phase: "enter" }
+  requestRender(sweepDurationMs.value + 200)
 }
 
 function disableWireframeMode() {
   wireframeMode.value = false
-  //No material swap to undo - we only ever ran the shader on the
-  //originals. Just remove the overlays + flip lights + HDR back, then
-  //drive uWfProgress back to 0.
-  removeWireframeOverlays()
-  applyLightsForMode()
-  syncEnvForCurrentMode()
   pickedMeshIdx.value = null
-  wfTransition = { startTime: performance.now(), from: 1, to: 0, duration: WF_SWEEP_DURATION_MS, phase: "leave" }
-  requestRender(WF_SWEEP_DURATION_MS + 200)
+  //Restore the normal-mode HDR. URL-cached so identical normal/wireframe
+  //HDR doesn't trigger a real reload.
+  syncEnvForCurrentMode()
+  //If overlay lines are currently on screen (either fully or partway
+  //through a fade-in), fade them OUT first. The leave sweep kicks off
+  //once the fade-out completes. Otherwise (no overlays yet - disable
+  //pressed during the enter sweep before overlays even spawned), go
+  //straight to the leave sweep.
+  if (wfOverlays.size > 0) {
+    const startFrom = wfOverlayFade ? lerpedOverlayValue() : 1
+    wfOverlayFade = {
+      startTime: performance.now(),
+      from:      startFrom,
+      to:        0,
+      duration:  WF_OVERLAY_FADE_DURATION_MS,
+      thenStartLeaveSweep: true,
+    }
+    requestRender(WF_OVERLAY_FADE_DURATION_MS + sweepDurationMs.value + 200)
+  } else {
+    wfOverlayFade = null
+    wfTransition = { startTime: performance.now(), from: 1, to: 0, duration: sweepDurationMs.value, phase: "leave" }
+    requestRender(sweepDurationMs.value + 200)
+  }
+}
+
+//Read the currently-applied overlay opacity straight off the first
+//overlay material. Used to start a leave fade-out from wherever an
+//in-flight fade-in is, so rapid toggle doesn't snap the line opacity.
+function lerpedOverlayValue(): number {
+  for (const overlay of wfOverlays.values()) {
+    const m = overlay.material as LineMaterial
+    return m.opacity / WIREFRAME_LINE_OPACITY
+  }
+  return 0
+}
+
+function advanceOverlayFade() {
+  if (!wfOverlayFade) return
+  const now = performance.now()
+  const t   = Math.min(1, (now - wfOverlayFade.startTime) / wfOverlayFade.duration)
+  const eased = t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2
+  const v = wfOverlayFade.from + (wfOverlayFade.to - wfOverlayFade.from) * eased
+  setOverlayOpacityAll(v)
+  if (t >= 1) {
+    const wasFadeOut = wfOverlayFade.to === 0
+    const startSweep = wfOverlayFade.thenStartLeaveSweep
+    wfOverlayFade = null
+    if (wasFadeOut) removeWireframeOverlays()
+    if (startSweep) {
+      wfTransition = { startTime: performance.now(), from: 1, to: 0, duration: sweepDurationMs.value, phase: "leave" }
+    }
+  }
+  requestRender()
 }
 
 function ensureOverlayForMesh(mesh: Mesh) {
@@ -2123,39 +2359,46 @@ function ensureOverlayForMesh(mesh: Mesh) {
   //Currently picked (orange-highlight) mesh also stays clean - the
   //overlay would compete visually with the pick highlight.
   if (pickedMeshIdx.value !== null && sceneMeshes.value[pickedMeshIdx.value]?.mesh.uuid === mesh.uuid) return
-  //Reuse the precomputed EdgesGeometry when the threshold hasn't
-  //changed since the warmup pass. Otherwise we'd pay the geometry
-  //computation again on the first toggle frame - that's the actual
-  //wireframe-toggle stall on complex models.
-  let edgesGeo: EdgesGeometry
-  if (precomputedEdges.has(mesh.uuid) && precomputedEdgesThreshold === wireframeEdgeThreshold.value) {
-    edgesGeo = precomputedEdges.get(mesh.uuid)!
-  } else {
-    edgesGeo = new EdgesGeometry(mesh.geometry, wireframeEdgeThreshold.value)
-  }
-  //depthTest stays ON so the lines respect occlusion (no X-ray bleed
-  //across other meshes). The wf base / pick materials carry a
-  //polygonOffset that pushes the surface back, so the overlay lines
-  //land just in front of it without z-fighting.
-  const overlayMat = new LineBasicMaterial({
-    color:       new Color(wireframeOverlayColor.value),
+  //Reuse the precomputed wireframe-without-diagonals BufferGeometry from
+  //the warmup pass. Falls back to a fresh build only if the cache is
+  //empty (shouldn't happen since precompileWireframeAssets runs at load).
+  const baseGeo = precomputedEdges.get(mesh.uuid)
+    ?? buildWireframeWithoutDiagonals(mesh.geometry as BufferGeometry)
+  //Wrap the line-segments positions into a LineSegmentsGeometry that
+  //LineMaterial can render with proper pixel-width screen-space quads
+  //(WebGL's native line width is 1px on most drivers - useless for a
+  //user-controlled thickness slider).
+  const positions = (baseGeo.getAttribute("position").array as Float32Array)
+  const lineGeom = new LineSegmentsGeometry()
+  lineGeom.setPositions(positions as unknown as number[])
+  const overlayMat = new LineMaterial({
+    color:       new Color(wireframeOverlayColor.value).getHex(),
+    linewidth:   wireframeLineWidth.value,
     transparent: true,
     opacity:     WIREFRAME_LINE_OPACITY,
     depthWrite:  false,
+    worldUnits:  false,
   })
-  const overlay = new LineSegments(edgesGeo, overlayMat)
+  //LineMaterial needs viewport resolution to convert pixel linewidth
+  //into NDC. Updated again on every resize by syncCanvasSize().
+  if (renderer) {
+    const size = new Vector2()
+    renderer.getSize(size)
+    overlayMat.resolution.copy(size)
+  }
+  const overlay = new Line2(lineGeom, overlayMat)
   overlay.renderOrder = WIREFRAME_OVERLAY_RENDER_ORDER
   mesh.add(overlay)
-  wfOverlays.set(mesh.uuid, overlay)
+  wfOverlays.set(mesh.uuid, overlay as unknown as LineSegments)
 }
 
 function removeOverlayForMesh(uuid: string) {
   const overlay = wfOverlays.get(uuid); if (!overlay) return
   if (overlay.parent) overlay.parent.remove(overlay)
-  if (overlay.material instanceof LineBasicMaterial) overlay.material.dispose()
-  //Only dispose the geometry if it isn't the cached pre-computed one
-  //(the cache survives toggles; the warmup is re-run on threshold change).
-  if (precomputedEdges.get(uuid) !== overlay.geometry) overlay.geometry.dispose()
+  ;(overlay.material as LineMaterial).dispose?.()
+  //LineSegmentsGeometry is a derived wrapper, not the cached
+  //BufferGeometry - always dispose it.
+  overlay.geometry.dispose()
   wfOverlays.delete(uuid)
 }
 
@@ -2170,14 +2413,35 @@ function syncWireframeOverlays() {
 
 function onWireframeOverlayColor(hex: string) {
   wireframeOverlayColor.value = hex
-  saveGlobalPref(WF_LINE_COLOR_KEY, hex, "Wireframe line color (shared across every project in the editor).")
+  //Persisted on Save click only - was auto-saving to the DB on every
+  //input event which made panel edits permanent before the user had a
+  //chance to undo. Save the global pref alongside the project settings
+  //in onSave() instead.
   for (const overlay of wfOverlays.values()) {
-    if (overlay.material instanceof LineBasicMaterial) {
-      overlay.material.color.set(hex)
-      overlay.material.needsUpdate = true
-    }
+    const m = overlay.material as LineMaterial
+    m.color.set(hex)
+    m.needsUpdate = true
   }
   requestRender()
+}
+
+//Live update of every existing overlay's pixel linewidth + resolution.
+//Called from the slider handler and on every resize so existing wireframes
+//stay at the right thickness without a re-toggle.
+function refreshOverlayLineWidth() {
+  const size = renderer ? renderer.getSize(new Vector2()) : new Vector2(1, 1)
+  for (const overlay of wfOverlays.values()) {
+    const m = overlay.material as LineMaterial
+    m.linewidth = wireframeLineWidth.value
+    m.resolution.copy(size)
+  }
+  requestRender()
+}
+
+function onWireframeLineWidth(px: number) {
+  if (!Number.isFinite(px)) return
+  wireframeLineWidth.value = px
+  refreshOverlayLineWidth()
 }
 
 //Sweep handlers - per-project values saved with the main viewer
@@ -2188,23 +2452,13 @@ function onSweepAxis(idx: 0 | 1 | 2, v: number) {
   a[idx] = v
   sweepAxis.value = a
 }
-function onSweepStart(v: number) { sweepStart.value = v }
-function onSweepEnd(v: number)   { sweepEnd.value   = v }
+//onSweepStart / onSweepEnd were replaced by onSweepStartInput /
+//onSweepEndInput which also drive the hover indicator at the same time.
 
 //Edge-threshold slider - the EdgesGeometry per overlay was baked at
-//mount-time with the OLD threshold; we need to nuke + rebuild so the
-//new angle takes effect on the next paint.
-function onWireframeEdgeThreshold(deg: number) {
-  if (!Number.isFinite(deg)) return
-  wireframeEdgeThreshold.value = deg
-  saveGlobalPref(WF_EDGE_THRESHOLD_KEY, String(deg), "Wireframe edge-threshold in degrees (shared across every project in the editor).")
-  removeWireframeOverlays()
-  //Rebuild the precomputed edges cache against the new threshold so
-  //subsequent toggles stay free of the recompute stall.
-  buildPrecomputedEdges()
-  syncWireframeOverlays()
-  requestRender()
-}
+//onWireframeEdgeThreshold: dead. The edge-angle threshold UX is gone -
+//topological diagonal detection from buildWireframeWithoutDiagonals
+//covers the diagonals problem without exposing a slider.
 
 function removeWireframeOverlays() {
   for (const [uuid, overlay] of wfOverlays.entries()) {
@@ -2223,29 +2477,33 @@ function onWireframeOverlayToggle(v: boolean) {
 }
 
 function onWireframeColorChange(hex: string) {
-  //Mode color is the DEFAULT for newly-added wf lights and the tint
-  //applied to emissive picks. Existing wf lights keep their own color
-  //so the user can color-pick each independently. Persisted globally.
+  //Mode color is the DEFAULT for newly-added wf lights AND the emission
+  //colour that all CustomEmissiveMaterial instances ramp toward at the
+  //END of the sweep. Persisted on Save click only.
   wireframeColor.value = hex
-  saveGlobalPref(WF_MODE_COLOR_KEY, hex, "Wireframe mode color (shared across every project in the editor).")
-  for (const e of emissiveList.value) {
-    e.material.emissive.set(hex)
-    e.material.needsUpdate = true
-  }
+  //Push the new colour into the shared sweep uniforms so every
+  //CustomEmissiveMaterial picks it up at the next draw - no per-instance
+  //iteration, no recompile.
+  applySweep({ emissiveColor: hex })
   requestRender()
 }
 
 function onEmissiveItemIntensity(uuid: string, v: number) {
   const e = findEmissive(uuid); if (!e) return
   e.intensity = v
-  e.material.emissiveIntensity = v
+  //Push the new intensity onto THIS mesh's CustomEmissiveMaterial
+  //instance via its setEmissiveBoost setter (per-instance uniform).
+  const sm = sceneMeshes.value.find((s) => s.mesh.uuid === uuid)
+  if (sm) {
+    const mat = sm.mesh.material
+    if (mat instanceof CustomEmissiveMaterial) mat.setEmissiveBoost(v)
+  }
   requestRender()
 }
 
 function onWfMatParam<K extends keyof WfMaterialParams>(key: K, value: WfMaterialParams[K]) {
   wfMatParams.value[key] = value
-  saveGlobalPref(WF_MAT_PARAMS_KEY, JSON.stringify(wfMatParams.value),
-    "Wireframe shared material params (color, metalness, roughness, env, specular).")
+  //Persisted on Save click only - see onWireframeOverlayColor.
   syncWfMaterialsParams()
   requestRender()
 }
@@ -2273,7 +2531,6 @@ const pickerNdc = new Vector2()
 function onCanvasPointerDown(e: PointerEvent) {
   pointerDownX  = e.clientX
   pointerDownY  = e.clientY
-  pointerDownAt = performance.now()
 }
 
 //Custom click against ViewHelper's interactive axis meshes. We reach into
@@ -2647,10 +2904,19 @@ function addPickedToEmissive() {
   if (pickedMeshIdx.value === null) return
   const sm = sceneMeshes.value[pickedMeshIdx.value]; if (!sm) return
   if (!isEmissiveMesh(sm.mesh.uuid)) {
-    const material = makeEmissiveMaterial(wireframeEmissive.value)
     emissiveList.value = [...emissiveList.value, {
-      uuid: sm.mesh.uuid, intensity: wireframeEmissive.value, material,
+      uuid: sm.mesh.uuid, intensity: wireframeEmissive.value,
     }]
+    //Swap the mesh's material from CustomNormalMaterial to a fresh
+    //CustomEmissiveMaterial that copies all PBR params from the current
+    //shared material. The picked mesh now lives entirely on its own
+    //emissive class instance - per-mesh boost, no leak to siblings.
+    const src = sm.mesh.material as MeshPhysicalMaterial
+    const emMat = new CustomEmissiveMaterial(src, wireframeEmissive.value)
+    wfMaterials.add(emMat)
+    sm.mesh.material = markRaw(emMat)
+    sm.mesh.castShadow    = false
+    sm.mesh.receiveShadow = false
   }
   pickedMeshIdx.value = null
   setMaterialFor(sm.mesh)
@@ -2660,12 +2926,23 @@ function addPickedToEmissive() {
 }
 
 function removeFromEmissive(uuid: string) {
-  const ent = findEmissive(uuid)
   emissiveList.value = emissiveList.value.filter((e) => e.uuid !== uuid)
-  if (ent) ent.material.dispose()
   const sm = sceneMeshes.value.find((s) => s.mesh.uuid === uuid)
   if (sm) {
+    //Swap back to a CustomNormalMaterial built from the current emissive
+    //material's PBR params. Doesn't restore the SHARED instance the mesh
+    //had originally - that's a minor cost (one extra material per
+    //pick/unpick cycle) for the simpler code path. If the user wanted
+    //the original shared material back they'd reload.
+    const cur = sm.mesh.material as MeshPhysicalMaterial
+    const norm = new CustomNormalMaterial(cur)
+    wfMaterials.add(norm)
+    sm.mesh.material = markRaw(norm)
     setMaterialFor(sm.mesh)
+    //Restore shadows on this mesh - it's no longer emissive, so it
+    //should cast + receive shadows like any other mesh.
+    sm.mesh.castShadow    = true
+    sm.mesh.receiveShadow = true
     //back to a regular wireframe-mode mesh - put the overlay back
     if (wireframeMode.value && wireframeOverlayOn.value) ensureOverlayForMesh(sm.mesh)
   }
@@ -2700,6 +2977,7 @@ async function onSave() {
       wfIntensity:     l.wfIntensity,
       wfColor:         l.wfColor,
       enabled:         l.enabled,
+      wfEnabled:       l.wfEnabled,
       castShadow:      l.castShadow,
     })),
     normalMode: {
@@ -2720,6 +2998,7 @@ async function onSave() {
       sweepAxis:  sweepAxis.value,
       sweepStart: sweepStart.value,
       sweepEnd:   sweepEnd.value,
+      sweepDurationMs: sweepDurationMs.value,
       //emissive picks are stored by mesh NAME because mesh.uuid is
       //regenerated by GLTFLoader on every reload, so uuid can't survive
       //a page refresh. Names come from the original glTF and are stable.
@@ -2730,6 +3009,15 @@ async function onSave() {
     },
   }
   await saveViewerSettings(payload)
+  //Flush the global editor prefs to the settings table now too. These
+  //used to auto-save on every panel edit which made changes permanent
+  //before the user could undo - now everything (project + globals)
+  //persists in a single explicit Save click.
+  saveGlobalPref(WF_LINE_COLOR_KEY,    wireframeOverlayColor.value, "Wireframe line color (shared across every project in the editor).")
+  saveGlobalPref(WF_LINE_WIDTH_KEY,    String(wireframeLineWidth.value), "Wireframe line thickness in pixels (shared across every project in the editor).")
+  saveGlobalPref(WF_MODE_COLOR_KEY,    wireframeColor.value,        "Wireframe mode color (shared across every project in the editor).")
+  saveGlobalPref(WF_EDGE_THRESHOLD_KEY, String(wireframeEdgeThreshold.value), "Wireframe edge-threshold in degrees (shared across every project in the editor).")
+  saveGlobalPref(WF_MAT_PARAMS_KEY,    JSON.stringify(wfMatParams.value),     "Wireframe shared material params (color, metalness, roughness, env, specular).")
   status.value = saveError.value ? `Save failed: ${saveError.value}` : "Saved"
   setTimeout(() => { status.value = `Materials: ${materials.value.length}` }, 2000)
 }
@@ -3191,50 +3479,10 @@ async function onSave() {
                 </div>
               </div>
               <div class="editor__row">
-                <label class="editor__row-label" :title="'Edges between faces whose normals differ by less than this angle are HIDDEN. Low = show every triangle edge, high = show only sharp corners.'">Edge threshold</label>
+                <label class="editor__row-label" title="Wireframe line thickness in pixels. Uses Line2 / screen-space quads so the width is real on every platform.">Lines width</label>
                 <div class="editor__row-control">
-                  <input type="range" class="editor__slider" min="0" max="60" step="0.5" :value="wireframeEdgeThreshold" @input="(e) => onWireframeEdgeThreshold(parseFloat((e.target as HTMLInputElement).value))" />
-                  <span class="editor__readout">{{ wireframeEdgeThreshold.toFixed(1) }}°</span>
-                </div>
-              </div>
-
-              <!--SWEEP - per-project axis + range for the wireframe wipe
-              animation. axis is a free vec3 (normalized at runtime),
-              offsets are in % of the bbox projected on that axis.-->
-              <p class="editor__warning editor__warning--neutral">⤿ Sweep direction is PER PROJECT (not shared) - tune per model.</p>
-              <div class="editor__row">
-                <label class="editor__row-label" title="X component of the sweep direction in world space.">Sweep X</label>
-                <div class="editor__row-control">
-                  <input type="range" class="editor__slider" min="-1" max="1" step="0.05" :value="sweepAxis[0]" @input="(e) => onSweepAxis(0, parseFloat((e.target as HTMLInputElement).value))" />
-                  <span class="editor__readout">{{ sweepAxis[0].toFixed(2) }}</span>
-                </div>
-              </div>
-              <div class="editor__row">
-                <label class="editor__row-label" title="Y component (up).">Sweep Y</label>
-                <div class="editor__row-control">
-                  <input type="range" class="editor__slider" min="-1" max="1" step="0.05" :value="sweepAxis[1]" @input="(e) => onSweepAxis(1, parseFloat((e.target as HTMLInputElement).value))" />
-                  <span class="editor__readout">{{ sweepAxis[1].toFixed(2) }}</span>
-                </div>
-              </div>
-              <div class="editor__row">
-                <label class="editor__row-label" title="Z component (depth).">Sweep Z</label>
-                <div class="editor__row-control">
-                  <input type="range" class="editor__slider" min="-1" max="1" step="0.05" :value="sweepAxis[2]" @input="(e) => onSweepAxis(2, parseFloat((e.target as HTMLInputElement).value))" />
-                  <span class="editor__readout">{{ sweepAxis[2].toFixed(2) }}</span>
-                </div>
-              </div>
-              <div class="editor__row">
-                <label class="editor__row-label" title="Where the sweep begins, in % of the bbox along the axis. 0 = first vertex hit. Negative values give a delay before any tint appears.">Sweep start</label>
-                <div class="editor__row-control">
-                  <input type="range" class="editor__slider" min="-50" max="150" step="1" :value="sweepStart" @input="(e) => onSweepStart(parseFloat((e.target as HTMLInputElement).value))" />
-                  <span class="editor__readout">{{ sweepStart.toFixed(0) }}%</span>
-                </div>
-              </div>
-              <div class="editor__row">
-                <label class="editor__row-label" title="Where the sweep ends, in % of the bbox along the axis. 100 = last vertex hit. >100 leaves the wipe finishing slightly off-model.">Sweep end</label>
-                <div class="editor__row-control">
-                  <input type="range" class="editor__slider" min="-50" max="150" step="1" :value="sweepEnd" @input="(e) => onSweepEnd(parseFloat((e.target as HTMLInputElement).value))" />
-                  <span class="editor__readout">{{ sweepEnd.toFixed(0) }}%</span>
+                  <input type="range" class="editor__slider" min="0.5" max="10" step="0.1" :value="wireframeLineWidth" @input="(e) => onWireframeLineWidth(parseFloat((e.target as HTMLInputElement).value))" />
+                  <span class="editor__readout">{{ wireframeLineWidth.toFixed(1) }}px</span>
                 </div>
               </div>
               <div class="editor__row">
@@ -3265,18 +3513,86 @@ async function onSave() {
                   <span class="editor__readout">{{ (1 - wfMatParams.roughness).toFixed(2) }}</span>
                 </div>
               </div>
-              <div class="editor__row">
-                <label class="editor__row-label">Env intensity</label>
-                <div class="editor__row-control">
-                  <input type="range" class="editor__slider" min="0" max="3" step="0.05" :value="wfMatParams.envMapIntensity" @input="(e) => onWfMatParam('envMapIntensity', parseFloat((e.target as HTMLInputElement).value))" />
-                  <span class="editor__readout">{{ wfMatParams.envMapIntensity.toFixed(2) }}</span>
-                </div>
-              </div>
+              <!--Env intensity removed - the HDR Intensity slider in
+              the HDR section already controls the env contribution.-->
               <div class="editor__row">
                 <label class="editor__row-label">Specular</label>
                 <div class="editor__row-control">
                   <input type="range" class="editor__slider" min="0" max="1" step="0.01" :value="wfMatParams.specularIntensity" @input="(e) => onWfMatParam('specularIntensity', parseFloat((e.target as HTMLInputElement).value))" />
                   <span class="editor__readout">{{ wfMatParams.specularIntensity.toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!--Animation section - per-project sweep direction + range +
+          duration. Separate from Material because these are timing /
+          spatial controls, not material PBR knobs.-->
+          <section class="editor__section" :class="{ 'editor__section--open': sectionOpen.wfAnimation }">
+            <button type="button" class="editor__section-head" @click="sectionOpen.wfAnimation = !sectionOpen.wfAnimation">
+              <span class="editor__section-title">Animation</span>
+              <ChevronDown :size="14" class="editor__section-chevron" />
+            </button>
+            <div v-show="sectionOpen.wfAnimation" class="editor__section-body">
+              <div class="editor__row">
+                <label class="editor__row-label" title="X component of the sweep direction in world space.">Sweep X</label>
+                <div class="editor__row-control">
+                  <input type="range" class="editor__slider" min="-1" max="1" step="0.05" :value="sweepAxis[0]" @input="(e) => onSweepAxis(0, parseFloat((e.target as HTMLInputElement).value))" />
+                  <span class="editor__readout">{{ sweepAxis[0].toFixed(2) }}</span>
+                </div>
+              </div>
+              <div class="editor__row">
+                <label class="editor__row-label" title="Y component (up).">Sweep Y</label>
+                <div class="editor__row-control">
+                  <input type="range" class="editor__slider" min="-1" max="1" step="0.05" :value="sweepAxis[1]" @input="(e) => onSweepAxis(1, parseFloat((e.target as HTMLInputElement).value))" />
+                  <span class="editor__readout">{{ sweepAxis[1].toFixed(2) }}</span>
+                </div>
+              </div>
+              <div class="editor__row">
+                <label class="editor__row-label" title="Z component (depth).">Sweep Z</label>
+                <div class="editor__row-control">
+                  <input type="range" class="editor__slider" min="-1" max="1" step="0.05" :value="sweepAxis[2]" @input="(e) => onSweepAxis(2, parseFloat((e.target as HTMLInputElement).value))" />
+                  <span class="editor__readout">{{ sweepAxis[2].toFixed(2) }}</span>
+                </div>
+              </div>
+              <div class="editor__row">
+                <label class="editor__row-label" title="Absolute world coord along the sweep axis where the wipe begins. Hover the slider to see the cut plane in 3D.">Sweep start</label>
+                <div class="editor__row-control">
+                  <input
+                    type="range" class="editor__slider"
+                    :min="sweepSliderMin" :max="sweepSliderMax" :step="sweepSliderStep"
+                    :value="sweepStart"
+                    @input="(e) => onSweepStartInput(parseFloat((e.target as HTMLInputElement).value))"
+                    @pointerenter="showSweepStartIndicator"
+                    @pointerleave="hideSweepIndicator"
+                  />
+                  <span class="editor__readout">{{ sweepStart.toFixed(2) }}</span>
+                </div>
+              </div>
+              <div class="editor__row">
+                <label class="editor__row-label" title="Absolute world coord along the sweep axis where the wipe ends. Hover the slider to see the cut plane in 3D.">Sweep end</label>
+                <div class="editor__row-control">
+                  <input
+                    type="range" class="editor__slider"
+                    :min="sweepSliderMin" :max="sweepSliderMax" :step="sweepSliderStep"
+                    :value="sweepEnd"
+                    @input="(e) => onSweepEndInput(parseFloat((e.target as HTMLInputElement).value))"
+                    @pointerenter="showSweepEndIndicator"
+                    @pointerleave="hideSweepIndicator"
+                  />
+                  <span class="editor__readout">{{ sweepEnd.toFixed(2) }}</span>
+                </div>
+              </div>
+              <div class="editor__row">
+                <label class="editor__row-label" title="Sweep enter / leave animation duration in milliseconds.">Duration</label>
+                <div class="editor__row-control">
+                  <input
+                    type="range" class="editor__slider"
+                    min="200" max="4000" step="50"
+                    :value="sweepDurationMs"
+                    @input="(e) => sweepDurationMs = parseInt((e.target as HTMLInputElement).value)"
+                  />
+                  <span class="editor__readout">{{ sweepDurationMs }}ms</span>
                 </div>
               </div>
             </div>
@@ -3312,6 +3628,10 @@ async function onSave() {
                   <button v-if="e.type === 'directional'" type="button" class="editor__sub-select editor__sub-select--mini" :class="{ 'editor__sub-select--active': selectedLightId === `tgt:${e.id}` }" @click="selectGizmo(i, 'target')" title="Target">T</button>
                 </div>
                 <div class="editor__mat-body">
+                  <div class="editor__row editor__row--inline">
+                    <input type="checkbox" class="editor__check" :id="`wf-light-en-${e.id}`" :checked="e.wfEnabled" @change="(ev) => onLightWfEnabledChange(i, (ev.target as HTMLInputElement).checked)" />
+                    <label class="editor__row-label" :for="`wf-light-en-${e.id}`" title="When unchecked the light fades to 0 intensity as the sweep enters wireframe mode (and fades back on leave).">Enabled in wireframe</label>
+                  </div>
                   <div class="editor__row">
                     <label class="editor__row-label">Intensity</label>
                     <div class="editor__row-control">

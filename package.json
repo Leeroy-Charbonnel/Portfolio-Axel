@@ -13,8 +13,8 @@
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:push": "drizzle-kit push --config=drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
-    "seed:i18n":    "bun scripts/seed-i18n.ts",
-    "restore:tmp":  "bun scripts/restore-tmp-to-prod.ts"
+    "seed:i18n": "bun scripts/seed-i18n.ts",
+    "restore:tmp": "bun scripts/restore-tmp-to-prod.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.5.3",
@@ -26,8 +26,10 @@
     "cors": "^2.8.6",
     "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
+    "gridstack": "^12.6.0",
     "helmet": "^8.1.0",
     "lucide-vue-next": "^0.577.0",
+    "marked": "^18.0.5",
     "multer": "^2.2.0",
     "postgres": "^3.4.8",
     "reka-ui": "^2.9.8",

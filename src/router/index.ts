@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router"
-import HomePage           from "../pages/HomePage.vue"
-import SettingsPage       from "../pages/SettingsPage.vue"
-import ModelEditorPage    from "../pages/ModelEditorPage.vue"
+import HomePage              from "../pages/HomePage.vue"
+import SettingsPage          from "../pages/SettingsPage.vue"
+import ModelEditorPage       from "../pages/ModelEditorPage.vue"
+import ProjectDetailPage     from "../pages/ProjectDetailPage.vue"
 import {
   LoginPage,
   PendingPage,
@@ -27,6 +28,15 @@ const router = createRouter({
     //Three.js model editor - per-project edit page. Replaces the Sketchfab
     //iframe with a local viewer when a .glb has been uploaded.
     { path: "/edit-3d/:id(\\d+)", component: ModelEditorPage },
+
+    //Project detail page - serves BOTH the public read-only render and
+    //the bento-grid editor. Flipping useAdmin().editMode swaps the page
+    //between view and edit modes (no separate /edit-detail route).
+    { path: "/project/:id(\\d+)", component: ProjectDetailPage },
+
+    //Legacy /edit-detail/:id from before the merge - redirect any
+    //existing bookmarks to the unified /project/:id route.
+    { path: "/edit-detail/:id(\\d+)", redirect: (to) => `/project/${to.params.id}` },
 
     //Auth pages from vue-shared-ui. Only reachable if AUTH_MODE != "public".
     { path: "/login",           component: LoginPage },

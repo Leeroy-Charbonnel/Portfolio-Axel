@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue"
+import { useRoute } from "vue-router"
 import { X, Save, RotateCcw, Shuffle } from "lucide-vue-next"
 import { useSettings } from "vue-shared-ui"
 import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
@@ -26,6 +27,7 @@ const MOBILE_KEY_SUFFIX      = "_mobile"
 
 const { open, hide } = useCssVarsPanel()
 const { getString, update, loaded } = useSettings()
+const route = useRoute()
 
 type RowType = "text" | "color" | "color-hsl" | "color-accent" | "size" | "unitless" | "int"
 type CssVarRow = {
@@ -118,6 +120,12 @@ const ROWS: CssVarRow[] = [
   { group: "Experience", key: "css_var_exp_company_size",         cssVar: "--exp-company-size",         label: "Company size",        defaultValue: "1.2rem", type: "size", unit: "rem", min: 0.5, max: 2.5, step: 0.05 },
   { group: "Experience", key: "css_var_exp_bullet_gap",           cssVar: "--exp-bullet-gap",           label: "Bullet gap",          defaultValue: "0.4rem", type: "size", unit: "rem", min: 0, max: 2, step: 0.05 },
   { group: "Experience", key: "css_var_exp_line_height",          cssVar: "--exp-line-height",          label: "Line height",         defaultValue: "1.6",    type: "unitless",         min: 1, max: 3, step: 0.05 },
+
+  //DETAIL PAGE - per-project bento grid. Only shown when the panel is
+  //open ON a /project/:id route (see groupedFilteredByRoute below).
+  { group: "Detail page", key: "css_var_detail_grid_row_h",    cssVar: "--detail-grid-row-h",    label: "Grid row height",  defaultValue: "200px",  type: "size", unit: "px",  min: 80,  max: 400,  step: 4 },
+  { group: "Detail page", key: "css_var_detail_grid_gap",      cssVar: "--detail-grid-gap",      label: "Grid gap",         defaultValue: "8px",    type: "size", unit: "px",  min: 0,   max: 32,   step: 1 },
+  { group: "Detail page", key: "css_var_detail_grid_max_width",cssVar: "--detail-grid-max-width",label: "Grid max width",   defaultValue: "1200px", type: "size", unit: "px",  min: 600, max: 2000, step: 10 },
 
   //NAV BAR (side nav) - always-visible rail, last in the panel
   { group: "Nav bar", key: "css_var_nav_font_size",   cssVar: "--nav-font-size",   label: "Font size",   defaultValue: "0.8rem", mobileDefault: "0.7rem", type: "size", unit: "rem", min: 0.5, max: 1.6, step: 0.05 },
@@ -381,11 +389,29 @@ function onColorInput(row: CssVarRow, hex: string) {
 //Hide the "(Phone)" variant group when on desktop and the desktop variant
 //when in phone mode so the author only sees the rows that matter for the
 //active layout.
+//Per-route group whitelist. The panel hides everything that doesn't
+//appear on the current screen so the author only sees variables that
+//actually affect what they're looking at. On the home / general routes
+//the whitelist is empty and every group renders (legacy behaviour).
+const GROUPS_BY_ROUTE: Record<string, string[]> = {
+  //On the project detail page, only the foundation colors + the Detail
+  //page's own tokens are relevant. Home/Main Project/Gallery/etc don't
+  //apply to that screen.
+  "/project/:id": ["Colors", "Detail page", "Nav bar"],
+}
+function whitelistForRoute(path: string): string[] | null {
+  //match /project/<digits>
+  if (/^\/project\/\d+$/.test(path)) return GROUPS_BY_ROUTE["/project/:id"]!
+  return null
+}
+
 const grouped = computed(() => {
+  const allow = whitelistForRoute(route.path)
   const out: { group: string; rows: CssVarRow[]; canRandomize: boolean }[] = []
   for (const row of ROWS) {
     if (phoneMode.value  && row.group === "Main Project")         continue
     if (!phoneMode.value && row.group === "Main Project (Phone)") continue
+    if (allow && !allow.includes(row.group)) continue
     const existing = out.find((g) => g.group === row.group)
     if (existing) existing.rows.push(row)
     else out.push({ group: row.group, rows: [row], canRandomize: false })

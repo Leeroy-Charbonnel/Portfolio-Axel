@@ -956,6 +956,21 @@ app.get("/api/portfolio", async (_req, res) => {
         description:     t.description,
       })),
       wireframeParameters: p.wireframeParameters,
+      //DETAIL PAGE blocks - resolve any image block's fileId into a url
+      //in the same shape the editor expects on round-trip.
+      detailPage: {
+        blocks: ((p.detailPage?.blocks ?? []) as Array<{
+          id: string; type: string; x: number; y: number; w: number; h: number;
+          mobileY?: number; mobileH?: number;
+          content: Record<string, unknown>
+        }>).map((b) => {
+          if (b.type === "image") {
+            const fid = (b.content?.fileId as string | null | undefined) ?? null
+            return { ...b, content: { ...b.content, fileId: fid, url: urlOf(fid) } }
+          }
+          return b
+        }),
+      },
       stats:               p.stats,
       software:            projectSoftware,
     }
