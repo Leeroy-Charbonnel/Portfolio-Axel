@@ -107,6 +107,30 @@ async function createSoftware(logo: File, key: string, url: string) {
 async function updateSoftware(id: number, patch: Record<string, unknown>) { await apiJson("PUT", `/api/software/${id}`, patch); await reload() }
 async function deleteSoftware(id: number) { await apiJson("DELETE", `/api/software/${id}`); await reload() }
 
+//3D MODEL mutations - file upload happens first (regular /api/files),
+//then the model row gets created with the resulting file ids. The
+//thumbnail is optional; an empty default view ("Default") is seeded
+//so the project picker has something to point at on day one.
+async function createModel(name: string, glbFile: File, thumbnailFile: File | null): Promise<{ id: number }> {
+  const glb       = await uploadFile(glbFile)
+  const thumbnail = thumbnailFile ? await uploadFile(thumbnailFile) : null
+  const row = await apiJson("POST", "/api/models", {
+    name,
+    glbFileId:       glb.id,
+    thumbnailFileId: thumbnail?.id ?? null,
+    views: [{
+      name:      "Default",
+      position:  [5, 5, 5],
+      target:    [0, 0, 0],
+      wireframe: false,
+    }],
+  })
+  await reload()
+  return row
+}
+async function updateModel(id: number, patch: Record<string, unknown>) { await apiJson("PUT", `/api/models/${id}`, patch); await reload() }
+async function deleteModel(id: number) { await apiJson("DELETE", `/api/models/${id}`); await reload() }
+
 //PROFILE mutation (singleton)
 async function updateProfile(patch: Record<string, unknown>) { await apiJson("PUT", "/api/profile", patch); await reload() }
 
@@ -121,6 +145,7 @@ export function usePortfolio() {
     createGalleryProject, updateGalleryProject, deleteGalleryProject,
     createExperience, updateExperience, deleteExperience,
     createSoftware, updateSoftware, deleteSoftware,
+    createModel, updateModel, deleteModel,
     updateProfile,
   }
 }

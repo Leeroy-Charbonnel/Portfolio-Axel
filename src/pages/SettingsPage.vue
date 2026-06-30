@@ -1,16 +1,27 @@
 <script setup lang="ts">
+import { ref } from "vue"
 import { useRouter } from "vue-router"
-import { ArrowLeft } from "lucide-vue-next"
+import { ArrowLeft, Box, Folder, Wrench } from "lucide-vue-next"
 import FileManager     from "../components/portfolio/FileManager.vue"
 import SoftwareEditor  from "../components/portfolio/SoftwareEditor.vue"
+import Models3dTab     from "../components/portfolio/Models3dTab.vue"
 
-//Settings page - software catalog + file management. Accent color and every
-//other CSS token live in the CssVarsPanel (gear menu > Customize CSS), so
-//this page focuses purely on data/asset admin.
+//Tabbed admin settings page. Each tab is a self-contained component
+//that talks to the API directly (or via usePortfolio). No tab state
+//is persisted - reload returns to the first tab. Accent / theme /
+//language still live in the gear menu (CssVarsPanel) - they don't
+//belong on a data-admin page.
 
 const router = useRouter()
-
 function goBack() { router.push("/") }
+
+type TabKey = "software" | "models" | "files"
+const TABS: { key: TabKey; label: string; icon: typeof Box }[] = [
+  { key: "software", label: "Software", icon: Wrench },
+  { key: "models",   label: "3D Models", icon: Box },
+  { key: "files",    label: "Files",    icon: Folder },
+]
+const currentTab = ref<TabKey>("software")
 </script>
 
 <template>
@@ -23,19 +34,31 @@ function goBack() { router.push("/") }
       <h1 class="settings-page__title">Settings</h1>
     </header>
 
-    <section class="settings-page__group">
-      <SoftwareEditor />
-    </section>
+    <nav class="settings-page__tabs">
+      <button
+        v-for="t in TABS"
+        :key="t.key"
+        type="button"
+        class="settings-page__tab"
+        :class="{ 'settings-page__tab--active': currentTab === t.key }"
+        @click="currentTab = t.key"
+      >
+        <component :is="t.icon" :size="14" />
+        <span>{{ t.label }}</span>
+      </button>
+    </nav>
 
-    <section class="settings-page__group">
-      <FileManager />
+    <section class="settings-page__panel">
+      <SoftwareEditor v-if="currentTab === 'software'" />
+      <Models3dTab    v-else-if="currentTab === 'models'" />
+      <FileManager    v-else-if="currentTab === 'files'" />
     </section>
   </div>
 </template>
 
 <style scoped>
 .settings-page {
-  max-width: 48rem;
+  max-width: 64rem;
   margin: 0 auto;
   padding: var(--spacing-3xl) var(--spacing-xl);
 }
@@ -44,7 +67,7 @@ function goBack() { router.push("/") }
   display: flex;
   align-items: center;
   gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-2xl);
+  margin-bottom: var(--spacing-xl);
   padding-bottom: var(--spacing-lg);
   border-bottom: var(--border-width-sm) solid var(--color-gray-medium);
 }
@@ -61,9 +84,9 @@ function goBack() { router.push("/") }
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
   cursor: pointer;
+  border-radius: var(--radius);
   transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
-
 .settings-page__back:hover {
   color: var(--color-text-hover);
   border-color: var(--color-accent);
@@ -76,12 +99,43 @@ function goBack() { router.push("/") }
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   color: var(--color-text-hover);
+  margin: 0;
 }
 
-.settings-page__group {
+.settings-page__tabs {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-xl);
+  border-bottom: var(--border-width-sm) solid var(--color-gray-medium);
+}
+.settings-page__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background-color: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  margin-bottom: -1px;
+}
+.settings-page__tab:hover {
+  color: var(--color-text-hover);
+}
+.settings-page__tab--active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.settings-page__panel {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-2xl);
 }
 </style>

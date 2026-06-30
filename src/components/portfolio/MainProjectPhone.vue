@@ -3,7 +3,7 @@ import { computed, onMounted, onBeforeUnmount, ref, toRef, watch } from "vue"
 import { Grid } from "lucide-vue-next"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
-import { useEffectiveViewerSettings } from "../../composables/useEffectiveViewerSettings"
+import { useEffectiveViewerSettings, useResolvedGlbUrl } from "../../composables/useEffectiveViewerSettings"
 import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
@@ -37,6 +37,7 @@ const { editMode } = useAdmin()
 const { data: portfolioData, updateMainProject } = usePortfolio()
 
 const effectiveViewerSettings = useEffectiveViewerSettings(toRef(props, "project"), portfolioData, { mobile: true })
+const resolvedGlbUrl          = useResolvedGlbUrl(toRef(props, "project"), portfolioData)
 
 const containerRef = ref<{ $el: HTMLElement } | HTMLElement | null>(null)
 useWireframeSweep(containerRef)
@@ -59,7 +60,7 @@ const mainImageUrl      = computed(() => props.project.mainImageUrl)
 const wireframeImageUrl = computed(() => props.project.mainWireframeUrl ?? props.project.mainImageUrl)
 
 const hasAnyWireframeImage = computed(() => {
-  if (props.project.glbUrl) return true
+  if (resolvedGlbUrl.value) return true
   if (props.project.mainWireframeUrl) return true
   return props.project.thumbnails.some((t) => t.wireframeUrl)
 })
@@ -161,8 +162,8 @@ async function onDescriptionSave(newVal: string) {
     the model floats with only its ground shadow visible.-->
     <div class="mp-phone__viewer">
       <ThreeViewer
-        v-if="project.glbUrl && !editMode"
-        :glb-url="project.glbUrl"
+        v-if="resolvedGlbUrl && !editMode"
+        :glb-url="resolvedGlbUrl"
         :settings="effectiveViewerSettings"
         :wireframe="isWireframe"
         :is-in-view="isInView"
@@ -173,7 +174,7 @@ async function onDescriptionSave(newVal: string) {
       variants at mount-time so the wireframe is already in the browser
       cache when the user toggles. Wireframe overlay is mask-clipped and
       its mask-position is the actual animated property.-->
-      <template v-if="!project.glbUrl && showMainImage && mainImageUrl">
+      <template v-if="!resolvedGlbUrl && showMainImage && mainImageUrl">
         <img
           :src="mainImageUrl"
           :alt="project.title[lang]"
@@ -188,12 +189,12 @@ async function onDescriptionSave(newVal: string) {
           class="mp-phone__viewer-image mp-phone__wf-layer wf-layer"
         />
       </template>
-      <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
+      <div v-else-if="!resolvedGlbUrl && showMainImage && !mainImageUrl" class="mp-phone__viewer-empty">
         No image
       </div>
 
       <iframe
-        v-if="!project.glbUrl && project.modelId && !editMode"
+        v-if="!resolvedGlbUrl && project.modelId && !editMode"
         ref="iframeRef"
         :title="`Sketchfab Model - ${project.title[lang]}`"
         class="mp-phone__viewer-embed"

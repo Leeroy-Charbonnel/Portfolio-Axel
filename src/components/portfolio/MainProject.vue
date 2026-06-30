@@ -4,7 +4,8 @@ import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink, B
 import { useRouter } from "vue-router"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
-import { useEffectiveViewerSettings } from "../../composables/useEffectiveViewerSettings"
+import { useEffectiveViewerSettings, useResolvedGlbUrl } from "../../composables/useEffectiveViewerSettings"
+import ModelPicker from "./ModelPicker.vue"
 import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
@@ -37,10 +38,30 @@ const { data: portfolioData, uploadFile, updateMainProject, deleteMainProject, s
 //Merge per-project viewerSettings with the admin's GLOBAL editor prefs.
 //Logic shared with MainProjectPhone via the composable.
 const effectiveViewerSettings = useEffectiveViewerSettings(toRef(props, "project"), portfolioData)
+const resolvedGlbUrl          = useResolvedGlbUrl(toRef(props, "project"), portfolioData)
+
+//ModelPicker v-model - reads project.model3dId / desktop+mobile view
+//names and writes them back via updateMainProject so the change
+//persists immediately.
+const modelPickerValue = computed(() => ({
+  model3dId:   props.project.model3dId,
+  desktopView: props.project.model3dDesktopView,
+  mobileView:  props.project.model3dMobileView,
+}))
+async function onModelPickerChange(v: { model3dId: number | null; desktopView: string; mobileView: string }) {
+  await updateMainProject(props.project.id, {
+    model3dId:          v.model3dId,
+    model3dDesktopView: v.desktopView,
+    model3dMobileView:  v.mobileView,
+  })
+}
 const router = useRouter()
 
 function openModelEditor() {
-  router.push(`/edit-3d/${props.project.id}`)
+  //The 3D editor now operates on model_3d rows, not projects. We need
+  //a model attached before we can jump in.
+  if (!props.project.model3dId) return
+  router.push(`/edit-3d/${props.project.model3dId}`)
 }
 //Single button for both view + edit - the detail page route shows the
 //editor UI automatically when editMode is on, view otherwise.
@@ -92,7 +113,7 @@ const wireframeImageUrl = computed(() => props.project.mainWireframeUrl ?? props
 //Without a .glb and without any wireframe image variants, the button
 //would be a no-op so we hide it.
 const hasAnyWireframeImage = computed(() => {
-  if (props.project.glbUrl) return true
+  if (resolvedGlbUrl.value) return true
   if (props.project.mainWireframeUrl) return true
   return props.project.thumbnails.some((t) => t.wireframeUrl)
 })
@@ -323,15 +344,15 @@ async function replaceThumbnailWireframe(idx: number) {
           by the saved viewerSettings). Fallback to the Sketchfab iframe
           when no .glb is present.-->
           <ThreeViewer
-            v-if="project.glbUrl && !editMode"
-            :glb-url="project.glbUrl"
+            v-if="resolvedGlbUrl && !editMode"
+            :glb-url="resolvedGlbUrl"
             :settings="effectiveViewerSettings"
             :wireframe="isWireframe"
             :is-in-view="isInView"
             class="main-project__three"
           />
 
-          <template v-if="!project.glbUrl && showMainImage && mainImageUrl">
+          <template v-if="!resolvedGlbUrl && showMainImage && mainImageUrl">
             <img
               :src="mainImageUrl ?? ''"
               :alt="project.title[lang]"
@@ -347,31 +368,40 @@ async function replaceThumbnailWireframe(idx: number) {
               class="main-project__viewer-image main-project__wf-layer wf-layer"
             />
           </template>
-          <div v-else-if="!project.glbUrl && showMainImage && !mainImageUrl" class="main-project__viewer-empty">
+          <div v-else-if="!resolvedGlbUrl && showMainImage && !mainImageUrl" class="main-project__viewer-empty">
             No image
           </div>
 
           <iframe
-            v-if="!project.glbUrl && project.modelId && !editMode"
+            v-if="!resolvedGlbUrl && project.modelId && !editMode"
             ref="iframeRef"
             :title="`Sketchfab Model - ${project.title[lang]}`"
             class="main-project__viewer-embed"
             :class="{ 'main-project__viewer-embed--hidden': !showSketchfab || isLoading }"
           ></iframe>
 
-          <ReplaceImageButton v-if="editMode && !project.glbUrl" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
+          <ReplaceImageButton v-if="editMode && !resolvedGlbUrl" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
 
           <!--OVERLAY ACTIONS - admin shortcuts + detail page link. Stacked
           vertically in a flex wrapper so they don't overlap (previously
           they shared a single absolute position and the second hid the
           first).-->
           <div class="main-project__overlay-actions">
+            <!--MODEL PICKER - in edit mode only. Lets the admin assign
+            which model + which views (desktop / mobile) this project
+            renders. Selection writes through updateMainProject so the
+            viewer reloads immediately after pick.-->
+            <ModelPicker
+              v-if="editMode"
+              :model-value="modelPickerValue"
+              @update:model-value="onModelPickerChange"
+            />
             <!--EDIT 3D - admin-only shortcut to the model editor page-->
             <button
-              v-if="editMode"
+              v-if="editMode && project.model3dId"
               type="button"
               class="main-project__overlay-btn"
-              :title="project.glbUrl ? 'Edit 3D model settings' : 'Upload a .glb and edit'"
+              title="Edit the attached 3D model"
               @click="openModelEditor"
             >
               <Box :size="14" />

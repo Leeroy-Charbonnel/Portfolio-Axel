@@ -5,7 +5,8 @@ import { ArrowLeft, Box, ImageIcon, Save, Trash2, Type, Upload } from "lucide-vu
 import { marked } from "marked"
 import { useLanguage } from "../composables/useLanguage"
 import { useAdmin } from "../composables/useAdmin"
-import ThreeViewer, { type ViewerSettings } from "../components/portfolio/ThreeViewer.vue"
+import ModelPicker from "../components/portfolio/ModelPicker.vue"
+import Viewer3dBlock from "../components/portfolio/Viewer3dBlock.vue"
 import type {
   DetailBlock,
   DetailBlockContent,
@@ -50,6 +51,8 @@ const projectTitle = computed(() => pickBilingual(project.value?.title))
 const blocks      = ref<DetailBlock[]>([])
 const selectedId  = ref<string | null>(null)
 const selectedBlock = computed(() => blocks.value.find((b) => b.id === selectedId.value) ?? null)
+
+type ViewerContent = { model3dId: number | null; desktopView: string; mobileView: string }
 
 //INLINE TEXT EDIT - double-click a text block to swap its rendered
 //markdown for a raw-source textarea. Blur / Escape commits and re-
@@ -656,19 +659,15 @@ onBeforeUnmount(() => {
                 :alt="(block.content as { alt?: { en: string; fr: string } }).alt?.[lang] || (block.content as { alt?: { fr: string } }).alt?.fr || ''"
                 class="detail-page__img"
               />
-              <!--3D VIEWER - reuses the parent project's GLB +
-              viewerSettings. No per-block config; the block is just a
-              placement marker. Skipped silently if the project has no
-              GLB attached (rendering ThreeViewer with a null url
-              would throw).-->
+              <!--3D VIEWER - delegate to Viewer3dBlock which looks up
+              the model in the portfolio cache, picks the named desktop
+              view, and renders ThreeViewer (or nothing when the model
+              or view can't be resolved).-->
               <div
-                v-else-if="block.type === 'viewer3d' && project?.glbUrl"
+                v-else-if="block.type === 'viewer3d'"
                 class="detail-page__viewer"
               >
-                <ThreeViewer
-                  :glbUrl="project.glbUrl"
-                  :settings="project.viewerSettings as ViewerSettings | null"
-                />
+                <Viewer3dBlock :content="block.content as ViewerContent" />
               </div>
             </div>
           </div>
@@ -743,10 +742,11 @@ onBeforeUnmount(() => {
               <template v-else-if="block.type === 'viewer3d'">
                 <!--Static placeholder in edit mode - the live ThreeViewer
                 would grab pointer events for orbit controls and fight
-                the block drag/resize. View mode renders the real viewer.-->
+                the block drag/resize. View mode renders the real viewer
+                via Viewer3dBlock.-->
                 <div class="bento-block__viewer-placeholder">
                   <Box :size="32" />
-                  <span>{{ project?.glbUrl ? "3D Viewer" : "3D Viewer (no .glb)" }}</span>
+                  <span>{{ (block.content as ViewerContent).model3dId ? "3D Viewer" : "3D Viewer (pick a model)" }}</span>
                 </div>
               </template>
 
@@ -803,9 +803,8 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button" class="detail-page__add"
-            :disabled="!project?.glbUrl"
-            :title="project?.glbUrl ? 'Embed the project 3D viewer' : 'Upload a .glb on this project first'"
-            @pointerdown="project?.glbUrl && onPanelButtonPointerDown($event, 'viewer3d')"
+            title="Drop a 3D viewer block - pick the model + view from the side panel after placement"
+            @pointerdown="onPanelButtonPointerDown($event, 'viewer3d')"
           >
             <Box :size="14" /> <span>3D Viewer</span>
           </button>
@@ -865,10 +864,14 @@ onBeforeUnmount(() => {
 
           <template v-else-if="selectedBlock.type === 'viewer3d'">
             <p class="detail-page__panel-hint">
-              This block embeds the project's 3D viewer. Edit the model
-              and viewer settings from the project's "Edit 3D" page -
-              this block stays in sync automatically.
+              Pick which 3D model to embed and which named view to show on
+              desktop / mobile. Models + views are managed in Settings →
+              3D Models and per-model from the Views tab of the 3D editor.
             </p>
+            <ModelPicker
+              :model-value="selectedBlock.content as ViewerContent"
+              @update:model-value="(v: ViewerContent) => { Object.assign(selectedBlock!.content, v); markDirty() }"
+            />
           </template>
         </div>
 

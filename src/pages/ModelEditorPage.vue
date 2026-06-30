@@ -82,20 +82,32 @@ const status      = ref("Loading...")
 //Route + project being edited
 const route  = useRoute()
 const router = useRouter()
-const projectId = computed(() => parseInt(String(route.params.id ?? ""), 10))
-const projectTitle = ref<string>("")
+const modelId = computed(() => parseInt(String(route.params.id ?? ""), 10))
+const modelName = ref<string>("")
 const glbUrl       = ref<string | null>(null)
+//Named camera presets stored on the model (model_3d.views). The Views
+//tab CRUDs this list; MainProject + viewer3d blocks pick which view to
+//apply per breakpoint by name.
+interface Model3dView {
+  name:      string
+  position:  [number, number, number]
+  target:    [number, number, number]
+  zoom?:     number
+  wireframe: boolean
+}
+const views = ref<Model3dView[]>([])
 const isUploadingGlb = ref(false)
 const glbUploadError = ref<string | null>(null)
 const isSaving       = ref(false)
 const saveError      = ref<string | null>(null)
 
-type Tab = "materials" | "hdr" | "lights" | "wireframe"
+type Tab = "materials" | "hdr" | "lights" | "wireframe" | "views"
 const TABS: { key: Tab; label: string }[] = [
   { key: "materials", label: "Materials" },
   { key: "hdr",       label: "HDR"       },
   { key: "lights",    label: "Lights"    },
   { key: "wireframe", label: "Wireframe" },
+  { key: "views",     label: "Views"     },
 ]
 const tab = ref<Tab>("materials")
 
@@ -1215,27 +1227,29 @@ function tuneShadowCameras(sphereRadius: number) {
 }
 
 async function loadProjectAndModel() {
-  if (!Number.isFinite(projectId.value)) {
-    status.value = "Missing project id"
+  if (!Number.isFinite(modelId.value)) {
+    status.value = "Missing model id"
     return
   }
   try {
-    const res = await fetch(`/api/main-project/${projectId.value}`, { credentials: "include" })
-    if (!res.ok) throw new Error(`fetch project ${res.status}`)
+    const res = await fetch(`/api/models/${modelId.value}`, { credentials: "include" })
+    if (!res.ok) throw new Error(`fetch model ${res.status}`)
     const row = await res.json() as {
       id: number
-      title: { en: string; fr: string }
+      name: string
       glbUrl: string | null
       viewerSettings: unknown
+      views: Array<{ name: string; position: [number, number, number]; target: [number, number, number]; zoom?: number; wireframe: boolean }>
     }
-    projectTitle.value = row.title?.en ?? `Project ${row.id}`
+    modelName.value = row.name ?? `Model ${row.id}`
     glbUrl.value = row.glbUrl
+    views.value = Array.isArray(row.views) ? row.views : []
     if (row.viewerSettings) hydrateFromSavedSettings(row.viewerSettings)
     if (row.glbUrl) loadGlbFn?.(row.glbUrl)
     else status.value = "No .glb yet — use Upload .glb above to start editing"
   } catch (e) {
-    console.error("[edit-3d] project load failed:", e)
-    status.value = `Project load failed: ${e instanceof Error ? e.message : String(e)}`
+    console.error("[edit-3d] model load failed:", e)
+    status.value = `Model load failed: ${e instanceof Error ? e.message : String(e)}`
   }
 }
 
@@ -1459,7 +1473,7 @@ function hydrateSharedLight(spec: {
 }
 
 async function uploadGlb() {
-  if (!Number.isFinite(projectId.value)) return
+  if (!Number.isFinite(modelId.value)) return
   const input = document.createElement("input")
   input.type = "file"
   input.accept = ".glb,.gltf"
@@ -1473,8 +1487,8 @@ async function uploadGlb() {
       const res = await fetch("/api/files", { method: "POST", credentials: "include", body: fd })
       if (!res.ok) throw new Error(`upload ${res.status} ${await res.text().catch(() => "")}`)
       const row = await res.json() as { id: string; url: string }
-      //attach the file to the project
-      const patch = await fetch(`/api/main-project/${projectId.value}`, {
+      //attach the new file id to the model (replaces the old .glb)
+      const patch = await fetch(`/api/models/${modelId.value}`, {
         method:      "PUT",
         credentials: "include",
         headers:     { "Content-Type": "application/json" },
@@ -1494,10 +1508,10 @@ async function uploadGlb() {
 }
 
 async function saveViewerSettings(payload: unknown) {
-  if (!Number.isFinite(projectId.value)) return
+  if (!Number.isFinite(modelId.value)) return
   isSaving.value = true; saveError.value = null
   try {
-    const res = await fetch(`/api/main-project/${projectId.value}/viewer-settings`, {
+    const res = await fetch(`/api/models/${modelId.value}/viewer-settings`, {
       method:      "PUT",
       credentials: "include",
       headers:     { "Content-Type": "application/json" },
@@ -2553,11 +2567,11 @@ function capturePose() {
 }
 
 async function persistStartView(field: "startView" | "startViewMobile", sv: { pos: [number, number, number]; target: [number, number, number] }) {
-  if (!Number.isFinite(projectId.value)) return
+  if (!Number.isFinite(modelId.value)) return
   status.value = `${field === "startView" ? "Desktop" : "Phone"} start captured (saving...)`
   isSaving.value = true; saveError.value = null
   try {
-    const res = await fetch(`/api/main-project/${projectId.value}/viewer-settings/start-view`, {
+    const res = await fetch(`/api/models/${modelId.value}/viewer-settings/start-view`, {
       method:      "PUT",
       credentials: "include",
       headers:     { "Content-Type": "application/json" },
@@ -2898,6 +2912,89 @@ function removeFromEmissive(uuid: string) {
 }
 
 //===========================================================================
+//VIEWS - CRUD over model_3d.views. Saving a view captures the current
+//camera + the current wireframe-mode toggle into a named entry that
+//MainProject and viewer3d blocks can later pick by name (per
+//breakpoint).
+//===========================================================================
+const newViewName = ref<string>("")
+
+function readCurrentCamera(): { position: [number, number, number]; target: [number, number, number] } | null {
+  if (!cameraRef || !controls) return null
+  return {
+    position: [cameraRef.position.x, cameraRef.position.y, cameraRef.position.z],
+    target:   [controls.target.x,    controls.target.y,    controls.target.z],
+  }
+}
+
+async function persistViews(next: Model3dView[]) {
+  if (!Number.isFinite(modelId.value)) return
+  isSaving.value = true; saveError.value = null
+  try {
+    const res = await fetch(`/api/models/${modelId.value}`, {
+      method:      "PUT",
+      credentials: "include",
+      headers:     { "Content-Type": "application/json" },
+      body:        JSON.stringify({ views: next }),
+    })
+    if (!res.ok) throw new Error(`save views ${res.status}`)
+    views.value = next
+  } catch (e) {
+    saveError.value = e instanceof Error ? e.message : String(e)
+    status.value    = `Views save failed: ${saveError.value}`
+    console.error("[edit-3d] views save failed:", e)
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function addCurrentCameraAsView() {
+  const name = newViewName.value.trim()
+  if (!name) { status.value = "Pick a name for the new view"; return }
+  if (views.value.find((v) => v.name === name)) { status.value = `A view named "${name}" already exists`; return }
+  const cam = readCurrentCamera()
+  if (!cam) { status.value = "Camera not ready yet"; return }
+  const next: Model3dView[] = [...views.value, {
+    name,
+    position:  cam.position,
+    target:    cam.target,
+    wireframe: wireframeMode.value,
+  }]
+  await persistViews(next)
+  newViewName.value = ""
+  status.value = saveError.value ? status.value : `Saved view "${name}"`
+}
+
+async function overwriteViewWithCurrentCamera(viewName: string) {
+  const cam = readCurrentCamera()
+  if (!cam) { status.value = "Camera not ready yet"; return }
+  const next = views.value.map((v) => v.name === viewName ? {
+    ...v,
+    position:  cam.position,
+    target:    cam.target,
+    wireframe: wireframeMode.value,
+  } : v)
+  await persistViews(next)
+  status.value = saveError.value ? status.value : `Updated "${viewName}"`
+}
+
+async function deleteView(viewName: string) {
+  if (!confirm(`Delete view "${viewName}"?`)) return
+  await persistViews(views.value.filter((v) => v.name !== viewName))
+}
+
+function applyView(v: Model3dView) {
+  if (!cameraRef || !controls) return
+  cameraRef.position.set(v.position[0], v.position[1], v.position[2])
+  controls.target.set(v.target[0], v.target[1], v.target[2])
+  controls.update()
+  //honor the saved wireframe-mode bit so the camera lands on the right look
+  if (v.wireframe && !wireframeMode.value) enableWireframeMode()
+  else if (!v.wireframe && wireframeMode.value) disableWireframeMode()
+  requestRender()
+}
+
+//===========================================================================
 //SAVE (stub)
 //===========================================================================
 const dirty = computed(() => true)
@@ -2986,7 +3083,7 @@ async function onSave() {
           <ArrowLeft :size="14" />
           <span>Back</span>
         </button>
-        <span class="editor__top-title">{{ projectTitle }}</span>
+        <span class="editor__top-title">{{ modelName }}</span>
         <button v-if="!glbUrl" type="button" class="editor__upload-glb" :disabled="isUploadingGlb" @click="uploadGlb">
           <Upload :size="14" />
           <span>{{ isUploadingGlb ? "Uploading…" : "Upload .glb" }}</span>
@@ -3630,6 +3727,51 @@ async function onSave() {
             </div>
           </section>
         </div>
+
+        <!--====================================================================
+        VIEWS - named camera presets stored on the model. Project +
+        viewer3d blocks pick which view to apply per breakpoint by name.
+        ====================================================================-->
+        <div v-show="tab === 'views'" class="editor__group">
+          <section class="editor__section">
+            <header class="editor__section-head">
+              <h3 class="editor__section-title">Named views</h3>
+            </header>
+            <p class="editor__hint">
+              Position the camera + toggle wireframe to taste, name the view, then save.
+              The picker on the project page (desktop / mobile) selects by name.
+            </p>
+
+            <div class="editor__views-add">
+              <input
+                v-model="newViewName"
+                type="text"
+                class="editor__views-input"
+                placeholder="View name (e.g. Front, Closeup, Hero)"
+                @keydown.enter="addCurrentCameraAsView"
+              />
+              <button type="button" class="editor__views-save" :disabled="!newViewName.trim()" @click="addCurrentCameraAsView">
+                Save current camera
+              </button>
+            </div>
+
+            <p v-if="!views.length" class="editor__empty">No views yet. Frame the model and save your first one above.</p>
+
+            <ul v-else class="editor__views-list">
+              <li v-for="v in views" :key="v.name" class="editor__views-item">
+                <div class="editor__views-meta">
+                  <span class="editor__views-name">{{ v.name }}</span>
+                  <span class="editor__views-flag">{{ v.wireframe ? "wireframe" : "normal" }}</span>
+                </div>
+                <div class="editor__views-actions">
+                  <button type="button" class="editor__views-btn" title="Apply this view to the live camera" @click="applyView(v)">Apply</button>
+                  <button type="button" class="editor__views-btn" title="Overwrite with the live camera + wireframe state" @click="overwriteViewWithCurrentCamera(v.name)">Overwrite</button>
+                  <button type="button" class="editor__views-btn editor__views-btn--danger" title="Delete view" @click="deleteView(v.name)">Delete</button>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </div>
       </div>
 
       <footer class="editor__panel-footer">
@@ -4112,6 +4254,59 @@ group, matching the .editor__group gap used by materials / lights).*/
 .editor__mesh-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xs); color: var(--color-text-hover); }
 
 .editor__panel-footer { padding: var(--spacing-md) var(--spacing-lg); border-top: var(--border-width-sm) solid var(--color-gray-medium); display: flex; justify-content: flex-end; }
+
+/* Views tab */
+.editor__views-add {
+  display: flex; gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+.editor__views-input {
+  flex: 1 1 auto;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--background);
+  color: var(--foreground);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  border-radius: var(--radius);
+  font-size: var(--font-size-xs);
+}
+.editor__views-input:focus { outline: none; border-color: var(--color-accent); }
+.editor__views-save {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background-color: var(--color-accent);
+  color: hsl(0 0% 0%);
+  border: none;
+  border-radius: var(--radius);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  cursor: pointer;
+}
+.editor__views-save:disabled { opacity: 0.4; cursor: not-allowed; }
+.editor__views-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-xs); }
+.editor__views-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--color-gray-light);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  border-radius: var(--radius);
+}
+.editor__views-meta { display: flex; flex-direction: column; }
+.editor__views-name { font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); color: var(--color-text-hover); }
+.editor__views-flag { font-size: 0.7rem; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); }
+.editor__views-actions { display: flex; gap: var(--spacing-xs); }
+.editor__views-btn {
+  padding: var(--spacing-xxs) var(--spacing-sm);
+  background-color: transparent;
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  border-radius: var(--radius);
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  cursor: pointer;
+}
+.editor__views-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.editor__views-btn--danger:hover { border-color: hsl(0 80% 60%); color: hsl(0 80% 60%); }
 .editor__save { display: inline-flex; align-items: center; gap: var(--spacing-xs); padding: var(--spacing-xs) var(--spacing-lg); background-color: transparent; border: var(--border-width-sm) solid var(--color-accent); color: var(--color-accent); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); cursor: pointer; transition: color 0.15s ease, background-color 0.15s ease; }
 .editor__save:hover:not(:disabled) { background-color: var(--color-accent); color: hsl(0 0% 0%); }
 .editor__save:disabled { opacity: 0.4; cursor: not-allowed; }

@@ -714,6 +714,59 @@ app.get("/api/models", requireAuth, requireAdmin, async (_req, res) => {
   res.json(rows)
 })
 
+//GET single model - the 3D editor (/edit-3d/:modelId) calls this on
+//load. URLs resolved server-side so the page can hand them straight
+//to ThreeViewer / loadGlb.
+app.get("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
+  const [row] = await db.select().from(model3d).where(eq(model3d.id, id))
+  if (!row) { res.status(404).json({ error: "not found" }); return }
+  let glbUrl: string | null = null
+  if (row.glbFileId) {
+    const [f] = await db.select({ storedFilename: fileTable.storedFilename })
+      .from(fileTable).where(eq(fileTable.id, row.glbFileId))
+    if (f) glbUrl = `/media/${f.storedFilename}`
+  }
+  let thumbnailUrl: string | null = null
+  if (row.thumbnailFileId) {
+    const [f] = await db.select({ storedFilename: fileTable.storedFilename })
+      .from(fileTable).where(eq(fileTable.id, row.thumbnailFileId))
+    if (f) thumbnailUrl = `/media/${f.storedFilename}`
+  }
+  res.json({ ...row, glbUrl, thumbnailUrl })
+})
+
+//PUT viewerSettings (full replacement of the JSON blob).
+app.put("/api/models/:id/viewer-settings", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
+  await db.update(model3d)
+    .set({ viewerSettings: req.body, updatedAt: new Date() })
+    .where(eq(model3d.id, id))
+  respondOk(res)
+})
+
+//PARTIAL save - patches ONLY startView / startViewMobile inside
+//viewerSettings. Mirrors /api/main-project/:id/viewer-settings/
+//start-view; the editor uses it for fast "save current camera"
+//captures that shouldn't clobber materials / lights / HDR state.
+app.put("/api/models/:id/viewer-settings/start-view", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
+  const [row] = await db.select({ viewerSettings: model3d.viewerSettings })
+    .from(model3d).where(eq(model3d.id, id))
+  if (!row) { res.status(404).json({ error: "not found" }); return }
+  const current = (row.viewerSettings as Record<string, unknown> | null) ?? {}
+  const next: Record<string, unknown> = { ...current }
+  if ("startView"       in (req.body ?? {})) next.startView       = req.body.startView       ?? null
+  if ("startViewMobile" in (req.body ?? {})) next.startViewMobile = req.body.startViewMobile ?? null
+  await db.update(model3d)
+    .set({ viewerSettings: next, updatedAt: new Date() })
+    .where(eq(model3d.id, id))
+  respondOk(res)
+})
+
 app.post("/api/models", requireAuth, requireAdmin, async (req, res) => {
   const { name, glbFileId, thumbnailFileId, views, viewerSettings } = req.body ?? {}
   if (typeof name !== "string" || !name.trim()) { res.status(400).json({ error: "name required" }); return }
