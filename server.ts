@@ -19,6 +19,7 @@ import {
   galleryProject,
   experience,
   profile,
+  model3d,
 } from "./db/schema"
 import { eq, and, asc, sql } from "drizzle-orm"
 
@@ -109,6 +110,21 @@ function requireAdmin(
     return
   }
   next()
+}
+
+//ROUTE HELPERS - thin wrappers that handlers were re-implementing
+//inline 10-14 times each. Keeping behaviour identical (same status
+//codes, same body shape) so this is a pure factorisation.
+function parseIntParam(req: express.Request, key: string, res: express.Response): number | null {
+  const n = parseInt(String(req.params[key] ?? ""), 10)
+  if (Number.isNaN(n)) {
+    res.status(400).json({ error: `bad ${key}` })
+    return null
+  }
+  return n
+}
+function respondOk(res: express.Response): void {
+  respondOk(res)
 }
 
 
@@ -474,7 +490,7 @@ app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
     console.warn(`[files] disk unlink failed for ${row.storedFilename}:`, e)
   }
   await db.delete(fileTable).where(eq(fileTable.id, id))
-  res.json({ ok: true })
+  respondOk(res)
 })
 
 //POST /api/files - admin only. Returns the new file row + ready-to-use url
@@ -531,8 +547,8 @@ app.post("/api/main-project", requireAuth, requireAdmin, async (_req, res) => {
 })
 
 app.put("/api/main-project/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   const [row] = await db.update(mainProject)
     .set({ ...req.body, updatedAt: new Date() })
     .where(eq(mainProject.id, id))
@@ -541,10 +557,10 @@ app.put("/api/main-project/:id", requireAuth, requireAdmin, async (req, res) => 
 })
 
 app.delete("/api/main-project/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   await db.delete(mainProject).where(eq(mainProject.id, id))
-  res.json({ ok: true })
+  respondOk(res)
 })
 
 //GALLERY PROJECT ---
@@ -560,8 +576,8 @@ app.post("/api/gallery-project", requireAuth, requireAdmin, async (_req, res) =>
 })
 
 app.put("/api/gallery-project/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   const [row] = await db.update(galleryProject)
     .set(req.body)
     .where(eq(galleryProject.id, id))
@@ -570,10 +586,10 @@ app.put("/api/gallery-project/:id", requireAuth, requireAdmin, async (req, res) 
 })
 
 app.delete("/api/gallery-project/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   await db.delete(galleryProject).where(eq(galleryProject.id, id))
-  res.json({ ok: true })
+  respondOk(res)
 })
 
 //EXPERIENCE ---
@@ -592,8 +608,8 @@ app.post("/api/experience", requireAuth, requireAdmin, async (_req, res) => {
 })
 
 app.put("/api/experience/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   const [row] = await db.update(experience)
     .set(req.body)
     .where(eq(experience.id, id))
@@ -602,10 +618,10 @@ app.put("/api/experience/:id", requireAuth, requireAdmin, async (req, res) => {
 })
 
 app.delete("/api/experience/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   await db.delete(experience).where(eq(experience.id, id))
-  res.json({ ok: true })
+  respondOk(res)
 })
 
 //SOFTWARE ---
@@ -654,8 +670,8 @@ app.post("/api/software", requireAuth, requireAdmin, async (req, res, next) => {
 })
 
 app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   const [row] = await db.update(software)
     .set(req.body)
     .where(eq(software.id, id))
@@ -670,10 +686,10 @@ app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
 //main_project_software cascade automatically via their own ON DELETE.
 app.delete("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
   if (await forwardFileOp(req, res, `/api/software/${encodeURIComponent(String(req.params.id ?? ""))}`)) return
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   const [row] = await db.select().from(software).where(eq(software.id, id))
-  if (!row) { res.json({ ok: true }); return }
+  if (!row) { respondOk(res); return }
 
   await db.delete(software).where(eq(software.id, id))
 
@@ -687,19 +703,92 @@ app.delete("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
     }
   }
 
-  res.json({ ok: true })
+  respondOk(res)
 })
+
+//MODEL_3D CRUD - reusable 3D assets. Files (.glb + thumbnail) must
+//already exist in the file table (use POST /api/files first); these
+//endpoints only handle the model_3d row.
+app.get("/api/models", requireAuth, requireAdmin, async (_req, res) => {
+  const rows = await db.select().from(model3d).orderBy(asc(model3d.name), asc(model3d.id))
+  res.json(rows)
+})
+
+app.post("/api/models", requireAuth, requireAdmin, async (req, res) => {
+  const { name, glbFileId, thumbnailFileId, views, viewerSettings } = req.body ?? {}
+  if (typeof name !== "string" || !name.trim()) { res.status(400).json({ error: "name required" }); return }
+  if (typeof glbFileId !== "string" || !glbFileId) { res.status(400).json({ error: "glbFileId required" }); return }
+  const [row] = await db.insert(model3d).values({
+    name:            name.trim(),
+    glbFileId,
+    thumbnailFileId: typeof thumbnailFileId === "string" ? thumbnailFileId : null,
+    views:           Array.isArray(views) ? views : [],
+    viewerSettings:  viewerSettings ?? null,
+  }).returning()
+  res.status(201).json(row)
+})
+
+app.put("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
+  //Only patch fields the caller actually sent - keeps the Views tab
+  //from clobbering viewerSettings, and the Material tab from clobbering
+  //views, etc.
+  const patch: Record<string, unknown> = { updatedAt: new Date() }
+  if (typeof req.body?.name === "string")            patch.name            = req.body.name.trim()
+  if (typeof req.body?.glbFileId === "string")       patch.glbFileId       = req.body.glbFileId
+  if ("thumbnailFileId" in (req.body ?? {}))         patch.thumbnailFileId = req.body.thumbnailFileId
+  if (Array.isArray(req.body?.views))                patch.views           = req.body.views
+  if ("viewerSettings" in (req.body ?? {}))          patch.viewerSettings  = req.body.viewerSettings
+  await db.update(model3d).set(patch).where(eq(model3d.id, id))
+  respondOk(res)
+})
+
+//DELETE - refuses if the model is still referenced by a project (FK
+//set-null would silently break the project's viewer) OR by any
+//viewer3d detail-page block (jsonb, no FK). Returns 409 + the list
+//of usages so the admin can clean up first.
+app.delete("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
+  const usages = await findModelUsages(id)
+  if (usages.length > 0) {
+    res.status(409).json({ error: "model in use", usages })
+    return
+  }
+  await db.delete(model3d).where(eq(model3d.id, id))
+  respondOk(res)
+})
+
+//Helper - where-used scan for a model id. Hits both main_project.model3dId
+//and main_project.detailPage.blocks[type=viewer3d].content.model3dId.
+//Returns a flat list { projectId, kind: "main" | "block", blockId? }.
+async function findModelUsages(modelId: number): Promise<Array<{ projectId: number; kind: "main" | "block"; blockId?: string }>> {
+  const out: Array<{ projectId: number; kind: "main" | "block"; blockId?: string }> = []
+  const direct = await db.select({ id: mainProject.id }).from(mainProject).where(eq(mainProject.model3dId, modelId))
+  for (const r of direct) out.push({ projectId: r.id, kind: "main" })
+  const all = await db.select({ id: mainProject.id, detailPage: mainProject.detailPage }).from(mainProject)
+  for (const r of all) {
+    const blocks = (r.detailPage?.blocks ?? []) as Array<{ id: string; type: string; content: Record<string, unknown> }>
+    for (const b of blocks) {
+      if (b.type === "viewer3d" && b.content?.model3dId === modelId) {
+        out.push({ projectId: r.id, kind: "block", blockId: b.id })
+      }
+    }
+  }
+  return out
+}
 
 //VIEWER SETTINGS - the entire editor snapshot (materials / lights / HDR /
 //wireframe state) as a single jsonb blob. Frontend posts its full payload
 //on Save and we just store it; the viewer applies it on load.
 app.put("/api/main-project/:id/viewer-settings", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   await db.update(mainProject)
     .set({ viewerSettings: req.body, updatedAt: new Date() })
     .where(eq(mainProject.id, id))
-  res.json({ ok: true })
+  respondOk(res)
 })
 
 //PARTIAL save - patches ONLY the startView / startViewMobile fields of
@@ -707,8 +796,8 @@ app.put("/api/main-project/:id/viewer-settings", requireAuth, requireAdmin, asyn
 //in to one or both fields; everything else in the existing viewerSettings
 //JSON is preserved.
 app.put("/api/main-project/:id/viewer-settings/start-view", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   const [row] = await db.select({ viewerSettings: mainProject.viewerSettings })
     .from(mainProject).where(eq(mainProject.id, id))
   if (!row) { res.status(404).json({ error: "not found" }); return }
@@ -719,14 +808,14 @@ app.put("/api/main-project/:id/viewer-settings/start-view", requireAuth, require
   await db.update(mainProject)
     .set({ viewerSettings: next, updatedAt: new Date() })
     .where(eq(mainProject.id, id))
-  res.json({ ok: true })
+  respondOk(res)
 })
 
 //GET single project - returns the editor everything it needs without
 //pulling the whole portfolio. Used by the /edit-3d page.
 app.get("/api/main-project/:id", async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   const [row] = await db.select().from(mainProject).where(eq(mainProject.id, id))
   if (!row) { res.status(404).json({ error: "not found" }); return }
 
@@ -742,8 +831,8 @@ app.get("/api/main-project/:id", async (req, res) => {
 
 //MAIN_PROJECT <-> SOFTWARE junction
 app.put("/api/main-project/:id/software", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseInt(String(req.params.id ?? ""), 10)
-  if (Number.isNaN(id)) { res.status(400).json({ error: "bad id" }); return }
+  const id = parseIntParam(req, "id", res)
+  if (id === null) return
   const softwareIds = req.body.softwareIds as number[]
   if (!Array.isArray(softwareIds)) { res.status(400).json({ error: "softwareIds must be an array" }); return }
   //replace strategy: wipe existing junction rows, re-insert in order
@@ -753,7 +842,7 @@ app.put("/api/main-project/:id/software", requireAuth, requireAdmin, async (req,
       softwareIds.map((softwareId, i) => ({ mainProjectId: id, softwareId, sortOrder: i }))
     )
   }
-  res.json({ ok: true })
+  respondOk(res)
 })
 
 //PROFILE - singleton, only PUT
@@ -788,11 +877,7 @@ app.get("/api/translations", async (req, res) => {
 })
 
 //upsert a single translation - admin only
-app.put("/api/translations/:id", requireAuth, async (req, res) => {
-  if ((req as any).user.role !== "admin") {
-    res.status(403).json({ error: "admin only" })
-    return
-  }
+app.put("/api/translations/:id", requireAuth, requireAdmin, async (req, res) => {
   const id = req.params.id as string
   const { lang, value } = req.body
   if (typeof lang !== "string" || typeof value !== "string") {
@@ -812,11 +897,7 @@ app.put("/api/translations/:id", requireAuth, async (req, res) => {
 //bulk upsert - admin only, accepts { lang: { id: value } } maps
 //used by the seed script + by vue-shared-ui composables that need to ensure
 //their description keys exist in the DB
-app.put("/api/translations", requireAuth, async (req, res) => {
-  if ((req as any).user.role !== "admin") {
-    res.status(403).json({ error: "admin only" })
-    return
-  }
+app.put("/api/translations", requireAuth, requireAdmin, async (req, res) => {
   const body = req.body as Record<string, Record<string, string>>
   if (typeof body !== "object" || body === null) {
     res.status(400).json({ error: "body must be an object keyed by lang" })
@@ -940,9 +1021,13 @@ app.get("/api/portfolio", async (_req, res) => {
       mainImageUrl:        urlOf(p.mainImageFileId),
       mainWireframeUrl:    urlOf(p.mainWireframeFileId),
       videoUrl:            urlOf(p.videoFileId),
-      //3D MODEL - when glbFileId is non-null the frontend renders via the
-      //local Three.js viewer (using viewerSettings); otherwise it falls
-      //back to the Sketchfab iframe (modelId).
+      //3D MODEL - canonical reference now lives on model_3d. Project
+      //picks which named view to render per breakpoint.
+      model3dId:           p.model3dId,
+      model3dDesktopView:  p.model3dDesktopView,
+      model3dMobileView:   p.model3dMobileView,
+      //LEGACY - kept on the response while the migration runs so any
+      //pre-migration project can still render. Removed in a follow-up.
       glbFileId:           p.glbFileId,
       glbUrl:              urlOf(p.glbFileId),
       viewerSettings:      p.viewerSettings,
@@ -1022,8 +1107,27 @@ app.get("/api/portfolio", async (_req, res) => {
     wireframeEdgeThreshold: editorPrefMap["editor3d_wireframe_edge_threshold"] ?? null,
   }
 
+  //3D MODELS - reusable assets referenced by MainProject.model3dId and
+  //by viewer3d detail-page blocks. URLs resolved here so the client
+  //picker and ThreeViewer can use them directly.
+  const model3dRows = await db
+    .select()
+    .from(model3d)
+    .orderBy(asc(model3d.name), asc(model3d.id))
+  const models = model3dRows.map((m) => ({
+    id:              m.id,
+    name:            m.name,
+    glbFileId:       m.glbFileId,
+    glbUrl:          urlOf(m.glbFileId) ?? "",
+    thumbnailFileId: m.thumbnailFileId,
+    thumbnailUrl:    urlOf(m.thumbnailFileId),
+    viewerSettings:  m.viewerSettings,
+    views:           m.views ?? [],
+  }))
+
   res.json({
     software:        softwareRows.map((s) => ({ id: s.id, key: s.key, url: s.url, logoFileId: s.logoFileId, logoUrl: urlOf(s.logoFileId) })),
+    models,
     mainProjects,
     galleryProjects,
     editorPrefs,

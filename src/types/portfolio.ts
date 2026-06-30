@@ -34,6 +34,28 @@ export interface SoftwareDto {
   logoUrl:     string | null
 }
 
+//3D MODEL ASSET - returned by GET /api/models. Reusable across the
+//main project viewer and viewer3d detail-page blocks. viewerSettings
+//is left untyped (it's the editor's snapshot blob, same shape as the
+//ThreeViewer ViewerSettings interface).
+export interface Model3dView {
+  name:      string
+  position:  [number, number, number]
+  target:    [number, number, number]
+  zoom?:     number
+  wireframe: boolean
+}
+export interface Model3dDto {
+  id:              number
+  name:            string
+  glbFileId:       string
+  glbUrl:          string
+  thumbnailFileId: string | null
+  thumbnailUrl:    string | null
+  viewerSettings:  unknown | null
+  views:           Model3dView[]
+}
+
 export interface ThumbnailDto {
   fileId:          string | null
   wireframeFileId: string | null
@@ -53,7 +75,12 @@ export const MAIN_PROJECT_LAYOUTS: { key: MainProjectLayout; label: string }[] =
 
 //DETAIL PAGE - per-project content grid (bento-style). Authored via the
 //page editor, rendered on the public detail page route.
-export type DetailBlockType = "text" | "image"
+//- text:     markdown source per language
+//- image:    file row + resolved url
+//- viewer3d: embeds the parent project's own ThreeViewer (no per-block
+//            settings - it inherits glbUrl + viewerSettings from the
+//            project, so the block is just a placement marker).
+export type DetailBlockType = "text" | "image" | "viewer3d"
 
 export interface DetailBlock {
   id:       string
@@ -75,8 +102,9 @@ export interface DetailBlock {
 
 //Per-type content. Union narrowed by DetailBlock.type at usage sites.
 export type DetailBlockContent =
-  | { text:   Bilingual }                                       //type: "text"
-  | { fileId: string | null; url: string | null; alt?: Bilingual }  //type: "image"
+  | { text:   Bilingual }                                            //type: "text"
+  | { fileId: string | null; url: string | null; alt?: Bilingual }   //type: "image"
+  | { model3dId: number | null; desktopView: string; mobileView: string }  //type: "viewer3d"
 
 export interface DetailPage {
   blocks: DetailBlock[]
@@ -91,6 +119,15 @@ export interface MainProjectDto {
   mainImageUrl:        string | null
   mainWireframeUrl:    string | null
   videoUrl:            string | null
+  //3D model reference - the project's viewer picks a model + which
+  //named view to apply per breakpoint. model3dId is null until the
+  //admin assigns one (or until the migration script has run).
+  model3dId:           number | null
+  model3dDesktopView:  string
+  model3dMobileView:   string
+  //Legacy fields - still resolved by the server from the file/blob
+  //attached to this row, kept here so the migration script can read
+  //them. Will be removed once every project has been moved over.
   glbFileId:           string | null
   glbUrl:              string | null
   viewerSettings:      unknown | null
@@ -143,6 +180,7 @@ export interface EditorPrefsDto {
 
 export interface PortfolioDto {
   software:        SoftwareDto[]
+  models:          Model3dDto[]
   mainProjects:    MainProjectDto[]
   galleryProjects: GalleryProjectDto[]
   experiences:     ExperienceDto[]

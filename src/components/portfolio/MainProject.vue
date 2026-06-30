@@ -361,29 +361,35 @@ async function replaceThumbnailWireframe(idx: number) {
 
           <ReplaceImageButton v-if="editMode && !project.glbUrl" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
 
-          <!--EDIT 3D - admin-only shortcut to the model editor page-->
-          <button
-            v-if="editMode"
-            type="button"
-            class="main-project__edit-3d"
-            :title="project.glbUrl ? 'Edit 3D model settings' : 'Upload a .glb and edit'"
-            @click="openModelEditor"
-          >
-            <Box :size="14" />
-            <span>Edit 3D</span>
-          </button>
-          <!--PROJECT DETAIL PAGE - one button for both modes. The page
-          itself reads useAdmin().editMode and swaps to the bento-grid
-          editor when the admin has Edit Content on.-->
-          <button
-            type="button"
-            class="main-project__edit-3d"
-            :title="editMode ? 'Edit the project detail page' : 'Open the project detail page'"
-            @click="openDetailPage"
-          >
-            <LayoutTemplate :size="14" />
-            <span>{{ editMode ? "Edit page" : "View page" }}</span>
-          </button>
+          <!--OVERLAY ACTIONS - admin shortcuts + detail page link. Stacked
+          vertically in a flex wrapper so they don't overlap (previously
+          they shared a single absolute position and the second hid the
+          first).-->
+          <div class="main-project__overlay-actions">
+            <!--EDIT 3D - admin-only shortcut to the model editor page-->
+            <button
+              v-if="editMode"
+              type="button"
+              class="main-project__overlay-btn"
+              :title="project.glbUrl ? 'Edit 3D model settings' : 'Upload a .glb and edit'"
+              @click="openModelEditor"
+            >
+              <Box :size="14" />
+              <span>Edit 3D</span>
+            </button>
+            <!--PROJECT DETAIL PAGE - one button for both modes. The page
+            itself reads useAdmin().editMode and swaps to the bento-grid
+            editor when the admin has Edit Content on.-->
+            <button
+              type="button"
+              class="main-project__overlay-btn"
+              :title="editMode ? 'Edit the project detail page' : 'Open the project detail page'"
+              @click="openDetailPage"
+            >
+              <LayoutTemplate :size="14" />
+              <span>{{ editMode ? "Edit page" : "View page" }}</span>
+            </button>
+          </div>
         </div>
 
         <div v-if="showThumbnails" class="main-project__thumbnails">
@@ -707,11 +713,19 @@ the empty-viewer + every badge in one knob.*/
   z-index: 2;
 }
 
-/*Admin-only "Edit 3D" shortcut - jumps to /edit-3d/:id*/
-.main-project__edit-3d {
+/*Overlay actions - wrapper that stacks "Edit 3D" and "Edit / View page"
+vertically in the viewer's top-right corner. Each child button is just
+styled in place; the wrapper owns the absolute positioning.*/
+.main-project__overlay-actions {
   position: absolute;
   top:   var(--spacing-md);
   right: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  z-index: 20;
+}
+.main-project__overlay-btn {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
@@ -723,11 +737,10 @@ the empty-viewer + every badge in one knob.*/
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
   cursor: pointer;
-  z-index: 20;
   backdrop-filter: blur(var(--filter-blur));
   transition: background-color 0.15s ease, color 0.15s ease;
 }
-.main-project__edit-3d:hover {
+.main-project__overlay-btn:hover {
   background-color: var(--color-accent);
   color: hsl(0 0% 0%);
 }

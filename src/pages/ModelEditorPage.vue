@@ -389,18 +389,12 @@ const sectionOpen = ref({
   wfEmissive:   false,
 })
 
-//Wireframe shared materials. Mesh.material is REPLACED (ref swap) on
-//entering wireframe mode and restored from a snapshot on exit. Three
-//instances cover all cases:
-//   wfBaseMat     : plain gray, edited from the Wireframe tab
-//   wfEmissiveMat : same base but with emissive = mode color
-//   wfPickMat     : same base but with emissive = orange (selection)
-//
 //WF MATERIAL PARAMS are GLOBAL across every project - persisted in the
 //settings table (key WF_MAT_PARAMS_KEY, JSON-encoded). Per-project
 //hydration intentionally ignores s.wireframeMode.material; the global
-//setting wins. The current save still emits material into the project
-//payload for back-compat with viewers that read it directly.
+//setting wins. Custom{Normal,Emissive}Material instances pull these
+//values from one shared uniform set (pushSweepPbrUniforms), so editor
+//changes propagate to every mesh without a material swap.
 type WfMaterialParams = {
   color:             string
   metalness:         number
@@ -423,9 +417,6 @@ function parseWfMatParams(raw: string): WfMaterialParams {
   } catch { return { ...WF_MAT_PARAMS_DEFAULT } }
 }
 const wfMatParams = ref<WfMaterialParams>(parseWfMatParams(getString(WF_MAT_PARAMS_KEY, "")))
-
-let wfBaseMat: MeshPhysicalMaterial | null = null
-let wfPickMat: MeshPhysicalMaterial | null = null
 
 //=== SWEEP machinery - the editor previews the same animation that
 //ThreeViewer will render. Custom{Normal,Emissive}Material classes
@@ -799,8 +790,7 @@ watch(settingsLoaded, (loaded) => {
   wireframeOverlayColor.value = getString(WF_LINE_COLOR_KEY, "#000000")
   wireframeColor.value        = getString(WF_MODE_COLOR_KEY, "#14b8a6")
   wfMatParams.value = parseWfMatParams(getString(WF_MAT_PARAMS_KEY, ""))
-  //push the freshly-loaded values onto the live materials / overlays
-  if (wfBaseMat || wfPickMat) syncWfMaterialsParams()
+  //push the freshly-loaded values onto the live overlays
   for (const overlay of wfOverlays.values()) {
     if (overlay.material instanceof LineBasicMaterial) {
       overlay.material.color.set(wireframeOverlayColor.value)
@@ -1055,15 +1045,11 @@ onMounted(() => {
       }
 
       scene!.add(gltf.scene)
-      //WIREFRAME WARMUP - precompiles the wireframe materials AND the
-      //edges geometry now, while the model is settling, instead of on
-      //the first wireframe toggle (where the GLSL compile + EdgesGeom
-      //computation produced a visible stall). Two heavy ops:
-      //  1) renderer.compile(scene, camera) with wfBaseMat temporarily
-      //     swapped onto every mesh forces its program into the cache.
-      //  2) EdgesGeometry is rebuilt + cached per mesh so syncWireframe-
-      //     Overlays can just attach pre-built geometry instead of
-      //     computing on the click frame.
+      //WIREFRAME WARMUP - precompiles the per-mesh EdgesGeometry now,
+      //while the model is settling, instead of on the first wireframe
+      //toggle (where the EdgesGeom computation produced a visible stall).
+      //Pre-built geometries are cached so syncWireframeOverlays can just
+      //attach them instead of computing on the click frame.
       precompileWireframeAssets()
 
       //Recompute the bounding sphere AFTER the position adjustment so
@@ -2107,11 +2093,6 @@ function onLightHover(idx: number, on: boolean) {
   requestRender()
 }
 
-//onLightPosition / onLightTargetPosition: used to back panel sliders
-//that have since been removed. Keep the call shape documented via the
-//defineExpose so callers can re-add the rows if needed - kept inside
-//defineExpose so TS doesn't flag them as unused.
-
 function onLightColorChange(mode: LightMode, idx: number, hex: string) {
   const e = lights.value[idx]; if (!e) return
   if (mode === "normal") e.normalColor = hex
@@ -2222,33 +2203,6 @@ function syncGizmoTargetToData() {
 //toolbar. Switching to the Wireframe tab no longer enables the preview -
 //the author was clobbering the live render every time they opened the
 //section to tune a slider.
-
-//ensureWfMaterials / wfBaseMat / wfPickMat used to back the OLD material
-//swap path. The Custom{Normal,Emissive}Material classes own the look
-//entirely now - these are dead.
-
-function syncWfMaterialsParams() {
-  if (!wfBaseMat || !wfPickMat) return
-  const p = wfMatParams.value
-  for (const m of [wfBaseMat, wfPickMat]) {
-    m.color.set(p.color)
-    m.metalness         = p.metalness
-    m.roughness         = p.roughness
-    m.envMapIntensity   = p.envMapIntensity
-    m.specularIntensity = p.specularIntensity
-    m.needsUpdate       = true
-  }
-  //Emissive picks are driven purely by uWfEmissive (the wireframe
-  //mode colour) + per-mesh uWfEmissiveIntensity shader uniforms - no
-  //material to mutate here.
-}
-
-function setMaterialFor(_mesh: Mesh) {
-  //NO-OP retained because various pick / unpick paths still call it.
-  //The Custom{Normal,Emissive}Material classes carry the role-specific
-  //look themselves - there's nothing to set per-pick anymore.
-  void _mesh
-}
 
 //SINGLE EFFECT - the sweep shader on the originals. No light swap, no
 //HDR swap, no edge overlay. The wireframe toggle ONLY animates the
@@ -2503,8 +2457,9 @@ function onEmissiveItemIntensity(uuid: string, v: number) {
 
 function onWfMatParam<K extends keyof WfMaterialParams>(key: K, value: WfMaterialParams[K]) {
   wfMatParams.value[key] = value
-  //Persisted on Save click only - see onWireframeOverlayColor.
-  syncWfMaterialsParams()
+  //Persisted on Save click only - see onWireframeOverlayColor. The
+  //Custom{Normal,Emissive}Material instances pick up the new value
+  //from the shared uniform set on the next watcher tick.
   requestRender()
 }
 
@@ -2853,8 +2808,6 @@ function onKeyDown(e: KeyboardEvent) {
   }
   if (e.key === "Escape") {
     if (pickedMeshIdx.value !== null) {
-      const sm = sceneMeshes.value[pickedMeshIdx.value]
-      if (sm) setMaterialFor(sm.mesh)
       pickedMeshIdx.value = null
       requestRender()
     }
@@ -2882,19 +2835,16 @@ function pickMeshForEmissive(idx: number) {
       const prevIdx = pickedMeshIdx.value
       pickedMeshIdx.value = null
       if (prevIdx !== idx) {
-        setMaterialFor(prev.mesh)
         if (wireframeMode.value && wireframeOverlayOn.value) ensureOverlayForMesh(prev.mesh)
       }
     }
   }
   if (pickedMeshIdx.value === idx) {
     pickedMeshIdx.value = null
-    setMaterialFor(sm.mesh)
     if (wireframeMode.value && wireframeOverlayOn.value) ensureOverlayForMesh(sm.mesh)
     requestRender(); return
   }
   pickedMeshIdx.value = idx
-  setMaterialFor(sm.mesh)
   //Picked mesh's overlay is removed so the orange highlight reads clean.
   removeOverlayForMesh(sm.mesh.uuid)
   requestRender()
@@ -2919,7 +2869,6 @@ function addPickedToEmissive() {
     sm.mesh.receiveShadow = false
   }
   pickedMeshIdx.value = null
-  setMaterialFor(sm.mesh)
   //emissive picks render clean (no wireframe overlay), drop it now
   removeOverlayForMesh(sm.mesh.uuid)
   requestRender()
@@ -2938,7 +2887,6 @@ function removeFromEmissive(uuid: string) {
     const norm = new CustomNormalMaterial(cur)
     wfMaterials.add(norm)
     sm.mesh.material = markRaw(norm)
-    setMaterialFor(sm.mesh)
     //Restore shadows on this mesh - it's no longer emissive, so it
     //should cast + receive shadows like any other mesh.
     sm.mesh.castShadow    = true

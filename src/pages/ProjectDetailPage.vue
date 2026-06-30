@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { ArrowLeft, ImageIcon, Save, Trash2, Type, Upload } from "lucide-vue-next"
+import { ArrowLeft, Box, ImageIcon, Save, Trash2, Type, Upload } from "lucide-vue-next"
 import { marked } from "marked"
 import { useLanguage } from "../composables/useLanguage"
 import { useAdmin } from "../composables/useAdmin"
+import ThreeViewer, { type ViewerSettings } from "../components/portfolio/ThreeViewer.vue"
 import type {
   DetailBlock,
+  DetailBlockContent,
   DetailBlockType,
   DetailPage,
   MainProjectDto,
@@ -35,9 +37,15 @@ const loadError   = ref<string | null>(null)
 const saving      = ref(false)
 const status      = ref("")
 
-const projectTitle = computed(() =>
-  project.value ? (project.value.title[lang.value] || project.value.title.fr || project.value.title.en) : "",
-)
+//Bilingual fallback chain - prefer the user's lang, fall back to fr,
+//then en, then empty string. Used everywhere a translation could be
+//missing on one side of the locale split.
+function pickBilingual(t: { en?: string; fr?: string } | null | undefined): string {
+  if (!t) return ""
+  return t[lang.value] || t.fr || t.en || ""
+}
+
+const projectTitle = computed(() => pickBilingual(project.value?.title))
 
 const blocks      = ref<DetailBlock[]>([])
 const selectedId  = ref<string | null>(null)
@@ -122,31 +130,34 @@ function renderMd(src: string): string {
 const GRID_COLS = 3
 const MIN_GHOST_ROWS = 12  //empty editor still shows a usable canvas
 
-const totalRows = computed(() => {
+//Highest bottom row across all blocks, given a y / h projection. Used
+//to size view-mode grid rows (desktop and mobile), the edit-mode ghost
+//canvas, and to pick the next free Y for panel-click block appends.
+function maxBottom(getY: (b: DetailBlock) => number, getH: (b: DetailBlock) => number): number {
   let max = 0
-  for (const b of blocks.value) if (b.y + b.h > max) max = b.y + b.h
-  return Math.max(max, 1)
-})
+  for (const b of blocks.value) {
+    const end = getY(b) + getH(b)
+    if (end > max) max = end
+  }
+  return max
+}
+const desktopY = (b: DetailBlock) => b.y
+const desktopH = (b: DetailBlock) => b.h
 
 //MOBILE VIEW - blocks lay out in a single column. Per-block mobileY /
 //mobileH override the desktop coords; when absent, fall back to desktop
 //y / h so an unauthored project still renders.
 function mobileY(b: DetailBlock): number { return b.mobileY ?? b.y }
 function mobileH(b: DetailBlock): number { return b.mobileH ?? b.h }
-const totalMobileRows = computed(() => {
-  let max = 0
-  for (const b of blocks.value) {
-    const end = mobileY(b) + mobileH(b)
-    if (end > max) max = end
-  }
-  return Math.max(max, 1)
-})
-const gridBgRows = computed(() => {
-  let bottom = 0
-  for (const b of blocks.value) if (b.y + b.h > bottom) bottom = b.y + b.h
+
+const totalRows       = computed(() => Math.max(maxBottom(desktopY, desktopH), 1))
+const totalMobileRows = computed(() => Math.max(maxBottom(mobileY,  mobileH ), 1))
+const gridBgRows      = computed(() => {
+  let bottom = maxBottom(desktopY, desktopH)
   if (drag.value && drag.value.currentY + drag.value.currentH > bottom) {
     bottom = drag.value.currentY + drag.value.currentH
   }
+  //+2 leaves room to drag below the last block without scrolling.
   return Math.max(MIN_GHOST_ROWS, bottom + 2)
 })
 
@@ -481,31 +492,32 @@ async function onSave() {
 function uniqueId(): string {
   return Math.random().toString(36).slice(2, 10)
 }
-function nextFreeY(): number {
-  let max = 0
-  for (const b of blocks.value) if (b.y + b.h > max) max = b.y + b.h
-  return max
+//Per-type default content. viewer3d defaults model3dId to null so the
+//placeholder ("No model") shows and the user is forced through the
+//ModelPicker before publish.
+const DEFAULT_CONTENT: Record<DetailBlockType, () => DetailBlockContent> = {
+  text:     () => ({ text: { en: "", fr: "" } }),
+  image:    () => ({ fileId: null, url: null, alt: { en: "", fr: "" } }),
+  viewer3d: () => ({ model3dId: null, desktopView: "", mobileView: "" }),
 }
+
 function addBlockAt(type: DetailBlockType, x: number, y: number) {
   const id = uniqueId()
   const w = 1, h = 1
   const clampedX = Math.max(0, Math.min(GRID_COLS - w, x))
   const clampedY = Math.max(0, y)
-  //Refuse to add on top of an existing block. Caller already vets
-  //drag-drop targets, but addBlock() (panel "click to append") could
-  //hit a collision when nextFreeY landed on a sparse layout.
+  //Refuse to add on top of an existing block. Drag-drop targets are
+  //already vetted by the drag handlers, but the panel "click to
+  //append" path could land on a sparse layout.
   if (wouldOverlap(clampedX, clampedY, w, h)) return
   snapshot()
-  const base = { id, type, x: clampedX, y: clampedY, w, h }
-  const block: DetailBlock = type === "text"
-    ? { ...base, content: { text: { en: "", fr: "" } } }
-    : { ...base, content: { fileId: null, url: null, alt: { en: "", fr: "" } } }
+  const block: DetailBlock = { id, type, x: clampedX, y: clampedY, w, h, content: DEFAULT_CONTENT[type]() }
   blocks.value = [...blocks.value, block]
   selectedId.value = id
   markDirty()
 }
 function addBlock(type: DetailBlockType) {
-  addBlockAt(type, 0, nextFreeY())
+  addBlockAt(type, 0, maxBottom(desktopY, desktopH))
 }
 function removeSelected() {
   const id = selectedId.value
@@ -644,6 +656,20 @@ onBeforeUnmount(() => {
                 :alt="(block.content as { alt?: { en: string; fr: string } }).alt?.[lang] || (block.content as { alt?: { fr: string } }).alt?.fr || ''"
                 class="detail-page__img"
               />
+              <!--3D VIEWER - reuses the parent project's GLB +
+              viewerSettings. No per-block config; the block is just a
+              placement marker. Skipped silently if the project has no
+              GLB attached (rendering ThreeViewer with a null url
+              would throw).-->
+              <div
+                v-else-if="block.type === 'viewer3d' && project?.glbUrl"
+                class="detail-page__viewer"
+              >
+                <ThreeViewer
+                  :glbUrl="project.glbUrl"
+                  :settings="project.viewerSettings as ViewerSettings | null"
+                />
+              </div>
             </div>
           </div>
         </template>
@@ -714,6 +740,15 @@ onBeforeUnmount(() => {
                   <span>No image</span>
                 </div>
               </template>
+              <template v-else-if="block.type === 'viewer3d'">
+                <!--Static placeholder in edit mode - the live ThreeViewer
+                would grab pointer events for orbit controls and fight
+                the block drag/resize. View mode renders the real viewer.-->
+                <div class="bento-block__viewer-placeholder">
+                  <Box :size="32" />
+                  <span>{{ project?.glbUrl ? "3D Viewer" : "3D Viewer (no .glb)" }}</span>
+                </div>
+              </template>
 
               <!--SE resize handle - always rendered so it can fade in
               on hover; selected blocks keep it visible permanently.
@@ -740,7 +775,10 @@ onBeforeUnmount(() => {
                 gridRowEnd:      `span ${drag.currentH}`,
               }"
             >
-              <component :is="drag.type === 'text' ? Type : ImageIcon" :size="28" />
+              <component
+                :is="drag.type === 'text' ? Type : drag.type === 'image' ? ImageIcon : Box"
+                :size="28"
+              />
             </div>
           </div>
         </template>
@@ -762,6 +800,14 @@ onBeforeUnmount(() => {
             @pointerdown="onPanelButtonPointerDown($event, 'image')"
           >
             <ImageIcon :size="14" /> <span>Image</span>
+          </button>
+          <button
+            type="button" class="detail-page__add"
+            :disabled="!project?.glbUrl"
+            :title="project?.glbUrl ? 'Embed the project 3D viewer' : 'Upload a .glb on this project first'"
+            @pointerdown="project?.glbUrl && onPanelButtonPointerDown($event, 'viewer3d')"
+          >
+            <Box :size="14" /> <span>3D Viewer</span>
           </button>
         </div>
 
@@ -815,6 +861,14 @@ onBeforeUnmount(() => {
                 @input="(e) => { const c = selectedBlock!.content as { alt?: { en: string; fr: string } }; if (!c.alt) c.alt = { en: '', fr: '' }; c.alt.en = (e.target as HTMLInputElement).value; markDirty() }"
               />
             </label>
+          </template>
+
+          <template v-else-if="selectedBlock.type === 'viewer3d'">
+            <p class="detail-page__panel-hint">
+              This block embeds the project's 3D viewer. Edit the model
+              and viewer settings from the project's "Edit 3D" page -
+              this block stays in sync automatically.
+            </p>
           </template>
         </div>
 
@@ -957,6 +1011,13 @@ scale with the rest of the type system. */
 .detail-page__img {
   width: 100%; height: 100%; object-fit: cover; display: block;
 }
+/* 3D viewer block - the ThreeViewer fills its own container via
+absolute positioning, so we just give it a sized relative box. */
+.detail-page__viewer {
+  position: relative;
+  width: 100%; height: 100%;
+  overflow: hidden;
+}
 
 /*===== EDIT MODE GRID =====================================================*/
 .bento-grid {
@@ -1071,11 +1132,13 @@ this rule restores normal text cursor + selection. */
 .bento-block__img {
   width: 100%; height: 100%; object-fit: cover; display: block;
 }
-.bento-block__img-placeholder {
+.bento-block__img-placeholder,
+.bento-block__viewer-placeholder {
   display: flex; flex-direction: column;
   align-items: center; gap: var(--spacing-xs);
   color: var(--color-text-tertiary);
   font-size: var(--font-size-xs);
+  pointer-events: none;  /* let the parent grab drag pointerdown */
 }
 .bento-block__resize {
   position: absolute;

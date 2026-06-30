@@ -272,18 +272,6 @@ export class CustomEmissiveMaterial extends MeshPhysicalMaterial {
 }
 
 //===========================================================================
-//FACTORY - shorthand for "give me the right class for this mesh role".
-export function buildWfMaterial(
-  source:    MeshStandardMaterial | MeshPhysicalMaterial,
-  role:      "normal" | "emissive",
-  intensity: number = 1,
-): CustomNormalMaterial | CustomEmissiveMaterial {
-  return role === "emissive"
-    ? new CustomEmissiveMaterial(source, intensity)
-    : new CustomNormalMaterial(source)
-}
-
-//===========================================================================
 //WIREFRAME EDGES - topological diagonal detection. Standard EdgesGeometry
 //uses a per-edge angle threshold to drop "near-coplanar" edges that are
 //likely triangulation diagonals on flat faces. We DON'T want that UX

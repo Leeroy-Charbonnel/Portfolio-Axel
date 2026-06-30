@@ -119,7 +119,7 @@ interface StartView {
   target: [number, number, number]
 }
 
-interface ViewerSettings {
+export interface ViewerSettings {
   startView?: StartView | null
   materials?: MaterialState[]
   //NEW shape - one shared light list with per-mode intensity + color.
@@ -255,9 +255,7 @@ let introPlayed = false
 
 //Mesh inventory + per-mesh state needed for wireframe toggle
 const sceneMeshes: { mesh: Mesh; name: string }[] = []
-const meshOriginalMaterials = new Map<string, MeshPhysicalMaterial>()
 const wfOverlays = new Map<string, LineSegments>()
-const wfEmissiveMaterials = new Map<string, MeshPhysicalMaterial>()
 
 //Shared lights - one entry per spec, intensity + color are swapped per
 //mode by applyLightsForMode() instead of having two parallel arrays.
@@ -981,7 +979,6 @@ onMounted(() => {
         }
         m.material = custom
         wfMaterials.add(custom)
-        meshOriginalMaterials.set(m.uuid, m.material as MeshPhysicalMaterial)
         meshIndex++
       })
 
@@ -1194,8 +1191,6 @@ onBeforeUnmount(() => {
   controls?.dispose()
   composer?.dispose()
   renderer?.dispose()
-  for (const m of wfEmissiveMaterials.values()) m.dispose()
-  wfEmissiveMaterials.clear()
   for (const overlay of wfOverlays.values()) {
     ;(overlay.material as LineMaterial).dispose?.()
     overlay.geometry.dispose()

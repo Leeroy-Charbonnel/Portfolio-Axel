@@ -58,6 +58,35 @@ export const software = pgTable("software", {
   sortOrder:  integer("sort_order").notNull().default(0),
 })
 
+//MODEL_3D - reusable 3D asset. One row per uploaded .glb + its thumbnail
+//and a list of named camera views. MainProject + DetailBlock(viewer3d)
+//reference a model by id and pick which view to show on desktop vs mobile,
+//so the same asset can be embedded in many places with different framings.
+//views[]: pos + target fully describe OrbitControls state; zoom is the
+//optional camera.zoom (orthographic); wireframe toggles the overlay at
+//load time. The 'name' field inside each view is the public identifier
+//used by mainProject.model3dDesktopView / model3dMobileView and by
+//viewer3d block content.
+export const model3d = pgTable("model_3d", {
+  id:              serial("id").primaryKey(),
+  name:            text("name").notNull(),
+  glbFileId:       uuid("glb_file_id").notNull().references(() => file.id, { onDelete: "restrict" }),
+  thumbnailFileId: uuid("thumbnail_file_id").references(() => file.id, { onDelete: "set null" }),
+  //viewerSettings is the editor snapshot (materials / lights / HDR /
+  //wireframe picks) the viewer applies at load. Moved over from
+  //main_project so all consumers of the same asset render identically.
+  viewerSettings:  jsonb("viewer_settings"),
+  views:           jsonb("views").$type<Array<{
+                     name:      string
+                     position:  [number, number, number]
+                     target:    [number, number, number]
+                     zoom?:     number
+                     wireframe: boolean
+                   }>>().notNull().default([]),
+  createdAt:       timestamp("created_at").notNull().defaultNow(),
+  updatedAt:       timestamp("updated_at").notNull().defaultNow(),
+})
+
 //MAIN_PROJECT - the 3 featured projects with Sketchfab embeds + wireframe toggle.
 //Bilingual fields (title, description) stored as jsonb { en, fr } for easy
 //editing from a future admin UI. wireframe_parameters keeps its nested shape
@@ -76,11 +105,17 @@ export const mainProject = pgTable("main_project", {
   layout:               text("layout").notNull().default("thumbs-left"),
   mainImageFileId:      uuid("main_image_file_id").references(() => file.id, { onDelete: "set null" }),
   mainWireframeFileId:  uuid("main_wireframe_file_id").references(() => file.id, { onDelete: "set null" }),
-  //3D MODEL - when set, the portfolio renders this project via the local
-  //Three.js viewer instead of the Sketchfab iframe. The .glb file lives
-  //in storage like every other binary; viewer_settings is the editor
-  //snapshot (materials / lights / HDR / wireframe picks) the viewer
-  //applies at load.
+  //3D MODEL - the project's viewer now references a model_3d row
+  //(reusable asset shared with detail-page viewer3d blocks). The two
+  //view names pick which saved camera view to apply at load on the
+  //matching breakpoint; resolved against model_3d.views by name.
+  //
+  //glbFileId / viewerSettings stay around as the MIGRATION SOURCE
+  //and are dropped in a follow-up once every project has been moved
+  //to a model_3d row.
+  model3dId:            integer("model_3d_id").references(() => model3d.id, { onDelete: "set null" }),
+  model3dDesktopView:   text("model_3d_desktop_view").notNull().default(""),
+  model3dMobileView:    text("model_3d_mobile_view").notNull().default(""),
   glbFileId:            uuid("glb_file_id").references(() => file.id, { onDelete: "set null" }),
   viewerSettings:       jsonb("viewer_settings"),
   thumbnails:           jsonb("thumbnails").$type<{
@@ -106,7 +141,7 @@ export const mainProject = pgTable("main_project", {
   detailPage:           jsonb("detail_page").$type<{
                           blocks: Array<{
                             id:       string
-                            type:     "text" | "image"
+                            type:     "text" | "image" | "viewer3d"
                             x:        number   //grid col start (0..2)
                             y:        number   //grid row start
                             w:        number   //col span (1..3)
