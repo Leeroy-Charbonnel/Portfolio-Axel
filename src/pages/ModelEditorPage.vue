@@ -2,7 +2,7 @@
 import { computed, markRaw, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useSettings } from "vue-shared-ui"
-import { ArrowLeft, Box, ChevronDown, Circle, Crosshair, Eye, EyeOff, Grid, Home, Lightbulb, LightbulbOff, MapPin, Monitor, Save, Smartphone, Square, Sun, Upload } from "lucide-vue-next"
+import { ArrowLeft, Box, ChevronDown, Circle, Crosshair, Eye, EyeOff, Grid, Lightbulb, LightbulbOff, Save, Square, Sun, Upload } from "lucide-vue-next"
 import {
   Box3,
   BufferGeometry,
@@ -787,10 +787,11 @@ function requestRender(ms = RENDER_KEEPALIVE_MS_DEFAULT) {
 //WYSIWYG. Returns the size as an aspect-locked box that fits inside the
 //container.
 function fitCanvasSize(containerW: number, containerH: number): { w: number; h: number } {
-  if (containerW / containerH > TARGET_ASPECT) {
-    return { w: Math.floor(containerH * TARGET_ASPECT), h: containerH }
-  }
-  return { w: containerW, h: Math.floor(containerW / TARGET_ASPECT) }
+  //Canvas fills every available pixel of the stage. The 16:9 desktop +
+  //9:16 mobile frames are drawn as inner outlines via the crosshair
+  //toggle so the author still has a reference for the public viewport
+  //while composing.
+  return { w: Math.floor(containerW), h: Math.floor(containerH) }
 }
 
 //useSettings loads asynchronously - on first paint getString() returns
@@ -1461,6 +1462,7 @@ function hydrateSharedLight(spec: {
     entry.target.position.set(entry.tx, entry.ty, entry.tz)
     ;(entry.light as DirectionalLight).target.updateMatrixWorld()
     updateLinkGeometry(entry)
+    orientSourceGizmo(entry)
   }
   //apply mode-appropriate intensity+color now that the entry is live
   const mode = activeMode()
@@ -1934,7 +1936,7 @@ function addLight(type: LightType) {
   light.position.set(2, 2, 2)
   scene.add(light)
 
-  const sourceGiz = makeGizmoDiamond(startColor)
+  const sourceGiz = makeGizmoPlane(startColor)
   sourceGiz.position.copy(light.position)
   scene.add(sourceGiz)
 
@@ -1972,6 +1974,10 @@ function addLight(type: LightType) {
     const link = new Line(lineGeo, lineMat)
     scene.add(link)
     entry.link = markRaw(link)
+    //source plane normal points at the target right away so the
+    //initial render already shows the direction; subsequent drags
+    //re-orient via the TransformControls callback.
+    orientSourceGizmo(entry)
   }
 
   lights.value = [...lights.value, entry]
@@ -1995,7 +2001,8 @@ function addLight(type: LightType) {
 
 //Diamond-shaped marker - octahedron at detail 0 = 8-faced diamond. Drawn
 //in wireframe with depth-test off so it's always visible regardless of
-//camera angle or what's behind it.
+//camera angle or what's behind it. Used by the TARGET marker so the
+//author can tell source (flat plane, see below) from target at a glance.
 function makeGizmoDiamond(colorHex: string, isTarget = false): Mesh {
   const geo = new OctahedronGeometry(LIGHT_GIZMO_RADIUS, 0)
   const mat = new MeshBasicMaterial({
@@ -2009,6 +2016,35 @@ function makeGizmoDiamond(colorHex: string, isTarget = false): Mesh {
   const diamond = new Mesh(geo, mat)
   diamond.renderOrder = LIGHT_GIZMO_RENDER_ORDER
   return diamond
+}
+
+//Plane-shaped marker for light SOURCES. Visually distinct from the
+//diamond target marker so the user can tell the two ends of a
+//directional light apart at a glance. For directional lights the
+//plane's normal is rotated to point at the target each frame
+//(orientSourceGizmo); for ambient / point / spot lights without a
+//target the plane just faces the camera default.
+function makeGizmoPlane(colorHex: string): Mesh {
+  const size = LIGHT_GIZMO_RADIUS * 2
+  const geo  = new PlaneGeometry(size, size)
+  const mat  = new MeshBasicMaterial({
+    color:       new Color(colorHex),
+    transparent: true,
+    opacity:     0.6,
+    depthTest:   false,
+    depthWrite:  false,
+    side:        DoubleSide,
+  })
+  const plane = new Mesh(geo, mat)
+  plane.renderOrder = LIGHT_GIZMO_RENDER_ORDER
+  return plane
+}
+
+//Rotate a directional light's source plane so its normal points at
+//the target. Idempotent - safe to call every frame the gizmos move.
+function orientSourceGizmo(entry: LightEntry) {
+  if (entry.type !== "directional" || !entry.target) return
+  entry.sourceGiz.lookAt(entry.target.position)
 }
 
 //Light is always on (shared between modes); gizmo helpers follow the
@@ -2178,18 +2214,10 @@ function selectGizmo(idx: number, which: "source" | "target") {
     if (el instanceof HTMLElement) el.scrollIntoView({ behavior: "smooth", block: "center" })
   })
 
-  //smoothly move the camera so the gizmo is in frame
-  if (cameraRef && controls) {
-    const focus = which === "target" ? entry.target!.position.clone() : entry.light.position.clone()
-    const distance = cameraRef.position.distanceTo(controls.target)
-    const offset = cameraRef.position.clone().sub(controls.target).normalize().multiplyScalar(distance)
-    cameraAnim = makeCameraAnim({
-      toPos:    focus.clone().add(offset),
-      toTarget: focus,
-      duration: GIZMO_SELECT_DURATION_MS,
-    })
-    requestRender(GIZMO_SELECT_DURATION_MS + 300)
-  }
+  //NOTE: we used to retarget the OrbitControls camera to focus on the
+  //picked gizmo. The user found that disruptive ("clicking shouldn't
+  //move my view"), so the pick now only attaches the TransformControls
+  //+ flips the panel - the camera stays put.
   requestRender()
 }
 
@@ -2216,6 +2244,7 @@ function syncGizmoTargetToData() {
     ;(e.light as DirectionalLight).target.updateMatrixWorld()
   }
   if (e.link) updateLinkGeometry(e)
+  orientSourceGizmo(e)
 }
 
 //===========================================================================
@@ -2560,81 +2589,12 @@ function checkViewHelperClick(e: PointerEvent): boolean {
   return true
 }
 
-//Save / restore the start view (camera pose used by the production
-//viewer's intro fly-in). Capturing the live camera + orbit target lets
-//the author frame a shot in the editor and have the public viewer land
-//on the exact same composition. Persists immediately so the button is
-//still wired up after a reload - relying on the bottom Save was too
-//easy to forget and led to "the start view button doesn't work" reports.
-function capturePose() {
-  if (!cameraRef || !controls) return null
-  return {
-    pos:    [cameraRef.position.x, cameraRef.position.y, cameraRef.position.z] as [number, number, number],
-    target: [controls.target.x,    controls.target.y,    controls.target.z]    as [number, number, number],
-  }
-}
-
-async function persistStartView(field: "startView" | "startViewMobile", sv: { pos: [number, number, number]; target: [number, number, number] }) {
-  if (!Number.isFinite(modelId.value)) return
-  status.value = `${field === "startView" ? "Desktop" : "Phone"} start captured (saving...)`
-  isSaving.value = true; saveError.value = null
-  try {
-    const res = await fetch(`/api/models/${modelId.value}/viewer-settings/start-view`, {
-      method:      "PUT",
-      credentials: "include",
-      headers:     { "Content-Type": "application/json" },
-      body:        JSON.stringify({ [field]: sv }),
-    })
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "")
-      throw new Error(`save ${res.status} ${detail}`)
-    }
-    status.value = `${field === "startView" ? "Desktop" : "Phone"} start saved`
-  } catch (e) {
-    saveError.value = e instanceof Error ? e.message : String(e)
-    status.value    = `Save failed: ${saveError.value}`
-    console.error("[edit-3d] start-view save failed:", e)
-  } finally {
-    isSaving.value = false
-    setTimeout(() => { status.value = `Materials: ${materials.value.length}` }, 2000)
-  }
-}
-
-async function saveStartView() {
-  const sv = capturePose(); if (!sv) return
-  startView.value = sv
-  await persistStartView("startView", sv)
-}
-
-async function saveStartViewMobile() {
-  const sv = capturePose(); if (!sv) return
-  startViewMobile.value = sv
-  await persistStartView("startViewMobile", sv)
-}
-
-function goToStartViewMobile() {
-  if (!cameraRef || !controls || !startViewMobile.value) return
-  cameraAnim = makeCameraAnim({
-    toPos:    new Vector3(...startViewMobile.value.pos),
-    toTarget: new Vector3(...startViewMobile.value.target),
-    toUp:     new Vector3(0, 1, 0),
-    duration: GO_TO_START_DURATION_MS,
-  })
-  requestRender(GO_TO_START_DURATION_MS + 400)
-}
-
-//Animate the editor camera to the saved start view so the author can
-//verify what visitors will see on first paint.
-function goToStartView() {
-  if (!cameraRef || !controls || !startView.value) return
-  cameraAnim = makeCameraAnim({
-    toPos:    new Vector3(...startView.value.pos),
-    toTarget: new Vector3(...startView.value.target),
-    toUp:     new Vector3(0, 1, 0),
-    duration: GO_TO_START_DURATION_MS,
-  })
-  requestRender(GO_TO_START_DURATION_MS + 400)
-}
+//Legacy startView / startViewMobile capture buttons (and their save
+//endpoint) were removed when the Views tab took over as the canonical
+//named-camera-presets store. The startView / startViewMobile refs are
+//still hydrated from existing viewerSettings on load so old projects
+//that haven't been re-authored still resolve a camera pose via the
+//public viewer's fallback path, but no new save path writes to them.
 
 //CAMERA TOGGLE - swap between perspective and orthographic projections.
 //The two cameras share position + target + up so the visible angle of
@@ -2929,6 +2889,16 @@ function removeFromEmissive(uuid: string) {
 //breakpoint).
 //===========================================================================
 const newViewName = ref<string>("")
+//Pre-fill the new-view input with the next sequential "View N" so the
+//author can hit Save without typing. Resets whenever the views list
+//changes (load, save, delete) - if the user is mid-typing they
+//override it the moment they edit the field.
+function defaultViewName(): string {
+  let i = views.value.length + 1
+  while (views.value.find((v) => v.name === `View ${i}`)) i++
+  return `View ${i}`
+}
+watch(views, () => { newViewName.value = defaultViewName() }, { immediate: false })
 
 function readCurrentCamera(): { position: [number, number, number]; target: [number, number, number] } | null {
   if (!cameraRef || !controls) return null
@@ -2972,7 +2942,7 @@ async function addCurrentCameraAsView() {
     wireframe: wireframeMode.value,
   }]
   await persistViews(next)
-  newViewName.value = ""
+  //views watcher reseeds newViewName to "View N+1" once the list grows
   status.value = saveError.value ? status.value : `Saved view "${name}"`
 }
 
@@ -3112,10 +3082,21 @@ async function onSave() {
      <div ref="viewportBox" class="editor__viewport-box">
       <canvas ref="canvas" class="editor__canvas"></canvas>
 
-      <!--SCREEN CENTER crosshair - semi-transparent + sign at the dead
-      centre of the viewport so the author can frame compositions on
-      that axis. Pointer-events: none so it never blocks orbit.-->
-      <div v-if="showCenterCrosshair" class="editor__viewport-crosshair" aria-hidden="true"></div>
+      <!--SCREEN CENTER crosshair + safe-frame overlays. Crosshair is a
+      semi-transparent + sign at the dead centre of the viewport. The
+      two frames show the 16:9 desktop + 9:16 mobile viewport bounds so
+      the author can compose for both public layouts at once. All three
+      share the same toggle and pointer-events: none so they never
+      block orbit.-->
+      <template v-if="showCenterCrosshair">
+        <div class="editor__viewport-crosshair" aria-hidden="true"></div>
+        <div class="editor__viewport-frame editor__viewport-frame--desktop" aria-hidden="true">
+          <span class="editor__viewport-frame-label">16:9 desktop</span>
+        </div>
+        <div class="editor__viewport-frame editor__viewport-frame--mobile" aria-hidden="true">
+          <span class="editor__viewport-frame-label">9:16 mobile</span>
+        </div>
+      </template>
 
       <!--Viewport-corner toolbar: clusters in the bottom-right above the
       ViewHelper viewport so axis-snap + scene-debug controls live in the
@@ -3165,53 +3146,9 @@ async function onSave() {
         <!--START POSE grid - two columns (desktop / phone) with a greyed
         device icon as a column "label", then the two action buttons below
         (save + go). Space between the columns separates the two devices.-->
-        <div class="editor__viewport-poses">
-          <div class="editor__viewport-pose-col">
-            <span class="editor__viewport-pose-label" aria-label="Desktop">
-              <Monitor :size="14" />
-            </span>
-            <button
-              type="button"
-              class="editor__viewport-tool"
-              data-tooltip="Save current view as desktop start"
-              @click="saveStartView"
-            >
-              <MapPin :size="14" />
-            </button>
-            <button
-              type="button"
-              class="editor__viewport-tool"
-              :disabled="!startView"
-              data-tooltip="Go to desktop start"
-              @click="goToStartView"
-            >
-              <Home :size="14" />
-            </button>
-          </div>
-
-          <div class="editor__viewport-pose-col">
-            <span class="editor__viewport-pose-label" aria-label="Phone">
-              <Smartphone :size="14" />
-            </span>
-            <button
-              type="button"
-              class="editor__viewport-tool"
-              data-tooltip="Save current view as phone start"
-              @click="saveStartViewMobile"
-            >
-              <MapPin :size="14" />
-            </button>
-            <button
-              type="button"
-              class="editor__viewport-tool"
-              :disabled="!startViewMobile"
-              data-tooltip="Go to phone start"
-              @click="goToStartViewMobile"
-            >
-              <Home :size="14" />
-            </button>
-          </div>
-        </div>
+        <!--Legacy desktop / phone start-view buttons were removed - the
+        Views tab is now the canonical way to capture + apply named
+        camera presets (one model can have arbitrarily many).-->
 
       </div>
      </div>
@@ -3803,28 +3740,20 @@ async function onSave() {
   z-index: 10;
 }
 
-/*Stage holds the 16/9 viewport-box centered in whatever space is left
-after the side panel. place-items:center keeps the box visually anchored
-when the window leaves slack on either axis.*/
+/*Stage now lets the canvas fill all available space (the 16:9 / 9:16
+public viewport hints are drawn as overlay frames via the crosshair
+toggle, not as a hard wrapper).*/
 .editor__stage {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
-  display: grid;
-  place-items: center;
 }
 
-/*16/9 viewport-box owns the canvas + every overlay (top-bar, hud,
-viewport-tools). Sizing is done in JS via fitCanvasSize so the canvas
-inherits exact integer pixel dims (no fractional rounding through CSS
-aspect-ratio). All overlays are positioned ABSOLUTE against this box so
-they hug the canvas edges instead of the larger stage edges - keeps the
-controls visually inside the active viewport regardless of window size.*/
+/*Viewport-box fills the stage. Overlays (top-bar, hud, viewport-tools)
+position ABSOLUTE against it.*/
 .editor__viewport-box {
-  position: relative;
-  /*Frame around the 3D canvas so its edges read as a distinct surface
-  against the editor background, not a transparent hole.*/
-  border: var(--border-width-sm) solid var(--color-gray-medium);
+  position: absolute;
+  inset: 0;
 }
 .editor__canvas { display: block; width: 100%; height: 100%; position: relative; z-index: 2; }
 
@@ -3943,29 +3872,47 @@ the viewport-box means they always cross at the canvas centre.*/
   transform: translateY(-0.5px);
 }
 
-/*START POSE grid - two columns (desktop / phone) side by side. Each
-column has a greyed device icon at the top acting as a label, then the
-save + go buttons stacked below it. Gap between the two columns is what
-separates the desktop column from the phone one.*/
-.editor__viewport-poses {
-  display: flex;
-  flex-direction: row;
-  gap: var(--spacing-sm);
-}
-.editor__viewport-pose-col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xxs);
-}
-.editor__viewport-pose-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width:  2rem;
-  height: 2rem;
-  color: var(--color-text-tertiary);
+/*SAFE-FRAME overlays for 16:9 desktop + 9:16 mobile. Both are centered
+boxes whose width / height are derived from the viewport-box size via
+CSS aspect-ratio + min/max. The desktop frame is the largest 16:9 that
+fits; the mobile frame is the largest 9:16 that fits. They share the
+crosshair toggle so the author can preview both public layouts.*/
+.editor__viewport-frame {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
   pointer-events: none;
+  z-index: 4;
+  border: 1px dashed hsl(0 0% 100% / 0.45);
 }
+.editor__viewport-frame--desktop {
+  /*16:9 = the largest box that fits both axes. width = min(100%, height * 16/9). */
+  aspect-ratio: 16 / 9;
+  width:  min(100%, 100cqh * 16 / 9);
+  height: min(100%, 100cqw * 9 / 16);
+  border-color: hsl(180 80% 60% / 0.55);
+}
+.editor__viewport-frame--mobile {
+  aspect-ratio: 9 / 16;
+  width:  min(100%, 100cqh * 9 / 16);
+  height: min(100%, 100cqw * 16 / 9);
+  border-color: hsl(40 95% 60% / 0.55);
+}
+.editor__viewport-box { container-type: size; }
+
+.editor__viewport-frame-label {
+  position: absolute;
+  top: 4px; left: 6px;
+  font-size: 0.65rem;
+  font-family: monospace;
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: hsl(0 0% 100% / 0.6);
+  background-color: hsl(0 0% 0% / 0.4);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
 .editor__viewport-tool {
   width: 2rem; height: 2rem;
   display: inline-flex; align-items: center; justify-content: center;
