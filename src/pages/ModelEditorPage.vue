@@ -1522,7 +1522,10 @@ async function saveViewerSettings(payload: unknown) {
       headers:     { "Content-Type": "application/json" },
       body:        JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error(`save ${res.status}`)
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "")
+      throw new Error(`save ${res.status} ${detail}`)
+    }
   } catch (e) {
     saveError.value = e instanceof Error ? e.message : String(e)
     console.error("[edit-3d] save failed:", e)
@@ -2582,7 +2585,10 @@ async function persistStartView(field: "startView" | "startViewMobile", sv: { po
       headers:     { "Content-Type": "application/json" },
       body:        JSON.stringify({ [field]: sv }),
     })
-    if (!res.ok) throw new Error(`save ${res.status}`)
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "")
+      throw new Error(`save ${res.status} ${detail}`)
+    }
     status.value = `${field === "startView" ? "Desktop" : "Phone"} start saved`
   } catch (e) {
     saveError.value = e instanceof Error ? e.message : String(e)

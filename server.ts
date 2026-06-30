@@ -44,7 +44,11 @@ app.use(cors({ origin: allowedOrigins, credentials: true }))
 //AUTH HANDLER - must be before express.json()
 app.all("/api/auth/{*path}", toNodeHandler(auth))
 
-app.use(express.json())
+//ViewerSettings save payloads can include serialized hdr URLs, dozens
+//of materials + lights + emissive entries. The default 100kb cap was
+//bouncing them with a bare 500. 10mb gives headroom for any realistic
+//model without changing intent (we still reject huge files via multer).
+app.use(express.json({ limit: "10mb" }))
 
 //FILES FORWARD - dev workflow: local Express never writes to its own
 //disk, all file ops are tunneled to prod's volume. When FILES_FORWARD_URL
@@ -741,10 +745,16 @@ app.get("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
 app.put("/api/models/:id/viewer-settings", requireAuth, requireAdmin, async (req, res) => {
   const id = parseIntParam(req, "id", res)
   if (id === null) return
-  await db.update(model3d)
-    .set({ viewerSettings: req.body, updatedAt: new Date() })
-    .where(eq(model3d.id, id))
-  respondOk(res)
+  try {
+    await db.update(model3d)
+      .set({ viewerSettings: req.body, updatedAt: new Date() })
+      .where(eq(model3d.id, id))
+    respondOk(res)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error(`[/api/models/${id}/viewer-settings] update failed:`, msg)
+    res.status(500).json({ error: "viewer-settings update failed", detail: msg })
+  }
 })
 
 //PARTIAL save - patches ONLY startView / startViewMobile inside
@@ -754,17 +764,23 @@ app.put("/api/models/:id/viewer-settings", requireAuth, requireAdmin, async (req
 app.put("/api/models/:id/viewer-settings/start-view", requireAuth, requireAdmin, async (req, res) => {
   const id = parseIntParam(req, "id", res)
   if (id === null) return
-  const [row] = await db.select({ viewerSettings: model3d.viewerSettings })
-    .from(model3d).where(eq(model3d.id, id))
-  if (!row) { res.status(404).json({ error: "not found" }); return }
-  const current = (row.viewerSettings as Record<string, unknown> | null) ?? {}
-  const next: Record<string, unknown> = { ...current }
-  if ("startView"       in (req.body ?? {})) next.startView       = req.body.startView       ?? null
-  if ("startViewMobile" in (req.body ?? {})) next.startViewMobile = req.body.startViewMobile ?? null
-  await db.update(model3d)
-    .set({ viewerSettings: next, updatedAt: new Date() })
-    .where(eq(model3d.id, id))
-  respondOk(res)
+  try {
+    const [row] = await db.select({ viewerSettings: model3d.viewerSettings })
+      .from(model3d).where(eq(model3d.id, id))
+    if (!row) { res.status(404).json({ error: "not found" }); return }
+    const current = (row.viewerSettings as Record<string, unknown> | null) ?? {}
+    const next: Record<string, unknown> = { ...current }
+    if ("startView"       in (req.body ?? {})) next.startView       = req.body.startView       ?? null
+    if ("startViewMobile" in (req.body ?? {})) next.startViewMobile = req.body.startViewMobile ?? null
+    await db.update(model3d)
+      .set({ viewerSettings: next, updatedAt: new Date() })
+      .where(eq(model3d.id, id))
+    respondOk(res)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error(`[/api/models/${id}/viewer-settings/start-view] update failed:`, msg)
+    res.status(500).json({ error: "start-view update failed", detail: msg })
+  }
 })
 
 app.post("/api/models", requireAuth, requireAdmin, async (req, res) => {
