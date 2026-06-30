@@ -1494,7 +1494,12 @@ async function uploadGlb() {
         headers:     { "Content-Type": "application/json" },
         body:        JSON.stringify({ glbFileId: row.id }),
       })
-      if (!patch.ok) throw new Error(`patch ${patch.status}`)
+      if (!patch.ok) {
+        //Surface the actual server error (FK violation, etc.) instead
+        //of a bare status code that hides the root cause.
+        const detail = await patch.text().catch(() => "")
+        throw new Error(`patch ${patch.status} ${detail}`)
+      }
       glbUrl.value = row.url
       loadGlbFn?.(row.url)
     } catch (e) {

@@ -793,8 +793,16 @@ app.put("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
   if ("thumbnailFileId" in (req.body ?? {}))         patch.thumbnailFileId = req.body.thumbnailFileId
   if (Array.isArray(req.body?.views))                patch.views           = req.body.views
   if ("viewerSettings" in (req.body ?? {}))          patch.viewerSettings  = req.body.viewerSettings
-  await db.update(model3d).set(patch).where(eq(model3d.id, id))
-  respondOk(res)
+  try {
+    await db.update(model3d).set(patch).where(eq(model3d.id, id))
+    respondOk(res)
+  } catch (e) {
+    //Surface the actual DB error (FK violation, type mismatch, etc.)
+    //so the client toast shows something diagnosable instead of a bare 500.
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error(`[/api/models/${id}] update failed:`, msg)
+    res.status(500).json({ error: "model update failed", detail: msg })
+  }
 })
 
 //DELETE - refuses if the model is still referenced by a project (FK
