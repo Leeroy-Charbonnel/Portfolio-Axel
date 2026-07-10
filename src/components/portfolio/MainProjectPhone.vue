@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, toRef, watch } from "vue"
+import { computed, ref, toRef, watch } from "vue"
 import { Grid } from "lucide-vue-next"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { useEffectiveViewerSettings, useResolvedGlbUrl } from "../../composables/useEffectiveViewerSettings"
+import { useInView } from "../../composables/useInView"
 import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
@@ -18,11 +19,11 @@ import type { MainProjectDto } from "../../types/portfolio"
 //peeking from below, so the visitor scrolls from one piece to the next
 //with no horizontal real estate wasted on side columns.
 //
-// - Number + title sit as a small bandeau at the top.
-// - 3D viewer fills the middle, free-floating with only the ground
-//   shadow (canvas + parent are both transparent).
-// - Thumbs row + description sit at the bottom.
-// - Wireframe toggle floats top-right of the viewer.
+//- Number + title sit as a small bandeau at the top.
+//- 3D viewer fills the middle, free-floating with only the ground
+//  shadow (canvas + parent are both transparent).
+//- Thumbs row + description sit at the bottom.
+//- Wireframe toggle floats top-right of the viewer.
 //
 //No grid, no alternating sides, no overlap tricks - the model is the
 //hero, everything else is in service of it.
@@ -43,7 +44,13 @@ const containerRef = ref<{ $el: HTMLElement } | HTMLElement | null>(null)
 useWireframeSweep(containerRef)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
 
-const isInView    = ref(false)
+//containerRef binds to a component (AnimatedReveal) so unwrap $el before
+//handing it to the shared in-view observer.
+const containerEl = computed<HTMLElement | null>(() => {
+  const raw = containerRef.value
+  return raw && "$el" in raw ? raw.$el : raw
+})
+const { inView: isInView } = useInView(containerEl, { threshold: 0.15, rootMargin: "0px 0px 200px 0px" })
 const isWireframe = ref(false)
 
 const sketchfab = useSketchfabViewer({
@@ -56,8 +63,7 @@ const sketchfab = useSketchfabViewer({
 const sketchfabError = sketchfab.error
 const isLoading      = sketchfab.isLoading
 
-const mainImageUrl      = computed(() => props.project.mainImageUrl)
-const wireframeImageUrl = computed(() => props.project.mainWireframeUrl ?? props.project.mainImageUrl)
+const mainImageUrl = computed(() => props.project.mainImageUrl)
 
 const hasAnyWireframeImage = computed(() => {
   if (resolvedGlbUrl.value) return true
@@ -74,27 +80,6 @@ const thumbCells = computed(() => {
   const real = props.project.thumbnails.slice(0, 3)
   while (real.length < 3) real.push({ fileId: null, wireframeFileId: null, url: null, wireframeUrl: null, description: { en: "", fr: "" } })
   return real
-})
-
-let observer: IntersectionObserver | null = null
-
-onMounted(() => {
-  const raw = containerRef.value as { $el?: HTMLElement } | HTMLElement | null
-  const el  = raw && "$el" in raw ? raw.$el : raw
-  if (!el) return
-  observer = new IntersectionObserver(
-    (entries) => {
-      const entry = entries[0]
-      if (entry) isInView.value = entry.isIntersecting
-    },
-    { threshold: 0.15, rootMargin: "0px 0px 200px 0px" },
-  )
-  observer.observe(el)
-})
-
-onBeforeUnmount(() => {
-  observer?.disconnect()
-  observer = null
 })
 
 watch(editMode, (newVal) => { if (newVal === false) isWireframe.value = false })
@@ -121,6 +106,17 @@ const lightboxImages = computed(() => {
 function onImageClick(startIndex: number) {
   if (editMode.value) return
   openLightbox(lightboxImages.value, startIndex)
+}
+
+//Thumbs map to lightbox slots by URL, not by position - lightboxImages
+//skips the main image when missing and skips url-less thumbs, so i+1 would
+//open the wrong image. Padded empty cells (url null) are ignored. The url
+//is guaranteed present in the array because it's built from the same
+//thumbnails with the same wireframe resolution.
+function onThumbClick(thumb: { url: string | null; wireframeUrl: string | null }) {
+  if (editMode.value || !thumb.url) return
+  const url = isWireframe.value ? thumb.wireframeUrl ?? thumb.url : thumb.url
+  openLightbox(lightboxImages.value, lightboxImages.value.findIndex((img) => img.url === url))
 }
 
 async function onTitleSave(newVal: string) {
@@ -224,7 +220,7 @@ async function onDescriptionSave(newVal: string) {
         :key="i"
         class="mp-phone__thumb"
         :class="{ 'mp-phone__thumb--clickable': thumb.url }"
-        @click="onImageClick(i + 1)"
+        @click="onThumbClick(thumb)"
       >
         <img v-if="thumb.url" :src="thumb.url" :alt="thumb.description?.[lang] ?? ''" class="mp-phone__thumb-img" />
         <img
@@ -271,7 +267,7 @@ to invite continued scroll. No quinconce, no alternating sides.*/
 }
 .mp-phone__number {
   font-family: sans-serif;
-  font-weight: 900;
+  font-weight: var(--font-weight-black);
   font-size: var(--mp-phone-number-size, var(--font-size-md));
   color: transparent;
   -webkit-text-stroke: 1px var(--color-gray-medium);

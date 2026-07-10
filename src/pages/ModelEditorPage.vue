@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, markRaw, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { useSettings } from "vue-shared-ui"
-import { ArrowLeft, Box, ChevronDown, Circle, Crosshair, Eye, EyeOff, Grid, Lightbulb, LightbulbOff, Save, Square, Sun, Upload } from "lucide-vue-next"
+import { useSettings, useToast } from "vue-shared-ui"
+import { ArrowLeft, Box, ChevronDown, Circle, CircleHelp, Crosshair, Eye, EyeOff, Grid, Lightbulb, LightbulbOff, Save, Square, Sun, Upload, X } from "lucide-vue-next"
 import {
   Box3,
   BufferGeometry,
@@ -51,7 +51,7 @@ import { RenderPass }        from "three/examples/jsm/postprocessing/RenderPass.
 import { OutputPass }        from "three/examples/jsm/postprocessing/OutputPass.js"
 import { SMAAPass }          from "three/examples/jsm/postprocessing/SMAAPass.js"
 import { ViewHelper }        from "three/examples/jsm/helpers/ViewHelper.js"
-import { Line2 }             from "three/examples/jsm/lines/Line2.js"
+import { LineSegments2 }     from "three/examples/jsm/lines/LineSegments2.js"
 import { LineMaterial }      from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import {
@@ -78,11 +78,13 @@ import {
 const canvas      = ref<HTMLCanvasElement | null>(null)
 const viewportBox = ref<HTMLDivElement | null>(null)
 const status      = ref("Loading...")
+const toast       = useToast()
 
 //Route + project being edited
 const route  = useRoute()
 const router = useRouter()
-const modelId = computed(() => parseInt(String(route.params.id ?? ""), 10))
+//model_3d rows use uuid primary keys - the param is passed through as-is
+const modelId = computed(() => String(route.params.id ?? ""))
 const modelName = ref<string>("")
 const glbUrl       = ref<string | null>(null)
 //Named camera presets stored on the model (model_3d.views). The Views
@@ -119,12 +121,8 @@ const tab = ref<Tab>("materials")
 //author frames the shot WYSIWYG. Production viewer renders at the same
 //aspect (see main-project__stage style).
 const TARGET_ASPECT = 16 / 9
-//Camera animation timings (ms). axisSnap is short to keep view-change
-//responsive; goToStart is medium for visible motion; selectGizmo is
-//short so attaching to a light feels instant.
+//Camera animation timing (ms) - axis snap is short to keep view-change responsive
 const AXIS_SNAP_DURATION_MS    = 500
-const GO_TO_START_DURATION_MS  = 800
-const GIZMO_SELECT_DURATION_MS = 500
 //Light defaults
 const POINT_LIGHT_INTENSITY        = 2
 const DIRECTIONAL_LIGHT_INTENSITY  = 1.5
@@ -143,9 +141,6 @@ const LIGHT_GIZMO_RADIUS           = 0.14
 const WIREFRAME_LINE_OPACITY       = 0.9
 const WIREFRAME_OVERLAY_RENDER_ORDER = 998
 const LIGHT_GIZMO_RENDER_ORDER     = 999
-//Wireframe overlay threshold - edges between adjacent faces below this
-//angle (deg) are filtered. Keeps mesh "hard" edges only.
-const WIREFRAME_EDGE_THRESHOLD_DEG = 1
 //Ground plane (shadow catcher) - same setup as ThreeViewer.
 const GROUND_SIZE                  = 40
 const GROUND_OPACITY               = 0.35
@@ -359,14 +354,8 @@ const wireframeColor = ref(getString("editor3d_wireframe_mode_color", "#14b8a6")
 const WF_LINE_COLOR_KEY  = "editor3d_wireframe_line_color"
 const WF_MAT_PARAMS_KEY  = "editor3d_wireframe_material"
 const WF_MODE_COLOR_KEY  = "editor3d_wireframe_mode_color"
-//Edge-threshold degrees: EdgesGeometry drops every edge between faces
-//whose normals differ by LESS than this. Low values keep almost every
-//edge (so flat triangulation diagonals show through); high values keep
-//only sharp corners. Global pref so it applies to every project.
-const WF_EDGE_THRESHOLD_KEY = "editor3d_wireframe_edge_threshold"
 
 const wireframeOverlayColor = ref(getString(WF_LINE_COLOR_KEY, "#000000"))
-const wireframeEdgeThreshold = ref(parseFloat(getString(WF_EDGE_THRESHOLD_KEY, "1")) || 1)
 //Wireframe line thickness (pixels). Stored as a global pref like the
 //line color. Uses Line2/LineMaterial under the hood (screen-space
 //quads), so width is real on every platform - WebGL's gl.LINES width
@@ -375,6 +364,46 @@ const WF_LINE_WIDTH_KEY     = "editor3d_wireframe_line_width"
 const wireframeLineWidth    = ref(parseFloat(getString(WF_LINE_WIDTH_KEY, "1")) || 1)
 const showLightGizmos       = ref(true)        //sphere/diamond helpers visibility
 const showCenterCrosshair   = ref(false)       //semi-transparent + sign on screen center for framing
+
+//SHORTCUTS HELP - "?" button in the viewport toolbar opens a popup
+//anchored next to the toolbar (never a centered modal - the scene must
+//stay visible while reading). Esc also closes it. The most-used keys
+//are ALSO surfaced permanently in the bottom bar (BAR_SHORTCUTS).
+const helpOpen = ref(false)
+const SHORTCUTS: { keys: string; action: string }[] = [
+  { keys: "Left drag",         action: "Orbit the camera" },
+  { keys: "Right drag",        action: "Pan the camera" },
+  { keys: "Scroll",            action: "Zoom in / out" },
+  { keys: "Click mesh",        action: "Pick a mesh (Materials tab jumps to it)" },
+  { keys: "Enter",             action: "Add the picked mesh to the emissive list (Wireframe tab)" },
+  { keys: "Click light gizmo", action: "Select the light + show its move gizmo" },
+  { keys: "1 - 5",             action: "Switch panel tab (Materials / HDR / Lights / Wireframe / Views)" },
+  { keys: "W",                 action: "Toggle wireframe preview" },
+  { keys: "C",                 action: "Toggle perspective / orthographic camera" },
+  { keys: "G",                 action: "Toggle light gizmos" },
+  { keys: "X",                 action: "Toggle crosshair + safe frames" },
+  { keys: "F",                 action: "Frame the model (fit camera to bounds)" },
+  { keys: "H",                 action: "Toggle this shortcuts popup" },
+  { keys: "Ctrl + S",          action: "Save" },
+  { keys: "Del / Backspace",   action: "Delete the selected light" },
+  { keys: "Esc",               action: "Deselect mesh / light, close this popup" },
+  { keys: "Axis widget",       action: "Click the corner axes to snap the camera" },
+  { keys: "Drop .hdr / .exr",  action: "Upload an environment (HDR tab)" },
+]
+
+//BOTTOM BAR - always-visible strip of the most-used keys so the author
+//never has to open the popup for the basics.
+const BAR_SHORTCUTS: { keys: string; label: string }[] = [
+  { keys: "1-5",    label: "Tabs" },
+  { keys: "W",      label: "Wireframe" },
+  { keys: "C",      label: "Camera" },
+  { keys: "G",      label: "Gizmos" },
+  { keys: "X",      label: "Frames" },
+  { keys: "F",      label: "Fit" },
+  { keys: "Del",    label: "Delete light" },
+  { keys: "Ctrl+S", label: "Save" },
+  { keys: "H",      label: "Help" },
+]
 
 //START VIEW - persisted camera pose used by the production viewer for the
 //intro fly-in. Set from the editor via "Save start view" - captures the
@@ -426,7 +455,11 @@ function parseWfMatParams(raw: string): WfMaterialParams {
   try {
     const parsed = JSON.parse(raw) as Partial<WfMaterialParams>
     return { ...WF_MAT_PARAMS_DEFAULT, ...parsed }
-  } catch { return { ...WF_MAT_PARAMS_DEFAULT } }
+  } catch (e) {
+    //corrupt settings row: fall back to defaults but leave a trace
+    console.warn("[editor3d] malformed wireframe material pref, using defaults:", e)
+    return { ...WF_MAT_PARAMS_DEFAULT }
+  }
 }
 const wfMatParams = ref<WfMaterialParams>(parseWfMatParams(getString(WF_MAT_PARAMS_KEY, "")))
 
@@ -782,15 +815,11 @@ function requestRender(ms = RENDER_KEEPALIVE_MS_DEFAULT) {
 //===========================================================================
 //ONMOUNTED
 //===========================================================================
-//Editor canvas is constrained to the SAME aspect as the production viewer
-//(see TARGET_ASPECT constant at the top) so the author frames the shot
-//WYSIWYG. Returns the size as an aspect-locked box that fits inside the
-//container.
+//Canvas fills every available pixel of the stage. The 16:9 desktop +
+//9:16 mobile frames are drawn as inner outlines via the crosshair
+//toggle so the author still has a reference for the public viewport
+//while composing.
 function fitCanvasSize(containerW: number, containerH: number): { w: number; h: number } {
-  //Canvas fills every available pixel of the stage. The 16:9 desktop +
-  //9:16 mobile frames are drawn as inner outlines via the crosshair
-  //toggle so the author still has a reference for the public viewport
-  //while composing.
   return { w: Math.floor(containerW), h: Math.floor(containerH) }
 }
 
@@ -803,9 +832,10 @@ watch(settingsLoaded, (loaded) => {
   wireframeOverlayColor.value = getString(WF_LINE_COLOR_KEY, "#000000")
   wireframeColor.value        = getString(WF_MODE_COLOR_KEY, "#14b8a6")
   wfMatParams.value = parseWfMatParams(getString(WF_MAT_PARAMS_KEY, ""))
-  //push the freshly-loaded values onto the live overlays
+  //push the freshly-loaded values onto the live overlays (Line2 overlays
+  //use LineMaterial - the old LineBasicMaterial check matched nothing)
   for (const overlay of wfOverlays.values()) {
-    if (overlay.material instanceof LineBasicMaterial) {
+    if (overlay.material instanceof LineMaterial) {
       overlay.material.color.set(wireframeOverlayColor.value)
       overlay.material.needsUpdate = true
     }
@@ -1228,7 +1258,7 @@ function tuneShadowCameras(sphereRadius: number) {
 }
 
 async function loadProjectAndModel() {
-  if (!Number.isFinite(modelId.value)) {
+  if (!modelId.value) {
     status.value = "Missing model id"
     return
   }
@@ -1236,7 +1266,7 @@ async function loadProjectAndModel() {
     const res = await fetch(`/api/models/${modelId.value}`, { credentials: "include" })
     if (!res.ok) throw new Error(`fetch model ${res.status}`)
     const row = await res.json() as {
-      id: number
+      id: string
       name: string
       glbUrl: string | null
       viewerSettings: unknown
@@ -1475,7 +1505,7 @@ function hydrateSharedLight(spec: {
 }
 
 async function uploadGlb() {
-  if (!Number.isFinite(modelId.value)) return
+  if (!modelId.value) return
   const input = document.createElement("input")
   input.type = "file"
   input.accept = ".glb,.gltf"
@@ -1515,7 +1545,7 @@ async function uploadGlb() {
 }
 
 async function saveViewerSettings(payload: unknown) {
-  if (!Number.isFinite(modelId.value)) return
+  if (!modelId.value) return
   isSaving.value = true; saveError.value = null
   try {
     const res = await fetch(`/api/models/${modelId.value}/viewer-settings`, {
@@ -1846,7 +1876,7 @@ async function deleteHdr(entry: HdrEntry) {
 async function loadExistingHdris() {
   try {
     const res = await fetch("/api/files", { credentials: "include" })
-    if (!res.ok) return
+    if (!res.ok) throw new Error(`GET /api/files -> ${res.status}`)
     const all = await res.json() as Array<{ id: string; url: string; originalFilename: string }>
     hdris.value = all
       .filter((f) => /\.(hdr|exr|hdri)$/i.test(f.originalFilename))
@@ -1855,6 +1885,7 @@ async function loadExistingHdris() {
     //previews even before any of them is selected
     for (const entry of hdris.value) ensureHdrThumbnail(entry)
   } catch (e) {
+    hdrError.value = `HDR list failed: ${e instanceof Error ? e.message : String(e)}`
     console.warn("[model-editor] could not list existing HDRs:", e)
   }
 }
@@ -2391,7 +2422,9 @@ function ensureOverlayForMesh(mesh: Mesh) {
     renderer.getSize(size)
     overlayMat.resolution.copy(size)
   }
-  const overlay = new Line2(lineGeom, overlayMat)
+  //LineSegments2 (not Line2) - the geometry holds independent segment
+  //pairs, and its constructor is typed for LineSegmentsGeometry
+  const overlay = new LineSegments2(lineGeom, overlayMat)
   overlay.renderOrder = WIREFRAME_OVERLAY_RENDER_ORDER
   mesh.add(overlay)
   wfOverlays.set(mesh.uuid, overlay as unknown as LineSegments)
@@ -2468,7 +2501,9 @@ function onSweepAxis(idx: 0 | 1 | 2, v: number) {
 function removeWireframeOverlays() {
   for (const [uuid, overlay] of wfOverlays.entries()) {
     if (overlay.parent) overlay.parent.remove(overlay)
-    if (overlay.material instanceof LineBasicMaterial) overlay.material.dispose()
+    //overlays are Line2 with LineMaterial - the old LineBasicMaterial
+    //check matched nothing and leaked the materials
+    if (overlay.material instanceof LineMaterial) overlay.material.dispose()
     //preserve the pre-computed edges (re-used on next toggle).
     if (precomputedEdges.get(uuid) !== overlay.geometry) overlay.geometry.dispose()
   }
@@ -2516,15 +2551,18 @@ function onWfMatParam<K extends keyof WfMaterialParams>(key: K, value: WfMateria
 
 //Shared global-pref save with LOUD failure: silent .catch was hiding 401s
 //in dev:client and the user thought the value had persisted (locally it
-//had) but the DB had nothing. Logs success too so the network trace is
-//easy to verify.
-function saveGlobalPref(key: string, value: string, description: string) {
-  updateSetting(key, value, { type: "string", group: "editor3d", description })
-    .then(() => console.log(`[model-editor] saved ${key} = ${value}`))
+//had) but the DB had nothing. Failures toast; the boolean lets onSave
+//report an honest status once every pref settled.
+function saveGlobalPref(key: string, value: string, description: string): Promise<boolean> {
+  return updateSetting(key, value, { type: "string", group: "editor3d", description })
+    .then(() => {
+      console.log(`[model-editor] saved ${key} = ${value}`)
+      return true
+    })
     .catch((err: unknown) => {
       console.error(`[model-editor] FAILED to save ${key}:`, err)
-      // eslint-disable-next-line no-alert
-      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("editor3d:save-failed", { detail: { key, err: String(err) } }))
+      toast.error(`Global pref ${key} failed to save`)
+      return false
     })
 }
 
@@ -2770,7 +2808,14 @@ function tryPickLightGizmo(): boolean {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === "Enter" && pickedMeshIdx.value !== null) {
+  //Ctrl/Cmd+S saves from anywhere, including while typing in an input -
+  //authors expect the editor convention, not the browser save dialog.
+  if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
+    e.preventDefault()
+    if (!isSaving.value) void onSave()
+    return
+  }
+  if (e.key === "Enter" && pickedMeshIdx.value !== null && !isTypingTarget(e.target)) {
     addPickedToEmissive()
     e.preventDefault()
     return
@@ -2792,12 +2837,79 @@ function onKeyDown(e: KeyboardEvent) {
     }
   }
   if (e.key === "Escape") {
+    if (helpOpen.value) helpOpen.value = false
     if (pickedMeshIdx.value !== null) {
       pickedMeshIdx.value = null
       requestRender()
     }
     if (selectedLightId.value !== null) detachLightGizmo()
+    return
   }
+
+  //SINGLE-KEY shortcuts - suppressed while typing so panel inputs keep
+  //their normal characters. Modifier combos are excluded so browser
+  //shortcuts (Ctrl+W etc.) pass through untouched.
+  if (isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return
+  const key = e.key.toLowerCase()
+  const tabByDigit: Record<string, Tab> = { "1": "materials", "2": "hdr", "3": "lights", "4": "wireframe", "5": "views" }
+  if (tabByDigit[key]) {
+    tab.value = tabByDigit[key]!
+    e.preventDefault()
+    return
+  }
+  switch (key) {
+    case "w":
+      wireframeMode.value ? disableWireframeMode() : enableWireframeMode()
+      e.preventDefault()
+      break
+    case "c":
+      switchCamera(cameraMode.value === "persp" ? "ortho" : "persp")
+      e.preventDefault()
+      break
+    case "g":
+      onShowGizmosToggle(!showLightGizmos.value)
+      e.preventDefault()
+      break
+    case "x":
+      showCenterCrosshair.value = !showCenterCrosshair.value
+      requestRender()
+      e.preventDefault()
+      break
+    case "f":
+      frameModel()
+      e.preventDefault()
+      break
+    case "h":
+      helpOpen.value = !helpOpen.value
+      e.preventDefault()
+      break
+  }
+}
+
+//FRAME MODEL - fit the camera to the scene bounding sphere while keeping
+//the current view direction. Perspective animates with the same easing
+//as the axis snaps; ortho snaps instantly because the apparent size is
+//driven by the frustum (retuned from the new distance), not the dolly.
+function frameModel() {
+  if (!cameraRef || !controls || sceneMeshes.value.length === 0) return
+  const focus = sceneCenter.clone()
+  const dir = cameraRef.position.clone().sub(controls.target)
+  if (dir.lengthSq() < 0.000001) dir.set(1, 1, 1)
+  dir.normalize()
+  const fov = (perspectiveCamera?.fov ?? CAMERA_FOV) * (Math.PI / 180)
+  const distance = Math.max(sceneRadius / Math.sin(fov / 2) * 1.2, ORBIT_MIN_DISTANCE)
+  const toPos = focus.clone().add(dir.multiplyScalar(distance))
+  if (cameraMode.value === "ortho") {
+    cameraRef.position.copy(toPos)
+    controls.target.copy(focus)
+    controls.update()
+    tuneOrthoFrustum()
+    requestRender(300)
+    return
+  }
+  controls.enabled = false
+  cameraAnim = makeCameraAnim({ toPos, toTarget: focus, duration: AXIS_SNAP_DURATION_MS })
+  requestRender(AXIS_SNAP_DURATION_MS + 200)
 }
 
 //Skip the global delete shortcut when the user is editing text - the
@@ -2909,7 +3021,9 @@ function readCurrentCamera(): { position: [number, number, number]; target: [num
 }
 
 async function persistViews(next: Model3dView[]) {
-  if (!Number.isFinite(modelId.value)) return
+  //modelId is a uuid string since the model_3d migration - the old
+  //Number.isFinite check was always false and silently blocked every save.
+  if (!modelId.value) return
   isSaving.value = true; saveError.value = null
   try {
     const res = await fetch(`/api/models/${modelId.value}`, {
@@ -2976,9 +3090,8 @@ function applyView(v: Model3dView) {
 }
 
 //===========================================================================
-//SAVE (stub)
+//SAVE
 //===========================================================================
-const dirty = computed(() => true)
 async function onSave() {
   const payload = {
     //null when no start view captured - production viewer falls back to
@@ -3038,13 +3151,16 @@ async function onSave() {
   //Flush the global editor prefs to the settings table now too. These
   //used to auto-save on every panel edit which made changes permanent
   //before the user could undo - now everything (project + globals)
-  //persists in a single explicit Save click.
-  saveGlobalPref(WF_LINE_COLOR_KEY,    wireframeOverlayColor.value, "Wireframe line color (shared across every project in the editor).")
-  saveGlobalPref(WF_LINE_WIDTH_KEY,    String(wireframeLineWidth.value), "Wireframe line thickness in pixels (shared across every project in the editor).")
-  saveGlobalPref(WF_MODE_COLOR_KEY,    wireframeColor.value,        "Wireframe mode color (shared across every project in the editor).")
-  saveGlobalPref(WF_EDGE_THRESHOLD_KEY, String(wireframeEdgeThreshold.value), "Wireframe edge-threshold in degrees (shared across every project in the editor).")
-  saveGlobalPref(WF_MAT_PARAMS_KEY,    JSON.stringify(wfMatParams.value),     "Wireframe shared material params (color, metalness, roughness, env, specular).")
-  status.value = saveError.value ? `Save failed: ${saveError.value}` : "Saved"
+  //persists in a single explicit Save click. Status only says "Saved"
+  //once every pref actually settled OK.
+  const prefsOk = await Promise.all([
+    saveGlobalPref(WF_LINE_COLOR_KEY, wireframeOverlayColor.value,      "Wireframe line color (shared across every project in the editor)."),
+    saveGlobalPref(WF_LINE_WIDTH_KEY, String(wireframeLineWidth.value), "Wireframe line thickness in pixels (shared across every project in the editor)."),
+    saveGlobalPref(WF_MODE_COLOR_KEY, wireframeColor.value,             "Wireframe mode color (shared across every project in the editor)."),
+    saveGlobalPref(WF_MAT_PARAMS_KEY, JSON.stringify(wfMatParams.value), "Wireframe shared material params (color, metalness, roughness, env, specular)."),
+  ])
+  const allOk = !saveError.value && prefsOk.every(Boolean)
+  status.value = allOk ? "Saved" : `Save failed${saveError.value ? `: ${saveError.value}` : " (global prefs)"}`
   setTimeout(() => { status.value = `Materials: ${materials.value.length}` }, 2000)
 }
 </script>
@@ -3077,7 +3193,18 @@ async function onSave() {
 
       <p v-if="glbUploadError" class="editor__top-err">{{ glbUploadError }}</p>
 
-      <div class="editor__hud">{{ status }}</div>
+      <!--BOTTOM BAR - status readout + always-visible shortcut hints.
+      Stops short of the ViewHelper's 128px corner viewport so the axis
+      cube stays clickable.-->
+      <div class="editor__bottom-bar">
+        <span class="editor__bottom-status">{{ status }}</span>
+        <div class="editor__bottom-keys">
+          <span v-for="s in BAR_SHORTCUTS" :key="s.keys" class="editor__bottom-hint">
+            <kbd class="editor__bottom-kbd">{{ s.keys }}</kbd>
+            <span class="editor__bottom-label">{{ s.label }}</span>
+          </span>
+        </div>
+      </div>
 
      <div ref="viewportBox" class="editor__viewport-box">
       <canvas ref="canvas" class="editor__canvas"></canvas>
@@ -3143,13 +3270,34 @@ async function onSave() {
           </button>
         </div>
 
-        <!--START POSE grid - two columns (desktop / phone) with a greyed
-        device icon as a column "label", then the two action buttons below
-        (save + go). Space between the columns separates the two devices.-->
-        <!--Legacy desktop / phone start-view buttons were removed - the
-        Views tab is now the canonical way to capture + apply named
-        camera presets (one model can have arbitrarily many).-->
+        <!--SHORTCUTS HELP toggle - own row under the cluster-->
+        <button
+          type="button"
+          class="editor__viewport-tool"
+          :class="{ 'editor__viewport-tool--off': !helpOpen }"
+          data-tooltip="Keyboard + mouse shortcuts"
+          @click="helpOpen = !helpOpen"
+        >
+          <CircleHelp :size="14" />
+        </button>
+      </div>
 
+      <!--SHORTCUTS HELP popup - anchored LEFT of the bottom-right toolbar
+      (deliberately not a centered modal: the scene stays visible while
+      the author reads). Esc or the close button dismisses it.-->
+      <div v-if="helpOpen" class="editor__help">
+        <header class="editor__help-head">
+          <span class="editor__help-title">Shortcuts</span>
+          <button type="button" class="editor__help-close" aria-label="Close shortcuts" @click="helpOpen = false">
+            <X :size="12" />
+          </button>
+        </header>
+        <ul class="editor__help-list">
+          <li v-for="s in SHORTCUTS" :key="s.keys" class="editor__help-item">
+            <span class="editor__help-keys">{{ s.keys }}</span>
+            <span class="editor__help-action">{{ s.action }}</span>
+          </li>
+        </ul>
       </div>
      </div>
     </div>
@@ -3463,7 +3611,7 @@ async function onSave() {
               <ChevronDown :size="14" class="editor__section-chevron" />
             </button>
             <div v-show="sectionOpen.wfMaterial" class="editor__section-body">
-              <p class="editor__warning">⚠ Material, lines color and mode color are shared across the wireframe mode of every project — changes apply everywhere.</p>
+              <p class="editor__warning">Material, lines color and mode color are shared across the wireframe mode of every project — changes apply everywhere.</p>
               <div class="editor__row">
                 <label class="editor__row-label">Lines color</label>
                 <div class="editor__row-control">
@@ -3723,9 +3871,9 @@ async function onSave() {
       </div>
 
       <footer class="editor__panel-footer">
-        <button type="button" class="editor__save" :disabled="!dirty" @click="onSave">
+        <button type="button" class="editor__save" :disabled="isSaving" @click="onSave">
           <Save :size="14" />
-          <span>Save</span>
+          <span>{{ isSaving ? "Saving…" : "Save" }}</span>
         </button>
       </footer>
     </aside>
@@ -3841,6 +3989,52 @@ the toolbar still reads as one rhythm.*/
   gap: var(--spacing-sm);
 }
 
+/*SHORTCUTS HELP popup - floats LEFT of the bottom-right toolbar so it
+never covers the model dead-center. Same glass styling as the toolbar.*/
+.editor__help {
+  position: absolute;
+  right: calc(var(--spacing-md) + 2rem + var(--spacing-sm));
+  bottom: calc(128px + var(--spacing-md));
+  width: 20rem;
+  background-color: hsl(0 0% 0% / 0.6);
+  border: var(--border-width-sm) solid var(--color-text-secondary);
+  backdrop-filter: blur(var(--filter-blur));
+  z-index: 6;
+}
+.editor__help-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: var(--border-width-sm) solid var(--color-gray-medium);
+}
+.editor__help-title {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-text-hover);
+}
+.editor__help-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.editor__help-close:hover { color: var(--color-accent); }
+.editor__help-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-xs) 0;
+}
+.editor__help-item {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) 1fr;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xxs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+}
+.editor__help-keys { color: var(--color-accent); white-space: nowrap; }
+.editor__help-action { color: var(--color-text-secondary); }
+
 /*SCREEN CENTER crosshair - two thin lines crossing in the middle of the
 viewport, painted with the existing accent colour at low alpha so they
 read as a soft guide rather than active content. position:absolute on
@@ -3950,17 +4144,62 @@ on dark overlays; this is consistent across browsers.*/
   border: var(--border-width-sm) solid var(--color-gray-medium);
 }
 
-.editor__hud {
-  position: absolute; bottom: var(--spacing-md); left: 50%;
-  transform: translateX(-50%);
+/*BOTTOM BAR - one strip for status + key hints. Ends before the
+ViewHelper's 128px corner so the axis cube stays clickable.*/
+.editor__bottom-bar {
+  position: absolute;
+  left:   var(--spacing-md);
+  right:  calc(128px + var(--spacing-md));
+  bottom: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
   padding: var(--spacing-xs) var(--spacing-md);
   background-color: hsl(0 0% 0% / 0.6);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  backdrop-filter: blur(var(--filter-blur));
+  pointer-events: none;
+  z-index: 5;
+}
+.editor__bottom-status {
   color: var(--color-text-hover);
   font-size: var(--font-size-xs);
   font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
-  letter-spacing: var(--letter-spacing-wide);
-  backdrop-filter: blur(var(--filter-blur));
-  pointer-events: none;
+  letter-spacing: var(--letter-spacing-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.editor__bottom-keys {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+}
+.editor__bottom-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+.editor__bottom-kbd {
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+  border: var(--border-width-sm) solid var(--color-gray-medium);
+  padding: 0 var(--spacing-xxs);
+  line-height: 1.4;
+}
+/*Hide the hint labels first, then the whole key strip, as the viewport
+narrows - the status readout keeps priority.*/
+@media (max-width: 1400px) {
+  .editor__bottom-label { display: none; }
+}
+@media (max-width: 1100px) {
+  .editor__bottom-keys { display: none; }
 }
 
 .editor__panel {

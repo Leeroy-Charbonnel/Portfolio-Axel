@@ -1,4 +1,4 @@
-import { onMounted, onBeforeUnmount, ref, type Ref } from "vue"
+import { onMounted, onBeforeUnmount, ref, type ComputedRef, type Ref } from "vue"
 
 interface UseInViewOptions {
   threshold?:  number
@@ -9,7 +9,7 @@ interface UseInViewOptions {
 
 //Observe whether a target element is currently inside the viewport.
 //Vue 3 port of the original React useIsInView hook from the portfolio.
-export function useInView(target: Ref<HTMLElement | null>, options: UseInViewOptions = {}) {
+export function useInView(target: Ref<HTMLElement | null> | ComputedRef<HTMLElement | null>, options: UseInViewOptions = {}) {
   const { threshold = 0, rootMargin = "0px", once = false } = options
   const inView = ref(false)
   let observer: IntersectionObserver | null = null

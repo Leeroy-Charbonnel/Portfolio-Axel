@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, toRef, watch } from "vue"
+import { computed, ref, toRef, watch } from "vue"
 import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink, Box, LayoutTemplate } from "lucide-vue-next"
 import { useRouter } from "vue-router"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { useEffectiveViewerSettings, useResolvedGlbUrl } from "../../composables/useEffectiveViewerSettings"
 import ModelPicker from "./ModelPicker.vue"
+import { useInView } from "../../composables/useInView"
 import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
 import { useWireframeSweep } from "../../composables/useWireframeSweep"
-import { pickImageFile, statLetter, statName } from "../../lib/portfolio-utils"
+import { statLetter, statName } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import AnimatedCounter from "./AnimatedCounter.vue"
 import EditableText from "./EditableText.vue"
@@ -19,13 +20,6 @@ import ReplaceImageButton from "./ReplaceImageButton.vue"
 import ThreeViewer from "./ThreeViewer.vue"
 import { MAIN_PROJECT_LAYOUTS, type MainProjectDto, type MainProjectLayout } from "../../types/portfolio"
 
-//Sketchfab viewer is loaded from a global <script> tag in index.html.
-declare global {
-  interface Window {
-    Sketchfab: any
-  }
-}
-
 const props = defineProps<{
   project: MainProjectDto
   index:   number
@@ -33,7 +27,7 @@ const props = defineProps<{
 
 const { lang } = useLanguage()
 const { editMode } = useAdmin()
-const { data: portfolioData, uploadFile, updateMainProject, deleteMainProject, setMainProjectSoftware } = usePortfolio()
+const { data: portfolioData, replaceImage, updateMainProject, deleteMainProject, setMainProjectSoftware } = usePortfolio()
 
 //Merge per-project viewerSettings with the admin's GLOBAL editor prefs.
 //Logic shared with MainProjectPhone via the composable.
@@ -48,7 +42,7 @@ const modelPickerValue = computed(() => ({
   desktopView: props.project.model3dDesktopView,
   mobileView:  props.project.model3dMobileView,
 }))
-async function onModelPickerChange(v: { model3dId: number | null; desktopView: string; mobileView: string }) {
+async function onModelPickerChange(v: { model3dId: string | null; desktopView: string; mobileView: string }) {
   await updateMainProject(props.project.id, {
     model3dId:          v.model3dId,
     model3dDesktopView: v.desktopView,
@@ -86,30 +80,54 @@ const containerRef = ref<HTMLElement | null>(null)
 useWireframeSweep(containerRef)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
 
-const isInView    = ref(false)
+const { inView: isInView } = useInView(containerRef, { threshold: 0.3, rootMargin: "0px 0px 200px 0px" })
 const isWireframe = ref(false)
+
+//FALLBACK PREVIEW - the public stage picks its surface automatically:
+//Three.js when a model is attached, else the Sketchfab embed, else the
+//flat image. Edit mode shows the flat image by default (replace buttons
+//need it) and this switcher lets the admin FORCE a stage to check what
+//each fallback actually looks like without leaving edit mode.
+type ViewerPreview = "edit" | "three" | "sketchfab" | "image"
+const viewerPreview = ref<ViewerPreview>("edit")
+watch(editMode, () => { viewerPreview.value = "edit" })
+
+//The surface currently occupying the stage.
+const activeSurface = computed<"three" | "sketchfab" | "image">(() => {
+  if (editMode.value) {
+    if (viewerPreview.value === "three"     && resolvedGlbUrl.value)  return "three"
+    if (viewerPreview.value === "sketchfab" && props.project.modelId) return "sketchfab"
+    return "image"
+  }
+  if (resolvedGlbUrl.value) return "three"
+  if (props.project.modelId && !sketchfabError.value) return "sketchfab"
+  return "image"
+})
 
 //Sketchfab lifecycle is owned by the shared composable - same flow lives
 //in MainProjectPhone, so the behaviour stays identical between layouts.
+//The composable's editMode input really means "iframe is v-if'd out";
+//with the preview switcher the iframe exists whenever the sketchfab
+//surface is active, so that's the signal we hand it.
+const sketchfabSuspended = computed(() => activeSurface.value !== "sketchfab")
 const sketchfab = useSketchfabViewer({
   iframeRef,
   modelId:  toRef(() => props.project.modelId),
   isInView,
-  editMode,
+  editMode: sketchfabSuspended,
   logTag:   "MainProject",
 })
 const sketchfabError = sketchfab.error
 const isLoading      = sketchfab.isLoading
 
-const mainImageUrl      = computed(() => props.project.mainImageUrl)
-const wireframeImageUrl = computed(() => props.project.mainWireframeUrl ?? props.project.mainImageUrl)
+const mainImageUrl = computed(() => props.project.mainImageUrl)
 
 //Used to decide whether to render the wireframe button. We show it when
 //ANY of these has a wireframe variant available:
-//  - the 3D viewer (we always have one when a .glb is uploaded - the
-//    ThreeViewer carries its own wireframe-mode rig from the editor)
-//  - the main image
-//  - at least one thumbnail
+//- the 3D viewer (we always have one when a .glb is uploaded - the
+//  ThreeViewer carries its own wireframe-mode rig from the editor)
+//- the main image
+//- at least one thumbnail
 //Without a .glb and without any wireframe image variants, the button
 //would be a no-op so we hide it.
 const hasAnyWireframeImage = computed(() => {
@@ -153,27 +171,21 @@ function onImageClick(startIndex: number) {
   openLightbox(lightboxImages.value, startIndex)
 }
 
-const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && !editMode.value))
-const showMainImage = computed(() => !showSketchfab.value || isLoading.value)
+//Thumbnails map to lightbox slots by URL, not by position - lightboxImages
+//skips the main image when missing and skips url-less thumbs, so i+1 would
+//open the wrong image. The url is guaranteed present in the array because
+//it's built from the same thumbnails with the same wireframe resolution.
+function onThumbnailClick(thumb: { url: string | null; wireframeUrl: string | null }) {
+  if (editMode.value || !thumb.url) return
+  const url = isWireframe.value ? thumb.wireframeUrl ?? thumb.url : thumb.url
+  openLightbox(lightboxImages.value, lightboxImages.value.findIndex((img) => img.url === url))
+}
 
-let observer: IntersectionObserver | null = null
-
-onMounted(() => {
-  if (!containerRef.value) return
-  observer = new IntersectionObserver(
-    (entries) => {
-      const entry = entries[0]
-      if (entry) isInView.value = entry.isIntersecting
-    },
-    { threshold: 0.3, rootMargin: "0px 0px 200px 0px" },
-  )
-  observer.observe(containerRef.value)
-})
-
-onBeforeUnmount(() => {
-  observer?.disconnect()
-  observer = null
-})
+const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && activeSurface.value === "sketchfab"))
+//The flat image doubles as the Sketchfab poster while the embed loads.
+const showImageLayer = computed(() =>
+  activeSurface.value === "image"
+  || (activeSurface.value === "sketchfab" && (!showSketchfab.value || isLoading.value)))
 
 //Wireframe state is local to this layout - the composable doesn't own it.
 watch(editMode, (newVal) => { if (newVal === false) isWireframe.value = false })
@@ -226,22 +238,16 @@ async function onStatSave(key: "vertices" | "edges" | "faces" | "triangles", val
   })
 }
 
-async function onReplaceMainImage() {
-  const file = await pickImageFile()
-  if (!file) return
-  try {
-    const { id } = await uploadFile(file)
+function onReplaceMainImage() {
+  return replaceImage("main image", async (id) => {
     await updateMainProject(props.project.id, { mainImageFileId: id })
-  } catch (e) { console.error("[MainProject] replace main image failed:", e) }
+  })
 }
 
-async function onReplaceWireframeImage() {
-  const file = await pickImageFile()
-  if (!file) return
-  try {
-    const { id } = await uploadFile(file)
+function onReplaceWireframeImage() {
+  return replaceImage("wireframe image", async (id) => {
     await updateMainProject(props.project.id, { mainWireframeFileId: id })
-  } catch (e) { console.error("[MainProject] replace wireframe image failed:", e) }
+  })
 }
 
 async function onDelete() {
@@ -253,7 +259,9 @@ async function onDelete() {
 //Server expects {fileId, wireframeFileId, description}; the API GET also
 //exposes resolved URLs which we strip before PUTting to keep the body tight.
 
-function serializeThumbnails(items: { fileId: string | null; wireframeFileId: string | null; description: { en: string; fr: string } }[]): any[] {
+type ThumbnailPatch = { fileId: string | null; wireframeFileId: string | null; description: { en: string; fr: string } }
+
+function serializeThumbnails(items: ThumbnailPatch[]): ThumbnailPatch[] {
   return items.map((t) => ({
     fileId:          t.fileId,
     wireframeFileId: t.wireframeFileId,
@@ -266,33 +274,27 @@ async function addThumbnail() {
     fileId:          null,
     wireframeFileId: null,
     description:     { en: "", fr: "" },
-  }] as any
+  }]
   await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next) })
 }
 
 async function removeThumbnail(idx: number) {
   const next = (props.project.thumbnails ?? []).filter((_, i) => i !== idx)
-  await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next as any) })
+  await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next) })
 }
 
-async function replaceThumbnailImage(idx: number) {
-  const file = await pickImageFile()
-  if (!file) return
-  try {
-    const { id } = await uploadFile(file)
+function replaceThumbnailImage(idx: number) {
+  return replaceImage("thumbnail image", async (id) => {
     const next = (props.project.thumbnails ?? []).map((t, i) => i === idx ? { ...t, fileId: id } : t)
-    await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next as any) })
-  } catch (e) { console.error("[MainProject] replace thumbnail failed:", e) }
+    await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next) })
+  })
 }
 
-async function replaceThumbnailWireframe(idx: number) {
-  const file = await pickImageFile()
-  if (!file) return
-  try {
-    const { id } = await uploadFile(file)
+function replaceThumbnailWireframe(idx: number) {
+  return replaceImage("thumbnail wireframe", async (id) => {
     const next = (props.project.thumbnails ?? []).map((t, i) => i === idx ? { ...t, wireframeFileId: id } : t)
-    await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next as any) })
-  } catch (e) { console.error("[MainProject] replace thumbnail wireframe failed:", e) }
+    await updateMainProject(props.project.id, { thumbnails: serializeThumbnails(next) })
+  })
 }
 </script>
 
@@ -339,20 +341,20 @@ async function replaceThumbnailWireframe(idx: number) {
       on top of it (right-edge column by default, switched per layout).-->
       <div class="main-project__stage">
         <div class="main-project__viewer">
-          <!--3D MODEL - when the project has a .glb uploaded, render via
-          local Three.js viewer (wireframe + materials + lights are driven
-          by the saved viewerSettings). Fallback to the Sketchfab iframe
-          when no .glb is present.-->
+          <!--STAGE SURFACES - activeSurface picks exactly one: Three.js when
+          a model is attached, else the Sketchfab embed, else the flat image.
+          In edit mode the flat image wins by default and the preview
+          switcher below forces a specific surface.-->
           <ThreeViewer
-            v-if="resolvedGlbUrl && !editMode"
-            :glb-url="resolvedGlbUrl"
+            v-if="activeSurface === 'three'"
+            :glb-url="resolvedGlbUrl ?? ''"
             :settings="effectiveViewerSettings"
             :wireframe="isWireframe"
             :is-in-view="isInView"
             class="main-project__three"
           />
 
-          <template v-if="!resolvedGlbUrl && showMainImage && mainImageUrl">
+          <template v-if="showImageLayer && mainImageUrl">
             <img
               :src="mainImageUrl ?? ''"
               :alt="project.title[lang]"
@@ -368,25 +370,61 @@ async function replaceThumbnailWireframe(idx: number) {
               class="main-project__viewer-image main-project__wf-layer wf-layer"
             />
           </template>
-          <div v-else-if="!resolvedGlbUrl && showMainImage && !mainImageUrl" class="main-project__viewer-empty">
+          <div v-else-if="showImageLayer && !mainImageUrl" class="main-project__viewer-empty">
             No image
           </div>
 
           <iframe
-            v-if="!resolvedGlbUrl && project.modelId && !editMode"
+            v-if="activeSurface === 'sketchfab'"
             ref="iframeRef"
             :title="`Sketchfab Model - ${project.title[lang]}`"
             class="main-project__viewer-embed"
             :class="{ 'main-project__viewer-embed--hidden': !showSketchfab || isLoading }"
           ></iframe>
 
-          <ReplaceImageButton v-if="editMode && !resolvedGlbUrl" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
+          <ReplaceImageButton v-if="editMode && activeSurface === 'image'" @click="isWireframe ? onReplaceWireframeImage() : onReplaceMainImage()" />
 
           <!--OVERLAY ACTIONS - admin shortcuts + detail page link. Stacked
           vertically in a flex wrapper so they don't overlap (previously
           they shared a single absolute position and the second hid the
           first).-->
           <div class="main-project__overlay-actions">
+            <!--FALLBACK PREVIEW - forces the stage onto one surface so the
+            admin can check what each public fallback (3D -> Sketchfab ->
+            image) looks like without leaving edit mode. "Edit" restores
+            the editable flat image.-->
+            <div v-if="editMode" class="main-project__preview-switch" role="group" aria-label="Preview surface">
+              <button
+                type="button"
+                class="main-project__overlay-btn"
+                :class="{ 'main-project__overlay-btn--active': viewerPreview === 'edit' }"
+                title="Editable flat image (default)"
+                @click="viewerPreview = 'edit'"
+              >Edit</button>
+              <button
+                type="button"
+                class="main-project__overlay-btn"
+                :class="{ 'main-project__overlay-btn--active': viewerPreview === 'three' }"
+                :disabled="!resolvedGlbUrl"
+                :title="resolvedGlbUrl ? 'Preview the Three.js viewer' : 'No 3D model attached'"
+                @click="viewerPreview = 'three'"
+              >3D</button>
+              <button
+                type="button"
+                class="main-project__overlay-btn"
+                :class="{ 'main-project__overlay-btn--active': viewerPreview === 'sketchfab' }"
+                :disabled="!project.modelId"
+                :title="project.modelId ? 'Preview the Sketchfab embed fallback' : 'No Sketchfab model id set'"
+                @click="viewerPreview = 'sketchfab'"
+              >Sketchfab</button>
+              <button
+                type="button"
+                class="main-project__overlay-btn"
+                :class="{ 'main-project__overlay-btn--active': viewerPreview === 'image' }"
+                title="Preview the flat image fallback"
+                @click="viewerPreview = 'image'"
+              >Image</button>
+            </div>
             <!--MODEL PICKER - in edit mode only. Lets the admin assign
             which model + which views (desktop / mobile) this project
             renders. Selection writes through updateMainProject so the
@@ -428,10 +466,10 @@ async function replaceThumbnailWireframe(idx: number) {
             :key="i"
             class="main-project__thumbnail"
             :class="{ 'main-project__thumbnail--clickable': !editMode && thumb.url }"
-            @click="onImageClick(i + 1)"
+            @click="onThumbnailClick(thumb)"
           >
             <img v-if="thumb.url" :src="thumb.url" :alt="thumb.description?.[lang] ?? ''" />
-            <div v-else-if="!thumb.url" class="main-project__thumbnail-empty">No image</div>
+            <div v-else class="main-project__thumbnail-empty">No image</div>
             <img
               v-if="thumb.wireframeUrl"
               :src="thumb.wireframeUrl"
@@ -640,7 +678,7 @@ Layout picker pins top-right of the article (absolute), never clips.
 .main-project__number {
   font-family: sans-serif;
   font-size: var(--mp-number-size);
-  font-weight: 900;
+  font-weight: var(--font-weight-black);
   line-height: 1;
   color: transparent;
   -webkit-text-stroke: var(--border-width-md) var(--color-gray-medium);
@@ -773,6 +811,25 @@ styled in place; the wrapper owns the absolute positioning.*/
 .main-project__overlay-btn:hover {
   background-color: var(--color-accent);
   color: hsl(0 0% 0%);
+}
+.main-project__overlay-btn--active {
+  background-color: var(--color-accent);
+  color: hsl(0 0% 0%);
+}
+.main-project__overlay-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.main-project__overlay-btn:disabled:hover {
+  background-color: hsl(0 0% 0% / 0.7);
+  color: var(--color-accent);
+}
+
+/*FALLBACK PREVIEW switch - one row of overlay pills in the overlay stack*/
+.main-project__preview-switch {
+  display: flex;
+  gap: var(--spacing-xxs);
+  justify-content: flex-end;
 }
 
 .main-project__viewer-empty {
@@ -1033,10 +1090,10 @@ the right without forcing the description to wrap mid-paragraph.*/
 that this row doesn't appear to visitors (same hue as the wireframe
 section in the model editor's Material card).*/
 .main-project__model-id--admin-only {
-  background-color: hsl(0 70% 50% / 0.08);
-  border: var(--border-width-sm) solid hsl(0 70% 50% / 0.35);
+  background-color: hsl(var(--destructive) / 0.08);
+  border: var(--border-width-sm) solid hsl(var(--destructive) / 0.35);
 }
-.main-project__model-id--admin-only .main-project__model-id-label { color: hsl(0 80% 70%); }
+.main-project__model-id--admin-only .main-project__model-id-label { color: hsl(var(--destructive)); }
 
 .main-project__model-id-label {
   color: var(--color-text-tertiary);
@@ -1049,9 +1106,9 @@ section in the model editor's Material card).*/
   color: var(--color-text-hover);
 }
 
-/*STATS - vertical column sidebar in the details-top grid. Each row is icon
-+ number on a single horizontal line. Replaces the old text labels with
-the StatIcon SVG so a quick glance shows vert/edge/face counts.*/
+/*STATS - vertical column sidebar in the details-top grid. Each row is a
+letter badge + number on a single horizontal line so a quick glance shows
+vert/edge/face counts.*/
 .main-project__stats {
   display: flex;
   flex-direction: column;
@@ -1172,11 +1229,6 @@ query / simulate-phone block below flips display:block and positions it.*/
 breakpoint switches to the "quinconce" staggered layout: thumbnails +
 description share ONE side, viewer takes the opposite side, and the desc
 spills past the stage bottom into the next project.*/
-.main-project__layout-picker--mobile-static {
-  position: static;
-  margin-left: auto;
-  align-self: flex-end;
-}
 
 /*=== PHONE QUINCONCE - shared rules + the @media + simulate-phone wrappers ==*/
 @media (max-width: 480px) {
@@ -1276,7 +1328,7 @@ spills past the stage bottom into the next project.*/
     width: 55%;
     padding: var(--spacing-sm) var(--spacing-md);
     background-color: hsl(var(--background) / 0.65);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(var(--filter-blur));
     border: var(--border-width-sm) solid var(--color-gray-medium);
     color: var(--color-text);
     font-size: var(--font-size-sm);
@@ -1352,7 +1404,7 @@ html.simulate-phone .main-project__description--phone {
   width: 55%;
   padding: var(--spacing-sm) var(--spacing-md);
   background-color: hsl(var(--background) / 0.65);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--filter-blur));
   border: var(--border-width-sm) solid var(--color-gray-medium);
   color: var(--color-text);
   font-size: var(--font-size-sm);

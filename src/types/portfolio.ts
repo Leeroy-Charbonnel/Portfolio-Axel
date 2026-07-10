@@ -46,7 +46,7 @@ export interface Model3dView {
   wireframe: boolean
 }
 export interface Model3dDto {
-  id:              number
+  id:              string
   name:            string
   glbFileId:       string
   glbUrl:          string
@@ -75,12 +75,21 @@ export const MAIN_PROJECT_LAYOUTS: { key: MainProjectLayout; label: string }[] =
 
 //DETAIL PAGE - per-project content grid (bento-style). Authored via the
 //page editor, rendered on the public detail page route.
-//- text:     markdown source per language
-//- image:    file row + resolved url
-//- viewer3d: embeds the parent project's own ThreeViewer (no per-block
-//            settings - it inherits glbUrl + viewerSettings from the
-//            project, so the block is just a placement marker).
-export type DetailBlockType = "text" | "image" | "viewer3d"
+//- text:      markdown source per language
+//- image:     file row + resolved url (animated gifs render natively here)
+//- video:     uploaded video file; gif-style playback via autoplay+loop+muted
+//- carousel:  ordered list of images with arrows + dots
+//- compare:   before/after pair split by a mouse-driven divider
+//- accordion: collapsible sections, markdown body per language
+//- viewer3d:  embeds a reusable model_3d asset via named views
+export type DetailBlockType =
+  | "text"
+  | "image"
+  | "video"
+  | "carousel"
+  | "compare"
+  | "accordion"
+  | "viewer3d"
 
 export interface DetailBlock {
   id:       string
@@ -100,11 +109,66 @@ export interface DetailBlock {
   content:  DetailBlockContent
 }
 
-//Per-type content. Union narrowed by DetailBlock.type at usage sites.
+//Per-type content shapes. url fields are resolved server-side from the
+//fileId at read time and stripped back to null on save (fileId is the
+//source of truth, urls are denormalized for rendering).
+export interface TextBlockContent {
+  text: Bilingual
+}
+export interface ImageBlockContent {
+  fileId: string | null
+  url:    string | null
+  alt?:   Bilingual
+}
+export interface VideoBlockContent {
+  fileId:   string | null
+  url:      string | null
+  //gif-style playback = autoplay + loop + muted + no controls
+  autoplay: boolean
+  loop:     boolean
+  muted:    boolean
+  controls: boolean
+}
+export interface CarouselItem {
+  fileId:   string
+  url:      string | null
+  caption?: Bilingual
+}
+export interface CarouselBlockContent {
+  items: CarouselItem[]
+  //0 = manual only; otherwise auto-advance every N ms
+  intervalMs: number
+}
+export interface CompareBlockContent {
+  beforeFileId: string | null
+  beforeUrl:    string | null
+  afterFileId:  string | null
+  afterUrl:     string | null
+  beforeLabel:  Bilingual
+  afterLabel:   Bilingual
+}
+export interface AccordionItem {
+  title: Bilingual
+  body:  Bilingual   //markdown source
+}
+export interface AccordionBlockContent {
+  items: AccordionItem[]
+}
+export interface Viewer3dBlockContent {
+  model3dId:   string | null
+  desktopView: string
+  mobileView:  string
+}
+
+//Union narrowed by DetailBlock.type at usage sites.
 export type DetailBlockContent =
-  | { text:   Bilingual }                                            //type: "text"
-  | { fileId: string | null; url: string | null; alt?: Bilingual }   //type: "image"
-  | { model3dId: number | null; desktopView: string; mobileView: string }  //type: "viewer3d"
+  | TextBlockContent
+  | ImageBlockContent
+  | VideoBlockContent
+  | CarouselBlockContent
+  | CompareBlockContent
+  | AccordionBlockContent
+  | Viewer3dBlockContent
 
 export interface DetailPage {
   blocks: DetailBlock[]
@@ -122,7 +186,7 @@ export interface MainProjectDto {
   //3D model reference - the project's viewer picks a model + which
   //named view to apply per breakpoint. model3dId is null until the
   //admin assigns one (or until the migration script has run).
-  model3dId:           number | null
+  model3dId:           string | null
   model3dDesktopView:  string
   model3dMobileView:   string
   //Legacy fields - still resolved by the server from the file/blob
@@ -172,10 +236,9 @@ export interface ProfileDto {
 //(ThreeViewer) layer these over the per-project values so a tweak in
 //one project propagates to every model on the site.
 export interface EditorPrefsDto {
-  wireframeLineColor:     string | null
-  wireframeModeColor:     string | null
-  wireframeMaterial:      string | null  //JSON-encoded WfMatParams
-  wireframeEdgeThreshold: string | null  //degrees, stored as string in settings table
+  wireframeLineColor: string | null
+  wireframeModeColor: string | null
+  wireframeMaterial:  string | null  //JSON-encoded WfMatParams
 }
 
 export interface PortfolioDto {

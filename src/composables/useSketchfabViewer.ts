@@ -1,4 +1,4 @@
-import { nextTick, ref, watch, type Ref } from "vue"
+import { nextTick, ref, watch, type ComputedRef, type Ref } from "vue"
 
 //SKETCHFAB iframe lifecycle - boots the API when the section scrolls into
 //view, tears down + re-inits when the v-if'd iframe gets re-mounted (e.g.
@@ -17,7 +17,9 @@ interface UseSketchfabViewerOpts {
   iframeRef: Ref<HTMLIFrameElement | null>
   modelId:   Ref<string | null | undefined>
   isInView:  Ref<boolean>
-  editMode:  Ref<boolean>
+  //true while the iframe is v-if'd out of the DOM (edit mode, or another
+  //preview surface active). Flipping back to false re-inits the client.
+  editMode:  Ref<boolean> | ComputedRef<boolean>
   logTag?:   string
 }
 

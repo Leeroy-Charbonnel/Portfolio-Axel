@@ -68,7 +68,7 @@ export const software = pgTable("software", {
 //used by mainProject.model3dDesktopView / model3dMobileView and by
 //viewer3d block content.
 export const model3d = pgTable("model_3d", {
-  id:              serial("id").primaryKey(),
+  id:              uuid("id").primaryKey().defaultRandom(),
   name:            text("name").notNull(),
   glbFileId:       uuid("glb_file_id").notNull().references(() => file.id, { onDelete: "restrict" }),
   thumbnailFileId: uuid("thumbnail_file_id").references(() => file.id, { onDelete: "set null" }),
@@ -113,7 +113,7 @@ export const mainProject = pgTable("main_project", {
   //glbFileId / viewerSettings stay around as the MIGRATION SOURCE
   //and are dropped in a follow-up once every project has been moved
   //to a model_3d row.
-  model3dId:            integer("model_3d_id").references(() => model3d.id, { onDelete: "set null" }),
+  model3dId:            uuid("model_3d_id").references(() => model3d.id, { onDelete: "set null" }),
   model3dDesktopView:   text("model_3d_desktop_view").notNull().default(""),
   model3dMobileView:    text("model_3d_mobile_view").notNull().default(""),
   glbFileId:            uuid("glb_file_id").references(() => file.id, { onDelete: "set null" }),

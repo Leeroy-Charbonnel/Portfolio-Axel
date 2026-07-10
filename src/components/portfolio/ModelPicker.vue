@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { Box, ChevronDown, Check } from "lucide-vue-next"
 import { usePortfolio } from "../../composables/usePortfolio"
 
@@ -15,7 +15,7 @@ import { usePortfolio } from "../../composables/usePortfolio"
 //(usually "Default") so the selection is never broken.
 
 interface PickerValue {
-  model3dId:    number | null
+  model3dId:    string | null
   desktopView:  string
   mobileView:   string
 }
@@ -30,7 +30,7 @@ const models       = computed(() => data.value?.models ?? [])
 const selectedModel = computed(() => models.value.find((m) => m.id === props.modelValue.model3dId) ?? null)
 const availableViews = computed(() => selectedModel.value?.views ?? [])
 
-function pickModel(id: number) {
+function pickModel(id: string) {
   const m = models.value.find((x) => x.id === id)
   const firstView = m?.views?.[0]?.name ?? ""
   emit("update:modelValue", {
@@ -58,6 +58,9 @@ watch(open, (v) => {
   if (v) document.addEventListener("mousedown", onDocClick)
   else   document.removeEventListener("mousedown", onDocClick)
 })
+//Unmounting while the popover is open (edit mode toggled off, block
+//deleted) must not leave the document listener behind.
+onBeforeUnmount(() => document.removeEventListener("mousedown", onDocClick))
 
 const triggerLabel = computed(() => {
   if (!selectedModel.value) return "Pick a 3D model"
@@ -162,7 +165,7 @@ const triggerLabel = computed(() => {
   min-width: 22rem;
   max-width: 32rem;
   padding: var(--spacing-md);
-  background-color: var(--background);
+  background-color: hsl(var(--background));
   border: var(--border-width-sm) solid var(--color-gray-medium);
   border-radius: var(--radius);
   box-shadow: 0 8px 32px hsl(0 0% 0% / 0.4);
@@ -234,9 +237,9 @@ const triggerLabel = computed(() => {
   position: absolute;
   top: var(--spacing-xs); right: var(--spacing-xs);
   color: var(--color-accent);
-  background-color: var(--background);
-  border-radius: 50%;
-  padding: 2px;
+  background-color: hsl(var(--background));
+  border-radius: var(--border-radius-full);
+  padding: var(--spacing-xxs);
 }
 
 .model-picker__field { display: flex; flex-direction: column; gap: var(--spacing-xxs); font-size: var(--font-size-xs); }
@@ -247,8 +250,8 @@ const triggerLabel = computed(() => {
 }
 .model-picker__field select {
   padding: var(--spacing-xs);
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
   border: var(--border-width-sm) solid var(--color-gray-medium);
   border-radius: var(--radius);
   font-size: var(--font-size-xs);

@@ -6,6 +6,13 @@ import * as schema from "./db/schema"
 const apiKey = process.env.RESEND_API_KEY
 const from   = process.env.EMAIL_FROM ?? "onboarding@resend.dev"
 
+//Fail LOUDLY at boot when the auth secret is missing - passing undefined
+//through would let better-auth run with a broken signing key (rule #4).
+const authSecret = process.env.BETTER_AUTH_SECRET
+if (!authSecret) {
+  throw new Error("BETTER_AUTH_SECRET is not set - refusing to boot with an unsigned session store")
+}
+
 let resend: Resend | null = null
 async function sendEmail(args: SendEmailArgs) {
   if (!apiKey) {
@@ -32,7 +39,7 @@ export const auth = createAppAuth({
   authMode:          (process.env.VITE_AUTH_MODE ?? "open") as AuthMode,
   baseURL:            process.env.BETTER_AUTH_URL ?? "http://localhost:3001",
   publicAppUrl:       process.env.PUBLIC_APP_URL  ?? "http://localhost:5173",
-  secret:             process.env.BETTER_AUTH_SECRET!,
+  secret:             authSecret,
   googleClientId:     process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   allowedOrigins:     process.env.ALLOWED_ORIGINS?.split(",") ?? ["http://localhost:5173"],

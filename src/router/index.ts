@@ -25,9 +25,10 @@ const router = createRouter({
     //even in public mode. Drop the route if you don't want users on /settings.
     { path: "/settings",        component: SettingsPage },
 
-    //Three.js model editor - per-project edit page. Replaces the Sketchfab
-    //iframe with a local viewer when a .glb has been uploaded.
-    { path: "/edit-3d/:id(\\d+)", component: ModelEditorPage },
+    //Three.js model editor - per-model edit page. model_3d rows use uuid
+    //primary keys since the uuid migration, so the param accepts hex+dashes
+    //(the old \d+ constraint silently 404'd every model after the migration).
+    { path: "/edit-3d/:id([0-9a-fA-F-]+)", component: ModelEditorPage },
 
     //Project detail page - serves BOTH the public read-only render and
     //the bento-grid editor. Flipping useAdmin().editMode swaps the page

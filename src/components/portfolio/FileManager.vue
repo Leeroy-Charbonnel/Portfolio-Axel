@@ -4,19 +4,16 @@ import { Trash2, RefreshCw } from "lucide-vue-next"
 import { usePortfolio } from "../../composables/usePortfolio"
 
 //Admin-only file manager. Lists every row in the file table with a usage
-//count, lets the admin delete individual files (only when unused) and
-//bulk-delete every orphan in one click (with a confirm modal).
+//count and lets the admin delete individual files (only when unused).
+//No bulk delete - the author inspects and removes rows manually since
+//HDRs / 3D models can carry useful orphans (alternate-pose variants)
+//that shouldn't be auto-killed.
 //
 //Three sub-tabs:
-//  - Images: ordinary image uploads (project main / thumbnails / gallery).
-//            Software logos are NOT shown here - they're managed in
-//            SoftwareEditor.
-//  - 3D models: .glb / .gltf
-//  - HDRs: .hdr / .exr / .hdri
-//
-//Bulk delete only applies to the Images tab. HDRs and 3D models are KEPT
-//even when no project currently references them (the author wants to swap
-//between them in the editor without re-uploading every time).
+//- Images: ordinary image uploads (project main / thumbnails / gallery).
+//  Software logos are NOT shown here - they're managed in SoftwareEditor.
+//- 3D models: .glb / .gltf
+//- HDRs: .hdr / .exr / .hdri
 
 interface FileRow {
   id:               string
@@ -305,7 +302,7 @@ onMounted(load)
   border-bottom-color: var(--color-accent);
 }
 .file-manager__tab-count {
-  font-size: var(--font-size-xxs, 0.625rem);
+  font-size: 0.625rem; /*deliberately below --font-size-xs - tiny count badge, no smaller token exists*/
   padding: 0 var(--spacing-xs);
   background-color: var(--color-background-gray-100);
   color: var(--color-text-tertiary);

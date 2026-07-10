@@ -24,6 +24,7 @@ function pickGlbFile(): Promise<File | null> {
     input.type   = "file"
     input.accept = ".glb,.gltf,model/gltf-binary,model/gltf+json"
     input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.oncancel = () => resolve(null)
     input.click()
   })
 }
@@ -52,20 +53,18 @@ async function onAdd() {
   }
 }
 
-async function onDelete(id: number, name: string) {
+async function onDelete(id: string, name: string) {
   if (!confirm(`Delete model "${name}"?`)) return
   try {
     await deleteModel(id)
   } catch (e) {
-    //API returns 409 with usages[] when the model is still referenced.
-    //Show the usages so the admin knows where to unwire it first.
-    const msg = e instanceof Error ? e.message : String(e)
-    alert(`Cannot delete: ${msg}`)
+    //API returns 409 with usages[] when the model is still referenced;
+    //the failed request already toasted, just leave the trace here.
     console.warn("[Models3dTab] delete blocked:", e)
   }
 }
 
-function openEditor(id: number) {
+function openEditor(id: string) {
   router.push(`/edit-3d/${id}`)
 }
 </script>
@@ -135,7 +134,7 @@ function openEditor(id: number) {
   padding: var(--spacing-xs) var(--spacing-md);
   background-color: var(--color-accent);
   border: none;
-  color: hsl(0 0% 0%);
+  color: var(--color-background);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
@@ -151,7 +150,7 @@ function openEditor(id: number) {
   padding: var(--spacing-md);
   text-align: center;
 }
-.models-tab__error { color: hsl(0 80% 60%); }
+.models-tab__error { color: hsl(var(--destructive)); }
 
 .models-tab__grid {
   list-style: none;
@@ -170,7 +169,7 @@ function openEditor(id: number) {
 .models-tab__thumb {
   display: flex; align-items: center; justify-content: center;
   aspect-ratio: 16 / 10;
-  background-color: hsl(0 0% 0% / 0.2);
+  background-color: var(--semi-transparent-dark);
   color: var(--color-text-tertiary);
   overflow: hidden;
 }
@@ -213,7 +212,7 @@ function openEditor(id: number) {
   color: var(--color-accent);
 }
 .models-tab__btn--danger:hover {
-  border-color: hsl(0 80% 60%);
-  color: hsl(0 80% 60%);
+  border-color: hsl(var(--destructive));
+  color: hsl(var(--destructive));
 }
 </style>

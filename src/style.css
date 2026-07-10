@@ -45,7 +45,7 @@ The light theme block exists but the portfolio forces .dark on <html> at boot.*/
     --card-foreground:        0 0% 90%;
     --popover:                0 0% 4%;
     --popover-foreground:     0 0% 90%;
-    --primary:                184 65% 51%;
+    --primary:                185 65% 51%;
     --primary-foreground:     0 0% 100%;
     --secondary:              0 0% 7%;
     --secondary-foreground:   0 0% 90%;
@@ -60,7 +60,7 @@ The light theme block exists but the portfolio forces .dark on <html> at boot.*/
     --info:                   217 91% 70%;
     --border-color:           0 0% 16%;
     --input:                  0 0% 16%;
-    --ring:                   184 65% 51%;
+    --ring:                   185 65% 51%;
   }
 }
 
@@ -112,6 +112,7 @@ through the whole UI.*/
   --font-weight-regular: 400;
   --font-weight-medium:  500;
   --font-weight-bold:    700;
+  --font-weight-black:   900;
 
   --font-size-xs:   0.8rem;
   --font-size-sm:   0.9rem;
@@ -163,6 +164,7 @@ through the whole UI.*/
   --grain-opacity: 0.12;
   --filter-blur:   6px;
   --tooltip-delay: 0.7s;
+  --transition-fast: 0.2s;
 
   /*--tag-bg drives every stat-badge / pill / empty-viewer surface in the
   portfolio. Defaults to a translucent foreground tint so it visually maps
@@ -333,15 +335,10 @@ button {
   padding-right: var(--spacing-md);
 }
 
-.main {
-  position: relative;
-}
-
-/*BORDER HELPERS - the variable name carried over from the original portfolio
-where 'border-radius-sm' was misused as a width. Now they correctly use the
+/*BORDER HELPER - the variable name carried over from the original portfolio
+where 'border-radius-sm' was misused as a width. Now correctly uses the
 --border-width-* scale.*/
 .border-sm { border: var(--border-width-sm) solid var(--color-border-primary); }
-.border-md { border: var(--border-width-md) solid var(--color-border-primary); }
 
 .section-title {
   font-size: var(--font-size-2xl);
@@ -365,6 +362,56 @@ where 'border-radius-sm' was misused as a width. Now they correctly use the
   bottom: calc(-1 * var(--spacing-xs));
   left: 25%;
 }
+
+/*MARKDOWN typography - shared by every rendered-markdown surface (detail
+page text blocks, accordion bodies, edit-mode previews). Heading sizes pull
+from the --font-size-* scale so they follow the rest of the type system.*/
+.md-content h1 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin: 0 0 var(--spacing-sm) 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+}
+.md-content h2 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  margin: var(--spacing-xs) 0;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+}
+.md-content h3 {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  margin: var(--spacing-xs) 0 var(--spacing-xxs) 0;
+  line-height: 1.3;
+}
+.md-content p      { margin: 0 0 var(--spacing-xs) 0; }
+.md-content strong { font-weight: var(--font-weight-bold); }
+.md-content em     { font-style: italic; }
+.md-content ul,
+.md-content ol     { margin: 0 0 var(--spacing-xs) var(--spacing-md); padding: 0; }
+.md-content li     { margin-bottom: var(--spacing-xxs); }
+.md-content a      { color: var(--color-accent); text-decoration: underline; }
+.md-content code {
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  background: var(--tag-bg);
+  padding: 0 var(--spacing-xxs);
+}
+.md-content blockquote {
+  margin: 0 0 var(--spacing-xs) 0;
+  padding-left: var(--spacing-sm);
+  border-left: var(--border-width-md) solid var(--color-gray-medium);
+  color: var(--color-text-tertiary);
+}
+.md-content hr {
+  border: none;
+  border-top: var(--border-width-sm) solid var(--color-gray-medium);
+  margin: var(--spacing-sm) 0;
+}
+.md-content img { max-width: 100%; }
 
 /*Full-bleed film-grain overlay - position:absolute so the grain SCROLLS
 with the page (fixed-position grain felt locked-in-place and the user
@@ -395,9 +442,6 @@ canvas {
   position: relative;
   z-index: 2;
 }
-
-/*Legacy helper - kept as a no-op for any consumer that still applies it.*/
-.no-grain { position: relative; }
 
 /*===========================================================================
 RESPONSIVE - global token overrides for tablet (<= 1024px) and phone

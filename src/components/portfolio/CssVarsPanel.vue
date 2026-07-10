@@ -2,7 +2,7 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { X, Save, RotateCcw, Shuffle } from "lucide-vue-next"
-import { useSettings } from "vue-shared-ui"
+import { useSettings, useToast } from "vue-shared-ui"
 import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 
 //SIDE PANEL - groups every editable CSS variable by DOMAIN (Colors,
@@ -27,6 +27,7 @@ const MOBILE_KEY_SUFFIX      = "_mobile"
 
 const { open, hide } = useCssVarsPanel()
 const { getString, update, loaded } = useSettings()
+const toast = useToast()
 const route = useRoute()
 
 type RowType = "text" | "color" | "color-hsl" | "color-accent" | "size" | "unitless" | "int"
@@ -41,7 +42,7 @@ type CssVarRow = {
   mobileDefault?: string
   type:          RowType
   group:         string
-  unit?:         "px" | "rem" | "%" | "s"  //size rows
+  unit?:         "px" | "rem" | "%" | "s" | "vh"  //size rows
   min?:          number
   max?:          number
   step?:         number
@@ -163,7 +164,7 @@ function clampPanelWidth(n: number): number {
 
 function persistPanelWidth(w: number) {
   void update(PANEL_WIDTH_KEY, String(clampPanelWidth(w)), {
-    type: "int",
+    type: "number",
     group: "css-panel",
     description: "Width of the CSS variables side panel (px).",
   }).catch((err) => console.warn("[css-panel] save width failed:", err))
@@ -185,7 +186,6 @@ const phoneMode      = computed(() =>
 function localValues(): Record<string, string> { return phoneMode.value ? localMobile.value  : localDesktop.value }
 function savedValues(): Record<string, string> { return phoneMode.value ? savedMobile.value  : savedDesktop.value }
 function rowDefault(row: CssVarRow): string    { return phoneMode.value ? (row.mobileDefault ?? row.defaultValue) : row.defaultValue }
-function rowKey(row: CssVarRow): string        { return phoneMode.value ? row.key + MOBILE_KEY_SUFFIX : row.key }
 
 function loadSaved() {
   const nextD: Record<string, string> = {}
@@ -256,35 +256,44 @@ const dirty = computed(() => {
   return false
 })
 
+//Rows are committed one by one; only the rows whose write SUCCEEDED move
+//into the saved snapshot. A failed row stays dirty (and toasts) instead of
+//being silently marked as saved.
 async function save() {
+  const failed: string[] = []
   for (const row of ROWS) {
     const nextD = localDesktop.value[row.key]
-    if (nextD !== savedDesktop.value[row.key]) {
+    if (nextD !== undefined && nextD !== savedDesktop.value[row.key]) {
       try {
         await update(row.key, nextD, {
           type:        "string",
           group:       "css-vars",
           description: `CSS variable ${row.cssVar} (desktop)`,
         })
+        savedDesktop.value = { ...savedDesktop.value, [row.key]: nextD }
       } catch (err) {
+        failed.push(row.key)
         console.error(`[css-panel] save ${row.key} failed:`, err)
       }
     }
     const nextM = localMobile.value[row.key]
-    if (nextM !== savedMobile.value[row.key]) {
+    if (nextM !== undefined && nextM !== savedMobile.value[row.key]) {
       try {
         await update(row.key + MOBILE_KEY_SUFFIX, nextM, {
           type:        "string",
           group:       "css-vars",
           description: `CSS variable ${row.cssVar} (phone)`,
         })
+        savedMobile.value = { ...savedMobile.value, [row.key]: nextM }
       } catch (err) {
+        failed.push(row.key + MOBILE_KEY_SUFFIX)
         console.error(`[css-panel] save ${row.key}${MOBILE_KEY_SUFFIX} failed:`, err)
       }
     }
   }
-  savedDesktop.value = { ...localDesktop.value }
-  savedMobile.value  = { ...localMobile.value }
+  if (failed.length > 0) {
+    toast.error(`${failed.length} CSS var(s) failed to save: ${failed.join(", ")}`)
+  }
 }
 
 function discard() {
@@ -347,9 +356,10 @@ function hexToHsl(hex: string): string {
 function hslToHex(hsl: string): string {
   const m = hsl.trim().match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%$/)
   if (!m) return "#000000"
-  const h = parseFloat(m[1]) / 360
-  const s = parseFloat(m[2]) / 100
-  const l = parseFloat(m[3]) / 100
+  //the three groups are guaranteed by the regex above
+  const h = parseFloat(m[1]!) / 360
+  const s = parseFloat(m[2]!) / 100
+  const l = parseFloat(m[3]!) / 100
   const hue2rgb = (p: number, q: number, t: number) => {
     if (t < 0) t += 1; if (t > 1) t -= 1
     if (t < 1 / 6) return p + (q - p) * 6 * t

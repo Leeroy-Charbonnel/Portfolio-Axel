@@ -21,7 +21,7 @@ import {
   profile,
   model3d,
 } from "./db/schema"
-import { eq, and, asc, sql } from "drizzle-orm"
+import { eq, and, asc, sql, type SQL } from "drizzle-orm"
 
 const app       = express()
 const isProd    = process.env.NODE_ENV === "production"
@@ -63,10 +63,34 @@ app.use(express.json({ limit: "10mb" }))
 const FILES_FORWARD_URL    = (process.env.FILES_FORWARD_URL ?? "").replace(/\/$/, "")
 const FILES_FORWARD_SECRET = process.env.FILES_FORWARD_SECRET ?? ""
 
+//The bypass is scoped to the routes forwardFileOp actually targets - a
+//leaked secret must not grant the whole admin API (settings, translations,
+//portfolio mutations), only the file tunnel.
+function isForwardablePath(path: string): boolean {
+  return path === "/api/files" || path.startsWith("/api/files/")
+    || path === "/api/software" || path.startsWith("/api/software/")
+}
+
 function hasForwardSecret(req: express.Request): boolean {
   if (!FILES_FORWARD_SECRET) return false
+  if (!isForwardablePath(req.path)) return false
   const header = req.headers["x-files-forward-secret"]
   return typeof header === "string" && header === FILES_FORWARD_SECRET
+}
+
+//HARD RULE: files live ONLY on the prod volume. A dev server without the
+//forward tunnel configured must REFUSE file writes instead of silently
+//dropping binaries on the local disk (which desyncs prod DB rows from the
+//prod volume and 404s every /media URL). Returns false after sending the
+//error so handlers can just early-return.
+function requireProdStorage(res: express.Response): boolean {
+  if (isProd || FILES_FORWARD_URL) return true
+  console.error("[files] REFUSED local write: FILES_FORWARD_URL / FILES_FORWARD_SECRET not set in .env - dev must tunnel every file op to prod")
+  res.status(500).json({
+    error: "file storage misconfigured",
+    detail: "dev server has no FILES_FORWARD_URL - files must go to the prod volume, local storage is forbidden",
+  })
+  return false
 }
 
 //AUTH MIDDLEWARE
@@ -128,7 +152,24 @@ function parseIntParam(req: express.Request, key: string, res: express.Response)
   return n
 }
 function respondOk(res: express.Response): void {
-  respondOk(res)
+  res.json({ ok: true })
+}
+
+//UUID route params (file ids, model_3d ids). Same contract as parseIntParam:
+//responds 400 + returns null on garbage so handlers can early-return.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function parseUuidParam(req: express.Request, key: string, res: express.Response): string | null {
+  const v = String(req.params[key] ?? "")
+  if (!UUID_RE.test(v)) {
+    res.status(400).json({ error: `bad ${key}` })
+    return null
+  }
+  return v
+}
+
+//postgres.js returns arrays, node-postgres wraps them in { rows } - normalize once
+function rowsOf<T = any>(result: unknown): T[] {
+  return ((result as any).rows ?? result) as T[]
 }
 
 
@@ -180,7 +221,9 @@ try {
 //count what's currently in storage AFTER the mkdir attempt
 try {
   bootDiag.storageFilesAfterMkdir = readdirSync(storageDir).length
-} catch { /* dir doesn't exist or unreadable */ }
+} catch (e) {
+  console.warn(`[boot] storage readdir failed (dir missing or unreadable):`, e)
+}
 console.log(`[boot] storage currently contains ${bootDiag.storageFilesAfterMkdir} file(s)`)
 
 //BOOTSTRAP SEED - if the storage volume is empty on first boot, copy the
@@ -380,9 +423,51 @@ async function forwardFileOp(req: express.Request, res: express.Response, target
   return true
 }
 
+//FILE REFERENCE COUNT - single source of truth for "which rows point at a
+//file id". GET /api/files, DELETE /api/files/orphans and DELETE /api/files/:id
+//all derive from this one expression, so a new FK to `file` is added HERE
+//and nowhere else. Covers direct fk columns, main_project.thumbnails jsonb,
+//model_3d assets, the profile avatar (stored as a /media URL string, not a
+//FK - matched via stored_filename) and every detail-page block shape:
+//fileId (image / video), beforeFileId / afterFileId (compare) and
+//items[].fileId (carousel).
+function fileRefCountSql(idExpr: SQL): SQL {
+  return sql`(
+    COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_image_file_id     = ${idExpr}), 0) +
+    COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_wireframe_file_id = ${idExpr}), 0) +
+    COALESCE((SELECT COUNT(*) FROM main_project    WHERE video_file_id          = ${idExpr}), 0) +
+    COALESCE((SELECT COUNT(*) FROM gallery_project WHERE image_file_id          = ${idExpr}), 0) +
+    COALESCE((SELECT COUNT(*) FROM software        WHERE logo_file_id           = ${idExpr}), 0) +
+    COALESCE((SELECT COUNT(*) FROM model_3d        WHERE glb_file_id = ${idExpr} OR thumbnail_file_id = ${idExpr}), 0) +
+    COALESCE((
+      SELECT COUNT(*)
+      FROM profile p, file fa
+      WHERE fa.id = ${idExpr} AND p.avatar_url = '/media/' || fa.stored_filename
+    ), 0) +
+    COALESCE((
+      SELECT COUNT(*)
+      FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
+      WHERE thumb->>'fileId' = (${idExpr})::text OR thumb->>'wireframeFileId' = (${idExpr})::text
+    ), 0) +
+    COALESCE((
+      SELECT COUNT(*)
+      FROM main_project mp2, jsonb_array_elements(mp2.detail_page->'blocks') AS blk
+      WHERE blk->'content'->>'fileId'       = (${idExpr})::text
+         OR blk->'content'->>'beforeFileId' = (${idExpr})::text
+         OR blk->'content'->>'afterFileId'  = (${idExpr})::text
+    ), 0) +
+    COALESCE((
+      SELECT COUNT(*)
+      FROM main_project mp3,
+           jsonb_array_elements(mp3.detail_page->'blocks') AS blk2,
+           jsonb_array_elements(COALESCE(blk2->'content'->'items', '[]'::jsonb)) AS item
+      WHERE item->>'fileId' = (${idExpr})::text
+    ), 0)
+  )::int`
+}
+
 //GET /api/files - admin only. Returns every row in the file table with a
 //reference count: how many portfolio rows currently point at this file id.
-//References include direct fk columns AND thumbnail jsonb scans on main_project.
 //Used by the file manager UI in /settings.
 app.get("/api/files", requireAuth, requireAdmin, async (_req, res) => {
   const result = await db.execute(sql`
@@ -394,22 +479,11 @@ app.get("/api/files", requireAuth, requireAdmin, async (_req, res) => {
       f.size_bytes,
       f.kind,
       f.created_at,
-      (
-        COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_image_file_id     = f.id), 0) +
-        COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_wireframe_file_id = f.id), 0) +
-        COALESCE((SELECT COUNT(*) FROM main_project    WHERE video_file_id          = f.id), 0) +
-        COALESCE((SELECT COUNT(*) FROM gallery_project WHERE image_file_id          = f.id), 0) +
-        COALESCE((SELECT COUNT(*) FROM software        WHERE logo_file_id           = f.id), 0) +
-        COALESCE((
-          SELECT COUNT(*)
-          FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
-          WHERE thumb->>'fileId' = f.id::text OR thumb->>'wireframeFileId' = f.id::text
-        ), 0)
-      )::int AS reference_count
+      ${fileRefCountSql(sql.raw("f.id"))} AS reference_count
     FROM file f
     ORDER BY f.created_at DESC
   `)
-  const rows = (result as any).rows ?? result
+  const rows = rowsOf(result)
   res.json(rows.map((row: any) => ({
     id:               row.id,
     originalFilename: row.original_filename,
@@ -428,6 +502,7 @@ app.get("/api/files", requireAuth, requireAdmin, async (_req, res) => {
 //"/api/files/:id" so express doesn't match "orphans" as a uuid param.
 app.delete("/api/files/orphans", requireAuth, requireAdmin, async (req, res) => {
   if (await forwardFileOp(req, res, "/api/files/orphans")) return
+  if (!requireProdStorage(res)) return
   //HDRs (.hdr/.exr/.hdri) and 3D models (.glb/.gltf) are KEPT even when
   //unreferenced - the author swaps between them in the editor picker,
   //so deleting them just because no project currently points at one
@@ -436,20 +511,17 @@ app.delete("/api/files/orphans", requireAuth, requireAdmin, async (req, res) => 
   const result = await db.execute(sql`
     SELECT f.id, f.stored_filename FROM file f WHERE
       f.original_filename !~* '\.(hdr|exr|hdri|glb|gltf)$' AND
-      NOT EXISTS (SELECT 1 FROM main_project    WHERE main_image_file_id     = f.id) AND
-      NOT EXISTS (SELECT 1 FROM main_project    WHERE main_wireframe_file_id = f.id) AND
-      NOT EXISTS (SELECT 1 FROM main_project    WHERE video_file_id          = f.id) AND
-      NOT EXISTS (SELECT 1 FROM gallery_project WHERE image_file_id          = f.id) AND
-      NOT EXISTS (SELECT 1 FROM software        WHERE logo_file_id           = f.id) AND
-      NOT EXISTS (
-        SELECT 1 FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
-        WHERE thumb->>'fileId' = f.id::text OR thumb->>'wireframeFileId' = f.id::text
-      )
+      ${fileRefCountSql(sql.raw("f.id"))} = 0
   `)
-  const orphans = ((result as any).rows ?? result) as { id: string; stored_filename: string }[]
+  const orphans = rowsOf<{ id: string; stored_filename: string }>(result)
   let deleted = 0
   for (const o of orphans) {
-    try { unlinkSync(join(storageDir, o.stored_filename)) } catch { /* already gone */ }
+    try {
+      unlinkSync(join(storageDir, o.stored_filename))
+    } catch (e) {
+      //row still gets removed - DB is source of truth - but leave a trace
+      console.warn(`[files] orphan disk unlink failed for ${o.stored_filename}:`, e)
+    }
     await db.delete(fileTable).where(eq(fileTable.id, o.id))
     deleted++
   }
@@ -462,26 +534,16 @@ app.delete("/api/files/orphans", requireAuth, requireAdmin, async (req, res) => 
 //Declared AFTER /orphans so express's matcher doesn't claim "orphans" as a uuid.
 app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
   if (await forwardFileOp(req, res, `/api/files/${encodeURIComponent(String(req.params.id ?? ""))}`)) return
-  const id = String(req.params.id ?? "")
+  if (!requireProdStorage(res)) return
+  //Garbage ids used to hit the ::uuid cast below and 500 - validate first.
+  const id = parseUuidParam(req, "id", res)
+  if (id === null) return
   const [row] = await db.select().from(fileTable).where(eq(fileTable.id, id))
   if (!row) { res.status(404).json({ error: "not found" }); return }
 
-  //reference count for this file
-  const refResult = await db.execute(sql`
-    SELECT (
-      COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_image_file_id     = ${id}::uuid), 0) +
-      COALESCE((SELECT COUNT(*) FROM main_project    WHERE main_wireframe_file_id = ${id}::uuid), 0) +
-      COALESCE((SELECT COUNT(*) FROM main_project    WHERE video_file_id          = ${id}::uuid), 0) +
-      COALESCE((SELECT COUNT(*) FROM gallery_project WHERE image_file_id          = ${id}::uuid), 0) +
-      COALESCE((SELECT COUNT(*) FROM software        WHERE logo_file_id           = ${id}::uuid), 0) +
-      COALESCE((
-        SELECT COUNT(*)
-        FROM main_project mp, jsonb_array_elements(mp.thumbnails) AS thumb
-        WHERE thumb->>'fileId' = ${id} OR thumb->>'wireframeFileId' = ${id}
-      ), 0)
-    )::int AS c
-  `)
-  const refCount = Number(((refResult as any).rows ?? refResult)[0]?.c ?? 0)
+  //reference count for this file - same expression as the list + orphan routes
+  const refResult = await db.execute(sql`SELECT ${fileRefCountSql(sql`${id}::uuid`)} AS c`)
+  const refCount = Number(rowsOf<{ c: number }>(refResult)[0]?.c ?? 0)
   if (refCount > 0) {
     res.status(409).json({ error: "file is still referenced", referenceCount: refCount })
     return
@@ -500,6 +562,7 @@ app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
 //POST /api/files - admin only. Returns the new file row + ready-to-use url
 app.post("/api/files", requireAuth, requireAdmin, async (req, res, next) => {
   if (await forwardFileOp(req, res, "/api/files")) return
+  if (!requireProdStorage(res)) return
   upload.single("file")(req, res, async (err: unknown) => {
     if (err) return next(err)
     if (!req.file) {
@@ -510,16 +573,29 @@ app.post("/api/files", requireAuth, requireAdmin, async (req, res, next) => {
     //recoverable from it without a separate column.
     const id = req.file.filename.split(".")[0]!
     const stored = relativeStoredName(req.file)
-    const [row] = await db.insert(fileTable).values({
-      id,
-      originalFilename: req.file.originalname,
-      storedFilename:   stored,
-      mimeType:         req.file.mimetype,
-      sizeBytes:        req.file.size,
-      kind:             inferKind(req.file.mimetype),
-      uploadedBy:       (req as any).user.id,
-    }).returning()
-    res.json({ ...row, url: `/media/${row!.storedFilename}` })
+    try {
+      const [row] = await db.insert(fileTable).values({
+        id,
+        originalFilename: req.file.originalname,
+        storedFilename:   stored,
+        mimeType:         req.file.mimetype,
+        sizeBytes:        req.file.size,
+        kind:             inferKind(req.file.mimetype),
+        uploadedBy:       (req as any).user.id,
+      }).returning()
+      res.json({ ...row, url: `/media/${row!.storedFilename}` })
+    } catch (e) {
+      //DB insert failed - remove the binary so the volume doesn't
+      //accumulate dead bytes (same rollback the software route does).
+      try {
+        unlinkSync(join(storageDir, stored))
+      } catch (unlinkErr) {
+        console.warn(`[files] rollback unlink failed for ${stored}:`, unlinkErr)
+      }
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error("[files] upload insert failed:", msg)
+      res.status(500).json({ error: "file insert failed", detail: msg })
+    }
   })
 })
 
@@ -557,6 +633,7 @@ app.put("/api/main-project/:id", requireAuth, requireAdmin, async (req, res) => 
     .set({ ...req.body, updatedAt: new Date() })
     .where(eq(mainProject.id, id))
     .returning()
+  if (!row) { res.status(404).json({ error: "not found" }); return }
   res.json(row)
 })
 
@@ -586,6 +663,7 @@ app.put("/api/gallery-project/:id", requireAuth, requireAdmin, async (req, res) 
     .set(req.body)
     .where(eq(galleryProject.id, id))
     .returning()
+  if (!row) { res.status(404).json({ error: "not found" }); return }
   res.json(row)
 })
 
@@ -618,6 +696,7 @@ app.put("/api/experience/:id", requireAuth, requireAdmin, async (req, res) => {
     .set(req.body)
     .where(eq(experience.id, id))
     .returning()
+  if (!row) { res.status(404).json({ error: "not found" }); return }
   res.json(row)
 })
 
@@ -635,6 +714,7 @@ app.delete("/api/experience/:id", requireAuth, requireAdmin, async (req, res) =>
 //does, then we insert the software row referencing it.
 app.post("/api/software", requireAuth, requireAdmin, async (req, res, next) => {
   if (await forwardFileOp(req, res, "/api/software")) return
+  if (!requireProdStorage(res)) return
   upload.single("logo")(req, res, async (err: unknown) => {
     if (err) return next(err)
     if (!req.file) { res.status(400).json({ error: "logo file is required" }); return }
@@ -665,9 +745,15 @@ app.post("/api/software", requireAuth, requireAdmin, async (req, res, next) => {
       res.json(row)
     } catch (e) {
       //software insert failed (unique key collision, etc.) - roll the orphaned
-      //file row + binary back so the upload doesn't accumulate dead bytes
-      try { unlinkSync(join(storageDir, storedRel)) } catch { /* ignore */ }
-      await db.delete(fileTable).where(eq(fileTable.id, fileId)).catch(() => {})
+      //file row + binary back so the upload doesn't accumulate dead bytes.
+      //Rollback failures are logged: a leftover orphan is worth a trace.
+      try {
+        unlinkSync(join(storageDir, storedRel))
+      } catch (unlinkErr) {
+        console.warn(`[software] rollback unlink failed for ${storedRel}:`, unlinkErr)
+      }
+      await db.delete(fileTable).where(eq(fileTable.id, fileId))
+        .catch((dbErr) => console.warn(`[software] rollback file-row delete failed for ${fileId}:`, dbErr))
       res.status(409).json({ error: e instanceof Error ? e.message : "software insert failed" })
     }
   })
@@ -680,6 +766,7 @@ app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
     .set(req.body)
     .where(eq(software.id, id))
     .returning()
+  if (!row) { res.status(404).json({ error: "not found" }); return }
   res.json(row)
 })
 
@@ -703,12 +790,22 @@ app.delete("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
     const [fileRow] = await db.select().from(fileTable).where(eq(fileTable.id, row.logoFileId))
     if (fileRow) {
       try { unlinkSync(join(storageDir, fileRow.storedFilename)) } catch (e) { console.warn(`[software] disk unlink failed:`, e) }
-      await db.delete(fileTable).where(eq(fileTable.id, row.logoFileId)).catch(() => {})
+      await db.delete(fileTable).where(eq(fileTable.id, row.logoFileId))
+        .catch((e) => console.warn(`[software] logo file-row delete failed for ${row.logoFileId}:`, e))
     }
   }
 
   respondOk(res)
 })
+
+//Resolve a file id to its public /media URL (null when the id is null or
+//the file row is gone). Shared by the single-model / single-project GETs.
+async function mediaUrlFor(fileId: string | null): Promise<string | null> {
+  if (!fileId) return null
+  const [f] = await db.select({ storedFilename: fileTable.storedFilename })
+    .from(fileTable).where(eq(fileTable.id, fileId))
+  return f ? `/media/${f.storedFilename}` : null
+}
 
 //MODEL_3D CRUD - reusable 3D assets. Files (.glb + thumbnail) must
 //already exist in the file table (use POST /api/files first); these
@@ -722,33 +819,25 @@ app.get("/api/models", requireAuth, requireAdmin, async (_req, res) => {
 //load. URLs resolved server-side so the page can hand them straight
 //to ThreeViewer / loadGlb.
 app.get("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseIntParam(req, "id", res)
+  const id = parseUuidParam(req, "id", res)
   if (id === null) return
   const [row] = await db.select().from(model3d).where(eq(model3d.id, id))
   if (!row) { res.status(404).json({ error: "not found" }); return }
-  let glbUrl: string | null = null
-  if (row.glbFileId) {
-    const [f] = await db.select({ storedFilename: fileTable.storedFilename })
-      .from(fileTable).where(eq(fileTable.id, row.glbFileId))
-    if (f) glbUrl = `/media/${f.storedFilename}`
-  }
-  let thumbnailUrl: string | null = null
-  if (row.thumbnailFileId) {
-    const [f] = await db.select({ storedFilename: fileTable.storedFilename })
-      .from(fileTable).where(eq(fileTable.id, row.thumbnailFileId))
-    if (f) thumbnailUrl = `/media/${f.storedFilename}`
-  }
+  const glbUrl       = await mediaUrlFor(row.glbFileId)
+  const thumbnailUrl = await mediaUrlFor(row.thumbnailFileId)
   res.json({ ...row, glbUrl, thumbnailUrl })
 })
 
 //PUT viewerSettings (full replacement of the JSON blob).
 app.put("/api/models/:id/viewer-settings", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseIntParam(req, "id", res)
+  const id = parseUuidParam(req, "id", res)
   if (id === null) return
   try {
-    await db.update(model3d)
+    const [row] = await db.update(model3d)
       .set({ viewerSettings: req.body, updatedAt: new Date() })
       .where(eq(model3d.id, id))
+      .returning({ id: model3d.id })
+    if (!row) { res.status(404).json({ error: "not found" }); return }
     respondOk(res)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -762,7 +851,7 @@ app.put("/api/models/:id/viewer-settings", requireAuth, requireAdmin, async (req
 //start-view; the editor uses it for fast "save current camera"
 //captures that shouldn't clobber materials / lights / HDR state.
 app.put("/api/models/:id/viewer-settings/start-view", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseIntParam(req, "id", res)
+  const id = parseUuidParam(req, "id", res)
   if (id === null) return
   try {
     const [row] = await db.select({ viewerSettings: model3d.viewerSettings })
@@ -798,7 +887,7 @@ app.post("/api/models", requireAuth, requireAdmin, async (req, res) => {
 })
 
 app.put("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseIntParam(req, "id", res)
+  const id = parseUuidParam(req, "id", res)
   if (id === null) return
   //Only patch fields the caller actually sent - keeps the Views tab
   //from clobbering viewerSettings, and the Material tab from clobbering
@@ -810,7 +899,8 @@ app.put("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
   if (Array.isArray(req.body?.views))                patch.views           = req.body.views
   if ("viewerSettings" in (req.body ?? {}))          patch.viewerSettings  = req.body.viewerSettings
   try {
-    await db.update(model3d).set(patch).where(eq(model3d.id, id))
+    const [row] = await db.update(model3d).set(patch).where(eq(model3d.id, id)).returning({ id: model3d.id })
+    if (!row) { res.status(404).json({ error: "not found" }); return }
     respondOk(res)
   } catch (e) {
     //Surface the actual DB error (FK violation, type mismatch, etc.)
@@ -826,7 +916,7 @@ app.put("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
 //viewer3d detail-page block (jsonb, no FK). Returns 409 + the list
 //of usages so the admin can clean up first.
 app.delete("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseIntParam(req, "id", res)
+  const id = parseUuidParam(req, "id", res)
   if (id === null) return
   const usages = await findModelUsages(id)
   if (usages.length > 0) {
@@ -840,7 +930,7 @@ app.delete("/api/models/:id", requireAuth, requireAdmin, async (req, res) => {
 //Helper - where-used scan for a model id. Hits both main_project.model3dId
 //and main_project.detailPage.blocks[type=viewer3d].content.model3dId.
 //Returns a flat list { projectId, kind: "main" | "block", blockId? }.
-async function findModelUsages(modelId: number): Promise<Array<{ projectId: number; kind: "main" | "block"; blockId?: string }>> {
+async function findModelUsages(modelId: string): Promise<Array<{ projectId: number; kind: "main" | "block"; blockId?: string }>> {
   const out: Array<{ projectId: number; kind: "main" | "block"; blockId?: string }> = []
   const direct = await db.select({ id: mainProject.id }).from(mainProject).where(eq(mainProject.model3dId, modelId))
   for (const r of direct) out.push({ projectId: r.id, kind: "main" })
@@ -862,9 +952,11 @@ async function findModelUsages(modelId: number): Promise<Array<{ projectId: numb
 app.put("/api/main-project/:id/viewer-settings", requireAuth, requireAdmin, async (req, res) => {
   const id = parseIntParam(req, "id", res)
   if (id === null) return
-  await db.update(mainProject)
+  const [row] = await db.update(mainProject)
     .set({ viewerSettings: req.body, updatedAt: new Date() })
     .where(eq(mainProject.id, id))
+    .returning({ id: mainProject.id })
+  if (!row) { res.status(404).json({ error: "not found" }); return }
   respondOk(res)
 })
 
@@ -897,12 +989,7 @@ app.get("/api/main-project/:id", async (req, res) => {
   if (!row) { res.status(404).json({ error: "not found" }); return }
 
   //resolve glb URL the same way the portfolio endpoint does
-  let glbUrl: string | null = null
-  if (row.glbFileId) {
-    const [f] = await db.select({ storedFilename: fileTable.storedFilename })
-      .from(fileTable).where(eq(fileTable.id, row.glbFileId))
-    if (f) glbUrl = `/media/${f.storedFilename}`
-  }
+  const glbUrl = await mediaUrlFor(row.glbFileId)
   res.json({ ...row, glbUrl })
 })
 
@@ -1118,17 +1205,35 @@ app.get("/api/portfolio", async (_req, res) => {
         description:     t.description,
       })),
       wireframeParameters: p.wireframeParameters,
-      //DETAIL PAGE blocks - resolve any image block's fileId into a url
-      //in the same shape the editor expects on round-trip.
+      //DETAIL PAGE blocks - resolve every file reference into a /media
+      //url in the same shape the editor expects on round-trip:
+      //fileId (image / video), beforeFileId / afterFileId (compare),
+      //items[].fileId (carousel).
       detailPage: {
         blocks: ((p.detailPage?.blocks ?? []) as Array<{
           id: string; type: string; x: number; y: number; w: number; h: number;
           mobileY?: number; mobileH?: number;
           content: Record<string, unknown>
         }>).map((b) => {
-          if (b.type === "image") {
+          if (b.type === "image" || b.type === "video") {
             const fid = (b.content?.fileId as string | null | undefined) ?? null
             return { ...b, content: { ...b.content, fileId: fid, url: urlOf(fid) } }
+          }
+          if (b.type === "compare") {
+            const before = (b.content?.beforeFileId as string | null | undefined) ?? null
+            const after  = (b.content?.afterFileId  as string | null | undefined) ?? null
+            return { ...b, content: {
+              ...b.content,
+              beforeFileId: before, beforeUrl: urlOf(before),
+              afterFileId:  after,  afterUrl:  urlOf(after),
+            } }
+          }
+          if (b.type === "carousel") {
+            const items = Array.isArray(b.content?.items) ? b.content.items as Array<Record<string, unknown>> : []
+            return { ...b, content: {
+              ...b.content,
+              items: items.map((it) => ({ ...it, url: urlOf((it.fileId as string | null | undefined) ?? null) })),
+            } }
           }
           return b
         }),
@@ -1174,14 +1279,13 @@ app.get("/api/portfolio", async (_req, res) => {
     ORDER BY s.user_id, s.key
   `)
   const editorPrefMap: Record<string, string> = {}
-  for (const r of ((editorPrefRows as any).rows ?? editorPrefRows) as { key: string; value: string }[]) {
+  for (const r of rowsOf<{ key: string; value: string }>(editorPrefRows)) {
     if (!(r.key in editorPrefMap)) editorPrefMap[r.key] = r.value
   }
   const editorPrefs = {
-    wireframeLineColor:     editorPrefMap["editor3d_wireframe_line_color"]     ?? null,
-    wireframeModeColor:     editorPrefMap["editor3d_wireframe_mode_color"]     ?? null,
-    wireframeMaterial:      editorPrefMap["editor3d_wireframe_material"]       ?? null,
-    wireframeEdgeThreshold: editorPrefMap["editor3d_wireframe_edge_threshold"] ?? null,
+    wireframeLineColor: editorPrefMap["editor3d_wireframe_line_color"] ?? null,
+    wireframeModeColor: editorPrefMap["editor3d_wireframe_mode_color"] ?? null,
+    wireframeMaterial:  editorPrefMap["editor3d_wireframe_material"]   ?? null,
   }
 
   //3D MODELS - reusable assets referenced by MainProject.model3dId and
@@ -1233,6 +1337,11 @@ const mediaDir = join(__dirname, "storage", "files")
 app.use("/media", express.static(mediaDir, {
   immutable: true,
   maxAge:    "30d",
+  //Uploads have no extension allowlist, so make sure the browser never
+  //sniffs a stored file into active content on this origin.
+  setHeaders: (res) => {
+    res.setHeader("X-Content-Type-Options", "nosniff")
+  },
 }))
 
 

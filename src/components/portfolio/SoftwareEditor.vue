@@ -10,7 +10,7 @@ import { pickImageFile } from "../../lib/portfolio-utils"
 //can rename inline. Delete removes the row AND the logo file when no
 //other software references it (handled server-side).
 
-const { data, createSoftware, updateSoftware, deleteSoftware, uploadFile } = usePortfolio()
+const { data, createSoftware, updateSoftware, deleteSoftware, replaceImage } = usePortfolio()
 const isAdding   = ref(false)
 const addError   = ref<string | null>(null)
 
@@ -30,15 +30,10 @@ async function onAdd() {
   }
 }
 
-async function onReplaceLogo(id: number) {
-  const file = await pickImageFile()
-  if (!file) return
-  try {
-    const uploaded = await uploadFile(file)
-    await updateSoftware(id, { logoFileId: uploaded.id })
-  } catch (e) {
-    console.error("[SoftwareEditor] replace logo failed:", e)
-  }
+function onReplaceLogo(id: number) {
+  return replaceImage("software logo", async (fileId) => {
+    await updateSoftware(id, { logoFileId: fileId })
+  })
 }
 
 //Plain inputs (no EditableText) - SoftwareEditor lives in /settings which

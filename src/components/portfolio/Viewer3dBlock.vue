@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { usePortfolio } from "../../composables/usePortfolio"
+import { applyEditorPrefs } from "../../composables/useEffectiveViewerSettings"
 import ThreeViewer, { type ViewerSettings } from "./ThreeViewer.vue"
 
 //Tiny resolver-renderer for a viewer3d detail-page block. Takes the
@@ -10,7 +11,7 @@ import ThreeViewer, { type ViewerSettings } from "./ThreeViewer.vue"
 //picked or the id is unresolved.
 
 const props = defineProps<{
-  content: { model3dId: number | null; desktopView: string; mobileView: string }
+  content: { model3dId: string | null; desktopView: string; mobileView: string }
   mobile?: boolean
 }>()
 
@@ -23,7 +24,9 @@ const resolved = computed(() => {
   if (!model || !model.glbUrl) return null
   const wantedName = props.mobile ? (c.mobileView || c.desktopView) : c.desktopView
   const view = wantedName ? model.views.find((v) => v.name === wantedName) : null
-  const base = (model.viewerSettings ?? {}) as ViewerSettings
+  //Layer the global editor3d_* prefs over the frozen snapshot - same
+  //"globals always win" contract as the main project viewers.
+  const base = applyEditorPrefs(model.viewerSettings, data.value?.editorPrefs) as ViewerSettings
   const settings: ViewerSettings = view
     ? { ...base, startView: { pos: view.position, target: view.target } }
     : base

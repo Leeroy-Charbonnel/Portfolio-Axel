@@ -1,15 +1,5 @@
-//PORTFOLIO utility functions - hex color helpers for the Sketchfab wireframe
-//override + numeric formatting for the stat counters.
-
-//Convert "#RRGGBB" (or "RRGGBB") to a normalized [r, g, b] in 0..1 range,
-//which is the format the Sketchfab API expects in setLight/createMaterial calls.
-export function hexToRgb(hex: string): number[] {
-  const clean = hex.replace(/^#/, "")
-  const r = parseInt(clean.substring(0, 2), 16) / 255
-  const g = parseInt(clean.substring(2, 4), 16) / 255
-  const b = parseInt(clean.substring(4, 6), 16) / 255
-  return [r, g, b]
-}
+//PORTFOLIO utility functions - numeric formatting for the stat counters +
+//stat badge metadata + the shared native file picker.
 
 //Compact number formatter for the stat counters: 1234 -> "1k", 1500000 -> "2M".
 //No decimals - the gallery cards are narrow and we'd rather lose a bit of
@@ -46,13 +36,15 @@ export function statName(key: StatKey, lang: string): string {
 
 //Open the native file picker and resolve with the selected File (or null if cancelled).
 //Used by every admin "Replace image" button - no <input> element needs to live in the DOM.
+//The 'cancel' event (supported by every evergreen browser) makes the promise
+//settle on user-cancel instead of hanging forever.
 export function pickImageFile(): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input")
     input.type   = "file"
     input.accept = "image/*"
     input.onchange = () => resolve(input.files?.[0] ?? null)
-    //user-cancel doesn't fire change in all browsers, but the promise will just hang silently which is fine - the UI is unchanged
+    input.oncancel = () => resolve(null)
     input.click()
   })
 }

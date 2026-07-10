@@ -16,6 +16,11 @@ import { useLightbox } from "../../composables/useLightbox"
 
 const { items, index, isOpen, close, goTo } = useLightbox()
 
+//Edge-clone URLs for the infinite-belt trick - resolved here so the
+//template doesn't index into a possibly-empty array.
+const firstCloneUrl = computed(() => items.value[0]?.url ?? "")
+const lastCloneUrl  = computed(() => items.value[items.value.length - 1]?.url ?? "")
+
 //`position` is the displayed offset inside the extended track. It can
 //briefly land on -1 (clone of last) or items.length (clone of first)
 //during the transition, then snaps to the real range [0, items.length).
@@ -28,10 +33,15 @@ const trackOffsetPercent = computed(() => -((position.value + 1) * 100))
 const dragStartX = ref<number | null>(null)
 const dragDX     = ref(0)
 const SWIPE_THRESHOLD_PX = 60
+//a drag end is followed by a browser click on the slide - this guard
+//keeps that synthetic click from triggering the click-outside close
+const DRAG_CLICK_GUARD_PX = 5
+const dragClickGuard = ref(false)
 
 function onPointerDown(e: PointerEvent) {
   dragStartX.value = e.clientX
   dragDX.value     = 0
+  dragClickGuard.value = false
   ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
 }
 function onPointerMove(e: PointerEvent) {
@@ -42,9 +52,22 @@ function onPointerUp(e: PointerEvent) {
   if (dragStartX.value === null) return
   const dx = e.clientX - dragStartX.value
   dragStartX.value = null
+  dragClickGuard.value = Math.abs(dx) > DRAG_CLICK_GUARD_PX
   if (dx >  SWIPE_THRESHOLD_PX) prev()
   if (dx < -SWIPE_THRESHOLD_PX) next()
   dragDX.value = 0
+}
+
+//CLICK-OUTSIDE close - the track covers the whole overlay so @click.self
+//on the overlay never fires; the slide's own padding area is the real
+//"outside the image" surface. Bound with .self so image clicks (the img
+//is a child) don't close.
+function onSlideClick() {
+  if (dragClickGuard.value) {
+    dragClickGuard.value = false
+    return
+  }
+  close()
 }
 
 function next() {
@@ -169,7 +192,7 @@ onBeforeUnmount(() => {
         Drag offset is added on top so the swipe feels responsive.-->
         <div
           class="lightbox__track"
-          :class="{ 'lightbox__track--no-transition': !transitionEnabled }"
+          :class="{ 'lightbox__track--no-transition': !transitionEnabled || dragStartX !== null }"
           :style="{ transform: `translateX(calc(${trackOffsetPercent}% + ${dragDX}px))` }"
           @pointerdown="onPointerDown"
           @pointermove="onPointerMove"
@@ -178,10 +201,10 @@ onBeforeUnmount(() => {
           @transitionend="onTrackTransitionEnd"
         >
           <!--CLONE of the last item at the head of the track.-->
-          <div v-if="items.length" class="lightbox__slide" aria-hidden="true">
+          <div v-if="items.length" class="lightbox__slide" aria-hidden="true" @click.self="onSlideClick">
             <img
-              v-if="items[items.length - 1].url"
-              :src="items[items.length - 1].url"
+              v-if="lastCloneUrl"
+              :src="lastCloneUrl"
               :alt="''"
               draggable="false"
               class="lightbox__image"
@@ -192,6 +215,7 @@ onBeforeUnmount(() => {
             v-for="(it, i) in items"
             :key="i"
             class="lightbox__slide"
+            @click.self="onSlideClick"
           >
             <img
               v-if="it.url"
@@ -203,10 +227,10 @@ onBeforeUnmount(() => {
           </div>
 
           <!--CLONE of the first item at the tail of the track.-->
-          <div v-if="items.length" class="lightbox__slide" aria-hidden="true">
+          <div v-if="items.length" class="lightbox__slide" aria-hidden="true" @click.self="onSlideClick">
             <img
-              v-if="items[0].url"
-              :src="items[0].url"
+              v-if="firstCloneUrl"
+              :src="firstCloneUrl"
               :alt="''"
               draggable="false"
               class="lightbox__image"
@@ -237,7 +261,7 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 1000;
   background-color: hsl(0 0% 0% / 0.92);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--filter-blur));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -318,11 +342,13 @@ position jump is invisible.*/
   box-sizing: border-box;
 }
 
+/*pointer-events stays ON so clicks on the image target the img (not the
+slide) and the slide's click.self close only fires outside the image.
+Drag still works: pointer events bubble from the img to the track.*/
 .lightbox__image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  pointer-events: none;
   user-select: none;
 }
 

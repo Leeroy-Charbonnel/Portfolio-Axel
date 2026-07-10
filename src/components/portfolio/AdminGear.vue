@@ -111,7 +111,7 @@ async function handleSignOut() {
   background-color: var(--semi-transparent-dark);
   backdrop-filter: blur(var(--filter-blur));
   cursor: pointer;
-  transition: color var(--transition-fast, 0.2s) ease, border-color var(--transition-fast, 0.2s) ease;
+  transition: color var(--transition-fast) ease, border-color var(--transition-fast) ease;
 }
 
 .admin-gear__btn:hover { color: var(--color-text-hover); }
@@ -155,7 +155,7 @@ async function handleSignOut() {
   letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
   cursor: pointer;
-  transition: background-color var(--transition-fast, 0.2s) ease, color var(--transition-fast, 0.2s) ease;
+  transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
 }
 
 .admin-gear__item:hover {

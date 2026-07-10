@@ -8,7 +8,6 @@ import {
   DirectionalLight,
   EquirectangularReflectionMapping,
   HalfFloatType,
-  LineBasicMaterial,
   LineSegments,
   Mesh,
   MeshPhysicalMaterial,
@@ -32,7 +31,7 @@ import {
   WebGLRenderTarget,
 } from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
-import { Line2 }         from "three/examples/jsm/lines/Line2.js"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineMaterial }  from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import { GLTFLoader }    from "three/examples/jsm/loaders/GLTFLoader.js"
@@ -141,10 +140,6 @@ export interface ViewerSettings {
     //Line thickness in pixels for the wireframe overlay. Global pref
     //(shared across projects via the settings table).
     overlayLineWidth?: number
-    //EdgesGeometry threshold (deg). Faces whose normals differ by LESS
-    //than this are merged so coplanar triangulation diagonals don't
-    //pollute the wireframe. Global editor pref - applies everywhere.
-    edgeThresholdDeg?: number
     //Per-project sweep axis (free vec3, normalized at runtime) + start
     ///end offsets (% of bbox projected on that axis) for the wireframe
     //wipe animation. Default = X axis 0%..100% reproduces the auto-bbox
@@ -196,8 +191,7 @@ const ORBIT_MIN_DISTANCE           = 0.05
 const ORBIT_MAX_DISTANCE           = 200
 //Wireframe overlay - matches the editor's values so editor + production
 //render identically (polygonOffset pushes surface back, lines land just
-//in front without z-fighting; edge threshold filters triangulation diagonals).
-const WIREFRAME_EDGE_THRESHOLD_DEG = 1
+//in front without z-fighting).
 const WIREFRAME_LINE_OPACITY       = 0.9
 const WIREFRAME_OVERLAY_RENDER_ORDER = 998
 //Shadow + ground
@@ -230,6 +224,33 @@ let pmrem:    PMREMGenerator | null = null
 let rafId:    number | null = null
 let renderUntil = 0
 function requestRender(ms = RENDER_KEEPALIVE_MS_DEFAULT) { renderUntil = performance.now() + ms }
+
+//Set in onBeforeUnmount. Async callbacks (GLTF / HDR loads) check it and
+//dispose their freshly-loaded resources instead of touching a dead scene.
+let isDisposed = false
+
+//Dispose every geometry, material and material-owned texture under a
+//scene-graph root. Used on unmount for the whole scene AND for a GLB
+//whose load callback fires after the viewer is already gone.
+function disposeObjectTree(root: { traverse: (cb: (obj: unknown) => void) => void }) {
+  root.traverse((obj) => {
+    const m = obj as Mesh
+    if (!m.isMesh) return
+    m.geometry?.dispose()
+    const mats = Array.isArray(m.material) ? m.material : [m.material]
+    for (const mat of mats) {
+      if (!mat) continue
+      //material.dispose() releases the program but not its textures -
+      //scan the texture slots (map, normalMap, roughnessMap, ...) too.
+      for (const value of Object.values(mat)) {
+        if (value && typeof value === "object" && (value as Texture).isTexture) {
+          (value as Texture).dispose()
+        }
+      }
+      mat.dispose()
+    }
+  })
+}
 
 //Intro fly-in: Sketchfab-style orbital approach. We lerp in SPHERICAL
 //coordinates around the orbit target (radius + azimuth + polar angle),
@@ -289,6 +310,9 @@ function applyEnvFromSource(source: Texture, intensity: number) {
   source.mapping = EquirectangularReflectionMapping
   const probe = pmrem.fromEquirectangular(source).texture
   probe.mapping = EquirectangularReflectionMapping
+  //the equirect source is fully baked into the PMREM probe at this point;
+  //keeping it around would leak one full-size DataTexture per env swap.
+  source.dispose()
   const old = scene.environment as { dispose?: () => void } | null
   scene.environment = probe
   scene.environmentIntensity = intensity
@@ -304,11 +328,17 @@ function applyEnvFromSource(source: Texture, intensity: number) {
 //the new intensity (constant-time), no reload, no parse, no PMREM.
 let currentHdrUrl:     string | null = null
 let currentHdrProbe:   Texture | null = null
+//ORDERING TOKEN - rapid wireframe toggles between two different HDR urls
+//fire two async loads whose callbacks can resolve out of order (last
+//LOADED would win instead of last REQUESTED). Every applyHdrFromUrl call
+//bumps the sequence; a callback whose token is stale bails out.
+let hdrRequestSeq = 0
 
 //Apply env from a direct URL saved on the viewerSettings (file extension
 //in the URL drives the loader choice). Falls back to procedural sky when
 //the URL is missing OR the file fails to load.
 function applyHdrFromUrl(url: string | null | undefined, intensity: number) {
+  const token = ++hdrRequestSeq
   if (!url) {
     currentHdrUrl   = null
     currentHdrProbe = null
@@ -320,8 +350,12 @@ function applyHdrFromUrl(url: string | null | undefined, intensity: number) {
   //path on every wireframe toggle for projects whose normal-mode HDR
   //and wireframe-mode HDR are the same file.
   if (url === currentHdrUrl && currentHdrProbe && scene) {
+    //dispose the outgoing env (e.g. a sky-gradient probe) unless it IS
+    //the cached probe we're rebinding.
+    const old = scene.environment
     scene.environment = currentHdrProbe
     scene.environmentIntensity = intensity
+    if (old && old !== currentHdrProbe) old.dispose()
     requestRender()
     return
   }
@@ -330,6 +364,12 @@ function applyHdrFromUrl(url: string | null | undefined, intensity: number) {
   loader.load(
     url,
     (source) => {
+      //stale response (a newer request started) or viewer unmounted -
+      //free the decoded texture instead of applying it out of order.
+      if (isDisposed || token !== hdrRequestSeq) {
+        source.dispose()
+        return
+      }
       applyEnvFromSource(source, intensity)
       //pull the probe back out of the scene so we can rebind it on the
       //next toggle without re-running PMREM.
@@ -339,6 +379,7 @@ function applyHdrFromUrl(url: string | null | undefined, intensity: number) {
     undefined,
     (err) => {
       console.error(`[ThreeViewer] HDR load failed for ${url}:`, err)
+      if (isDisposed || token !== hdrRequestSeq) return
       currentHdrUrl   = null
       currentHdrProbe = null
       applyEnvFromSource(makeSkyGradient(), intensity)
@@ -702,7 +743,9 @@ function syncWireframeOverlays(on: boolean, color: string, emissiveUuidSet: Set<
         worldUnits:  false,
       })
       overlayMat.resolution.copy(viewport)
-      const overlay = new Line2(lineGeom, overlayMat)
+      //LineSegments2 (not Line2) - the geometry holds independent segment
+      //pairs, and its constructor is typed for LineSegmentsGeometry
+      const overlay = new LineSegments2(lineGeom, overlayMat)
       overlay.renderOrder = WIREFRAME_OVERLAY_RENDER_ORDER
       sm.mesh.add(overlay)
       wfOverlays.set(sm.mesh.uuid, overlay as unknown as LineSegments)
@@ -939,6 +982,12 @@ onMounted(() => {
   loader.load(
     props.glbUrl,
     (gltf) => {
+      //viewer unmounted while the glb was in flight - free everything we
+      //just parsed instead of leaking it into a torn-down scene.
+      if (isDisposed) {
+        disposeObjectTree(gltf.scene)
+        return
+      }
       isLoading.value = false
       loadingProgress.value = 1
       //EMISSIVE PICKS - meshes the author flagged as "glow in wireframe
@@ -1185,17 +1234,57 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  //flag first so in-flight GLTF / HDR callbacks dispose their payload
+  //and bail instead of resurrecting a torn-down scene.
+  isDisposed = true
   if (rafId !== null) cancelAnimationFrame(rafId)
   resizeObserver?.disconnect()
   resizeObserver = null
-  controls?.dispose()
-  composer?.dispose()
-  renderer?.dispose()
+
+  //WIREFRAME OVERLAYS - LineSegments2 geometry + LineMaterial per mesh.
   for (const overlay of wfOverlays.values()) {
     ;(overlay.material as LineMaterial).dispose?.()
     overlay.geometry.dispose()
   }
   wfOverlays.clear()
+
+  //SCENE GRAPH - every mesh geometry + material + material texture under
+  //the scene root: the loaded GLB, the ground plane, everything.
+  if (scene) disposeObjectTree(scene)
+
+  //MATERIAL REGISTRY - Custom{Normal,Emissive}Material instances. Already
+  //covered by the scene traversal when attached (dispose is idempotent),
+  //this also frees any instance that got detached along the way.
+  for (const mat of wfMaterials) mat.dispose()
+  wfMaterials.clear()
+
+  //PRECOMPUTED WIREFRAME EDGES - one BufferGeometry per mesh.
+  for (const g of precomputedEdges.values()) g.dispose()
+  precomputedEdges.clear()
+
+  //ENVIRONMENT - the active probe (if it isn't the cached one), the
+  //cached PMREM probe, and the PMREM generator's internal targets.
+  if (scene?.environment && scene.environment !== currentHdrProbe) scene.environment.dispose()
+  if (scene) scene.environment = null
+  currentHdrProbe?.dispose()
+  currentHdrProbe = null
+  currentHdrUrl   = null
+  pmrem?.dispose()
+  pmrem = null
+
+  controls?.dispose()
+  composer?.dispose()
+  renderer?.dispose()
+
+  //Drop object references so nothing keeps the GPU-side handles alive.
+  sceneMeshes.length = 0
+  liveLights.length = 0
+  emissivePickMeshes.clear()
+  scene    = null
+  camera   = null
+  controls = null
+  composer = null
+  renderer = null
 })
 
 //Re-apply when settings change (e.g. coming back from edit page)
@@ -1262,17 +1351,18 @@ watch(() => props.settings, (s) => {
 }
 
 /*BRUTALIST loading bar - thicker than the original 2px so it actually
-reads against a busy background. Track at 8% alpha gives a visible base
-line even at 0% progress; fill is the accent so the loading state ties
-to the rest of the site's interactive palette. min-width keeps a small
-visible bar even before the first progress event fires.*/
+reads against a busy background. Track uses the shared --tag-bg surface
+so it stays visible at 0% progress and follows the theme; fill is the
+accent so the loading state ties to the rest of the site's interactive
+palette. min-width keeps a small visible bar even before the first
+progress event fires.*/
 .three-viewer__loading {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background-color: hsl(0 0% 100% / 0.08);
+  height: var(--spacing-xxs);
+  background-color: var(--tag-bg);
   pointer-events: none;
   z-index: 10;
 }

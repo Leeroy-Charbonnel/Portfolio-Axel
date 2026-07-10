@@ -30,3 +30,7 @@ dist-ssr
 # named volume in prod (Dokploy: Mount Type = Volume Mount, NOT Bind Mount).
 storage/
 seed-files/
+
+# Local working files - seed payload for the prod-push scripts + session notes
+src/tmp/
+todo.txt

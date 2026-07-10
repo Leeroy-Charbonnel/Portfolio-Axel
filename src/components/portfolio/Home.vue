@@ -34,9 +34,10 @@ function jumpToProjects() {
 function readArrowDelayMs(): number {
   const raw = getComputedStyle(document.documentElement).getPropertyValue("--home-arrow-delay").trim()
   //value is stored as "1.5s" or "1500ms" - both convertible to ms
-  if (raw.endsWith("ms")) return parseFloat(raw) || 1500
-  if (raw.endsWith("s"))  return (parseFloat(raw) || 1.5) * 1000
-  return parseFloat(raw) * 1000 || 1500
+  const parsed = raw.endsWith("ms") ? parseFloat(raw) : parseFloat(raw) * 1000
+  if (Number.isFinite(parsed)) return parsed
+  console.warn(`[Home] --home-arrow-delay is missing or unparseable ("${raw}"), falling back to 1500ms`)
+  return 1500
 }
 
 onMounted(() => {
@@ -173,7 +174,7 @@ to one side as soon as a line outgrew the cap.*/
 
 .home-section__title {
   font-size: var(--home-title-size);
-  font-weight: 900;
+  font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   color: var(--color-text-hover);

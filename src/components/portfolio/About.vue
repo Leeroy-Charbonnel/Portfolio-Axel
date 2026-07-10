@@ -3,7 +3,6 @@ import { computed } from "vue"
 import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { usePortfolio } from "../../composables/usePortfolio"
-import { pickImageFile } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import EditableText from "./EditableText.vue"
 import ReplaceImageButton from "./ReplaceImageButton.vue"
@@ -13,7 +12,7 @@ const props = defineProps<{ profile: ProfileDto }>()
 
 const { t, lang } = useLanguage()
 const { editMode } = useAdmin()
-const { uploadFile, updateProfile } = usePortfolio()
+const { replaceImage, updateProfile } = usePortfolio()
 
 //arrays editing: one line per item, save splits on newlines, joins back for view
 const gamesJoined = computed(() => props.profile.interests.games.join("\n"))
@@ -32,13 +31,10 @@ async function onInterestSave(field: "games" | "art", newVal: string) {
   await updateProfile({ interests: { ...props.profile.interests, [field]: items } })
 }
 
-async function onReplaceAvatar() {
-  const file = await pickImageFile()
-  if (!file) return
-  try {
-    const { url } = await uploadFile(file)
+function onReplaceAvatar() {
+  return replaceImage("avatar", async (_id, url) => {
     await updateProfile({ avatarUrl: url })
-  } catch (e) { console.error("[About] replace avatar failed:", e) }
+  })
 }
 </script>
 
@@ -54,7 +50,7 @@ async function onReplaceAvatar() {
     >
       <h3 class="about__heading">{{ t("experienceAbout") }}</h3>
       <div class="about__content">
-        <div v-if="profile.avatarUrl || editMode" class="about__avatar no-grain">
+        <div v-if="profile.avatarUrl || editMode" class="about__avatar">
           <component
             :is="editMode ? 'div' : 'a'"
             :href="editMode ? undefined : 'https://sketchfab.com/Obambulatesart'"

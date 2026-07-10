@@ -1,5 +1,7 @@
 import { ref } from "vue"
+import { useToast } from "vue-shared-ui"
 import type { PortfolioDto } from "../types/portfolio"
+import { pickImageFile } from "../lib/portfolio-utils"
 
 //SHARED portfolio state - one fetch per page load, cached in module scope so
 //every section component reads the same ref. No silent fallback: on error we
@@ -49,6 +51,12 @@ async function reload() {
 //we re-fetch after success so the next render reflects DB truth (including any
 //server-side denormalization like file ids -> media URLs).
 
+//Every admin mutation funnels through apiJson / uploadFile, so surfacing
+//failures HERE (toast + throw) means no call site can silently swallow a
+//failed write (project rule #4). Callers may still catch to keep their own
+//UI state consistent; the user has already seen the toast by then.
+const toast = useToast()
+
 async function apiJson(method: string, path: string, body?: unknown): Promise<any> {
   const res = await fetch(path, {
     method,
@@ -58,6 +66,7 @@ async function apiJson(method: string, path: string, body?: unknown): Promise<an
   })
   if (!res.ok) {
     const txt = await res.text().catch(() => "")
+    toast.error(`${method} ${path} failed (${res.status})`)
     throw new Error(`${method} ${path} -> ${res.status} ${txt}`)
   }
   return res.json()
@@ -68,8 +77,25 @@ async function uploadFile(file: File): Promise<{ id: string; url: string }> {
   const fd = new FormData()
   fd.append("file", file)
   const res = await fetch("/api/files", { method: "POST", credentials: "include", body: fd })
-  if (!res.ok) throw new Error(`upload failed: ${res.status}`)
+  if (!res.ok) {
+    toast.error(`Upload of "${file.name}" failed (${res.status})`)
+    throw new Error(`upload failed: ${res.status}`)
+  }
   return res.json()
+}
+
+//REPLACE-IMAGE flow shared by every admin "replace picture" button:
+//native picker -> upload -> apply the patch. Cancelling the picker is a
+//no-op; upload/patch failures already toast via uploadFile/apiJson.
+async function replaceImage(label: string, apply: (fileId: string, url: string) => Promise<void>): Promise<void> {
+  const picked = await pickImageFile()
+  if (!picked) return
+  try {
+    const uploaded = await uploadFile(picked)
+    await apply(uploaded.id, uploaded.url)
+  } catch (e) {
+    console.error(`[usePortfolio] replace ${label} failed:`, e)
+  }
 }
 
 //MAIN PROJECT mutations
@@ -111,7 +137,7 @@ async function deleteSoftware(id: number) { await apiJson("DELETE", `/api/softwa
 //then the model row gets created with the resulting file ids. The
 //thumbnail is optional; an empty default view ("Default") is seeded
 //so the project picker has something to point at on day one.
-async function createModel(name: string, glbFile: File, thumbnailFile: File | null): Promise<{ id: number }> {
+async function createModel(name: string, glbFile: File, thumbnailFile: File | null): Promise<{ id: string }> {
   const glb       = await uploadFile(glbFile)
   const thumbnail = thumbnailFile ? await uploadFile(thumbnailFile) : null
   const row = await apiJson("POST", "/api/models", {
@@ -128,8 +154,8 @@ async function createModel(name: string, glbFile: File, thumbnailFile: File | nu
   await reload()
   return row
 }
-async function updateModel(id: number, patch: Record<string, unknown>) { await apiJson("PUT", `/api/models/${id}`, patch); await reload() }
-async function deleteModel(id: number) { await apiJson("DELETE", `/api/models/${id}`); await reload() }
+async function updateModel(id: string, patch: Record<string, unknown>) { await apiJson("PUT", `/api/models/${id}`, patch); await reload() }
+async function deleteModel(id: string) { await apiJson("DELETE", `/api/models/${id}`); await reload() }
 
 //PROFILE mutation (singleton)
 async function updateProfile(patch: Record<string, unknown>) { await apiJson("PUT", "/api/profile", patch); await reload() }
@@ -140,7 +166,7 @@ export function usePortfolio() {
   }
   return {
     data, loading, loaded, error, reload,
-    uploadFile,
+    uploadFile, replaceImage,
     createMainProject, updateMainProject, deleteMainProject, setMainProjectSoftware,
     createGalleryProject, updateGalleryProject, deleteGalleryProject,
     createExperience, updateExperience, deleteExperience,

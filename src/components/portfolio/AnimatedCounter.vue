@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue"
+import { onBeforeUnmount, ref, watch } from "vue"
 import { useInView } from "../../composables/useInView"
 import { formatNumber } from "../../lib/portfolio-utils"
 
@@ -19,6 +19,9 @@ const { inView } = useInView(root, { once: true, rootMargin: "0px 0px 100px 0px"
 
 const easeOut = (x: number) => 1 - Math.pow(1 - x, 2)
 
+//rAF id kept so the loop can be cancelled when the component unmounts
+let rafId: number | null = null
+
 watch(inView, (isInView) => {
   if (!isInView) return
 
@@ -35,10 +38,14 @@ watch(inView, (isInView) => {
     const progress = Math.min((ts - startTs) / total, 1)
     const current = props.from + (props.to - props.from) * easeOut(progress)
     display.value = formatNumber(current)
-    if (progress < 1) requestAnimationFrame(tick)
+    if (progress < 1) rafId = requestAnimationFrame(tick)
   }
 
-  requestAnimationFrame(tick)
+  rafId = requestAnimationFrame(tick)
+})
+
+onBeforeUnmount(() => {
+  if (rafId !== null) cancelAnimationFrame(rafId)
 })
 </script>
 

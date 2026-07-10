@@ -3,7 +3,7 @@ import type { EditorPrefsDto, MainProjectDto, PortfolioDto } from "../types/port
 
 //EFFECTIVE viewer settings - merges the source's viewerSettings jsonb
 //with the admin's GLOBAL editor3d_* prefs (line color, mode color,
-//shared material, edge threshold). The globals ALWAYS win over what was
+//shared material). The globals ALWAYS win over what was
 //frozen at save time so a tweak in the editor propagates to every model
 //on the site instead of being stuck on whichever was last saved.
 //
@@ -18,6 +18,28 @@ import type { EditorPrefsDto, MainProjectDto, PortfolioDto } from "../types/port
 //Without a model: the legacy startViewMobile field on viewerSettings
 //is honored.
 
+//Layer the admin's GLOBAL editor3d_* prefs over a settings snapshot.
+//Exported so every ThreeViewer consumer (MainProject via the composable
+//below, Viewer3dBlock directly) applies the same "globals win" rule.
+//raw/next are jsonb blobs with no stable schema - `any` is the honest
+//type here, narrowing happens inside ThreeViewer at apply time.
+export function applyEditorPrefs(raw: any, prefs: EditorPrefsDto | undefined): any {
+  const next: any = raw
+    ? { ...raw, wireframeMode: { ...(raw.wireframeMode ?? {}) } }
+    : { wireframeMode: {} }
+  if (prefs?.wireframeLineColor) next.wireframeMode.overlayColor = prefs.wireframeLineColor
+  if (prefs?.wireframeModeColor) next.wireframeMode.color        = prefs.wireframeModeColor
+  if (prefs?.wireframeMaterial) {
+    try {
+      next.wireframeMode.material = JSON.parse(prefs.wireframeMaterial)
+    } catch (e) {
+      //corrupt global pref: keep the per-model material but leave a trace
+      console.warn("[applyEditorPrefs] malformed editor3d_wireframe_material pref, ignored:", e)
+    }
+  }
+  return next
+}
+
 export function useEffectiveViewerSettings(
   project: Ref<MainProjectDto> | ComputedRef<MainProjectDto> | { value: MainProjectDto },
   portfolioData: Ref<PortfolioDto | null>,
@@ -28,10 +50,7 @@ export function useEffectiveViewerSettings(
     const models = portfolioData.value?.models ?? []
     const model  = proj.model3dId ? models.find((m) => m.id === proj.model3dId) ?? null : null
     const raw    = (model?.viewerSettings ?? proj.viewerSettings ?? null) as any
-    const prefs: EditorPrefsDto | undefined = portfolioData.value?.editorPrefs
-    const next: any = raw
-      ? { ...raw, wireframeMode: { ...(raw.wireframeMode ?? {}) } }
-      : { wireframeMode: {} }
+    const next   = applyEditorPrefs(raw, portfolioData.value?.editorPrefs)
 
     if (model) {
       const wantedName = opts.mobile
@@ -44,16 +63,6 @@ export function useEffectiveViewerSettings(
     } else if (opts.mobile && raw?.startViewMobile) {
       //LEGACY phone-specific start pose
       next.startView = raw.startViewMobile
-    }
-
-    if (prefs?.wireframeLineColor) next.wireframeMode.overlayColor = prefs.wireframeLineColor
-    if (prefs?.wireframeModeColor) next.wireframeMode.color        = prefs.wireframeModeColor
-    if (prefs?.wireframeMaterial) {
-      try { next.wireframeMode.material = JSON.parse(prefs.wireframeMaterial) } catch { /*malformed - ignore*/ }
-    }
-    if (prefs?.wireframeEdgeThreshold) {
-      const n = parseFloat(prefs.wireframeEdgeThreshold)
-      if (Number.isFinite(n)) next.wireframeMode.edgeThresholdDeg = n
     }
     return next
   })

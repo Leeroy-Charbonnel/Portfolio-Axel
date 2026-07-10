@@ -14,8 +14,10 @@
     "db:push": "drizzle-kit push --config=drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
     "seed:i18n": "bun scripts/seed-i18n.ts",
+    "push:files": "bun scripts/push-local-files-to-prod.ts",
     "restore:tmp": "bun scripts/restore-tmp-to-prod.ts",
-    "migrate:model3d": "bun scripts/migrate-model3d.ts"
+    "migrate:model3d": "bun scripts/migrate-model3d.ts",
+    "migrate:model3d-uuid": "bun scripts/migrate-model3d-uuid.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.5.3",
@@ -27,7 +29,6 @@
     "cors": "^2.8.6",
     "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
-    "gridstack": "^12.6.0",
     "helmet": "^8.1.0",
     "lucide-vue-next": "^0.577.0",
     "marked": "^18.0.5",

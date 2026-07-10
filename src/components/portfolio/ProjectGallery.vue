@@ -5,7 +5,7 @@ import { useLanguage } from "../../composables/useLanguage"
 import { useAdmin } from "../../composables/useAdmin"
 import { useLightbox } from "../../composables/useLightbox"
 import { usePortfolio } from "../../composables/usePortfolio"
-import { formatNumber, pickImageFile, statLetter, statName } from "../../lib/portfolio-utils"
+import { formatNumber, statLetter, statName } from "../../lib/portfolio-utils"
 import AnimatedReveal from "./AnimatedReveal.vue"
 import EditableText from "./EditableText.vue"
 import RemoveButton from "./RemoveButton.vue"
@@ -17,7 +17,7 @@ const props = defineProps<{ projects: GalleryProjectDto[] }>()
 
 const { t, lang } = useLanguage()
 const { editMode } = useAdmin()
-const { uploadFile, updateGalleryProject, deleteGalleryProject, createGalleryProject } = usePortfolio()
+const { replaceImage, updateGalleryProject, deleteGalleryProject, createGalleryProject } = usePortfolio()
 
 //LIGHTBOX hookup - tapping any gallery card opens the carousel with the
 //FULL gallery list and starts at the clicked card's index.
@@ -48,13 +48,10 @@ async function onStatSave(p: GalleryProjectDto, key: "vertices" | "edges" | "fac
   await updateGalleryProject(p.id, { stats: { ...p.stats, [key]: n } })
 }
 
-async function onReplaceImage(p: GalleryProjectDto) {
-  const file = await pickImageFile()
-  if (!file) return
-  try {
-    const { id } = await uploadFile(file)
+function onReplaceImage(p: GalleryProjectDto) {
+  return replaceImage("gallery image", async (id) => {
     await updateGalleryProject(p.id, { imageFileId: id })
-  } catch (e) { console.error("[Gallery] replace image failed:", e) }
+  })
 }
 </script>
 
@@ -80,7 +77,7 @@ async function onReplaceImage(p: GalleryProjectDto) {
 
           <div class="gallery-item__inner">
             <div
-              class="gallery-item__thumbnail-wrap no-grain"
+              class="gallery-item__thumbnail-wrap"
               :class="{ 'gallery-item__thumbnail-wrap--clickable': !editMode && project.imageUrl }"
               @click="onCardImageClick(project)"
             >
@@ -323,12 +320,12 @@ ellipsis instead of wrapping so the card height stays predictable.*/
   margin-top: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-xs);
-  background-color: hsl(0 70% 50% / 0.08);
-  border: var(--border-width-sm) solid hsl(0 70% 50% / 0.35);
+  background-color: hsl(var(--destructive) / 0.08);
+  border: var(--border-width-sm) solid hsl(var(--destructive) / 0.35);
 }
 
 .gallery-item__link-label {
-  color: hsl(0 80% 70%);
+  color: hsl(var(--destructive));
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
   flex-shrink: 0;
