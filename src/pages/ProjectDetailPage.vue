@@ -942,6 +942,15 @@ accent square next to the title is the only colored element.=====*/
 .detail-page__save:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /*===== BODY ===============================================================*/
+/*EDIT MODE is a fullscreen app layout: the page locks to the viewport
+and the grid + panel become two INDEPENDENT scroll areas, so the editor
+tools never leave the screen no matter how far the grid scrolls.
+(position:sticky was defeated by the global overflow-x:hidden on body -
+an ancestor with any overflow kills sticky, hence this layout instead.)*/
+.detail-page--edit {
+  height: 100vh;
+  overflow: hidden;
+}
 .detail-page__body {
   display: flex; flex: 1 1 auto; min-height: 0;
 }
@@ -1121,17 +1130,15 @@ this rule restores normal text cursor + selection. */
 /*===== SIDE PANEL - background LEVELS delimit the parts, no borders. The
 panel itself is level 1 (secondary bg), groups are transparent, item
 cards inside the editors are level 2 (dp-item), inputs level 3.
-STICKY: the panel follows the page scroll so the editor tools stay
-reachable however far down the grid goes; it scrolls internally when
-its own content is taller than the viewport. z-index 2 lifts it above
-the global grain overlay (z 1) so no grain texture sits on the tools.*/
+The panel is a fixed column of the fullscreen edit layout (see the
+.detail-page--edit rules above): it never scrolls away with the grid and
+scrolls internally when its own content is taller than the viewport.
+position:relative + z-index 2 lift it above the global grain overlay
+(z 1) so no grain texture sits on the tools.*/
 .detail-page__panel {
   width: 340px;
   flex-shrink: 0;
-  align-self: flex-start;
-  position: sticky;
-  top: 0;
-  max-height: 100vh;
+  position: relative;
   z-index: 2;
   padding: var(--spacing-lg);
   background-color: var(--color-background-secondary);
