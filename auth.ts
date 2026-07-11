@@ -6,11 +6,17 @@ import * as schema from "./db/schema"
 const apiKey = process.env.RESEND_API_KEY
 const from   = process.env.EMAIL_FROM ?? "onboarding@resend.dev"
 
-//Fail LOUDLY at boot when the auth secret is missing - passing undefined
-//through would let better-auth run with a broken signing key (rule #4).
+//Scream LOUDLY at boot when the auth secret is missing, but keep the
+//server alive - the public portfolio must stay up even if auth is
+//misconfigured (a hard throw here 502'd the whole prod site). Admin
+//login will fail until the env var is set; /diag reports it.
 const authSecret = process.env.BETTER_AUTH_SECRET
 if (!authSecret) {
-  throw new Error("BETTER_AUTH_SECRET is not set - refusing to boot with an unsigned session store")
+  console.error("=======================================================")
+  console.error("[auth] BETTER_AUTH_SECRET IS NOT SET - sessions cannot")
+  console.error("[auth] be signed, admin login WILL fail. Set it in the")
+  console.error("[auth] environment (Dokploy) and redeploy.")
+  console.error("=======================================================")
 }
 
 let resend: Resend | null = null
@@ -39,7 +45,7 @@ export const auth = createAppAuth({
   authMode:          (process.env.VITE_AUTH_MODE ?? "open") as AuthMode,
   baseURL:            process.env.BETTER_AUTH_URL ?? "http://localhost:3001",
   publicAppUrl:       process.env.PUBLIC_APP_URL  ?? "http://localhost:5173",
-  secret:             authSecret,
+  secret:             authSecret as string,
   googleClientId:     process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   allowedOrigins:     process.env.ALLOWED_ORIGINS?.split(",") ?? ["http://localhost:5173"],
