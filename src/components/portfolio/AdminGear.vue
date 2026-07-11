@@ -60,15 +60,15 @@ async function handleSignOut() {
 <template>
   <div v-if="isAdmin" ref="dropdownRef" class="admin-gear">
     <!--SAVE - shown when the current page registered a save action and
-    edit mode is on. Accent-tinted while there are unsaved changes.-->
+    edit mode is on. Always clickable (no dirty detection - a click just
+    saves); only a save already in flight blocks a re-click.-->
     <button
       v-if="saveAction && editMode"
       type="button"
       class="admin-gear__btn"
-      :class="{ 'admin-gear__btn--active': saveAction.dirty.value }"
-      :disabled="!saveAction.dirty.value || saveAction.saving.value"
-      :data-tooltip="saveAction.saving.value ? 'Saving...' : saveAction.dirty.value ? 'Save changes' : 'No changes'"
-      aria-label="Save changes"
+      :disabled="saveAction.saving.value"
+      :data-tooltip="saveAction.saving.value ? 'Saving...' : 'Save'"
+      aria-label="Save"
       @click="saveAction.run()"
     >
       <Save :size="18" />

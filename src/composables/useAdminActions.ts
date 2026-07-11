@@ -5,9 +5,12 @@ import { shallowRef, type Ref } from "vue"
 //their action here; AdminGear renders a Save button LEFT of the
 //read/edit toggle whenever an action is registered and edit mode is on.
 //Pages must clear the registration on unmount.
+//
+//No dirty tracking BY DESIGN (user rule: "on fait simple") - the button
+//always saves on click, whether something changed or not. `saving` only
+//guards against double-submits.
 
 export interface AdminSaveAction {
-  dirty:  Ref<boolean>
   saving: Ref<boolean>
   run:    () => void
 }

@@ -25,6 +25,8 @@ import { useAdminActions } from "../composables/useAdminActions"
 import { usePortfolio } from "../composables/usePortfolio"
 import { pickBilingual as pickBi } from "../lib/markdown"
 import DetailBlockRenderer from "../components/portfolio/detail/DetailBlockRenderer.vue"
+import { blockBorderStyle } from "../components/portfolio/detail/blockStyle"
+import BlockStyleEditor from "../components/portfolio/detail/editors/BlockStyleEditor.vue"
 import TextEditor      from "../components/portfolio/detail/editors/TextEditor.vue"
 import HeadingEditor   from "../components/portfolio/detail/editors/HeadingEditor.vue"
 import QuoteEditor     from "../components/portfolio/detail/editors/QuoteEditor.vue"
@@ -659,7 +661,7 @@ function onKeyDown(e: KeyboardEvent) {
   if (!editMode.value) return
   if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
     e.preventDefault()
-    if (dirty.value && !saving.value) void onSave()
+    if (!saving.value) void onSave()
     return
   }
   const t = e.target as HTMLElement | null
@@ -683,7 +685,7 @@ const { registerSave, unregisterSave } = useAdminActions()
 onMounted(() => {
   loadProject()
   window.addEventListener("keydown", onKeyDown)
-  registerSave({ dirty, saving, run: () => { void onSave() } })
+  registerSave({ saving, run: () => { void onSave() } })
 })
 onBeforeUnmount(() => {
   detachDocumentListeners()
@@ -734,6 +736,7 @@ onBeforeUnmount(() => {
                 gridRowEnd:      `span ${block.h}`,
                 '--mobile-row-start': mobileY(block) + 1,
                 '--mobile-row-span':  mobileH(block),
+                ...blockBorderStyle(block),
               }"
             >
               <DetailBlockRenderer :block="block" />
@@ -798,7 +801,7 @@ onBeforeUnmount(() => {
               renderer, wrapped pointer-events:none so the tile keeps
               acting as the drag handle. Interactive blocks (carousel,
               compare, accordion) show as static previews.-->
-              <div v-else class="bento-block__preview">
+              <div v-else class="bento-block__preview" :style="blockBorderStyle(block)">
                 <DetailBlockRenderer :block="block" />
               </div>
 
@@ -858,6 +861,9 @@ onBeforeUnmount(() => {
               <Trash2 :size="14" />
             </button>
           </div>
+          <!--SHARED STYLE controls (Excel-like borders) - identical for
+          every block type, above the type-specific editor.-->
+          <BlockStyleEditor :block="selectedBlock" :key="`style-${selectedBlock.id}`" @dirty="markDirty" />
           <!--One editor component per block type (detail/editors/). They
           mutate the content directly, emit "structural" right before a
           list/media mutation (undo snapshot) and "dirty" after any edit.-->

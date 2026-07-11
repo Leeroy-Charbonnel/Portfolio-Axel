@@ -105,9 +105,21 @@ export type DetailBlockType =
   | "embed"
   | "viewer3d"
 
+//PER-BLOCK STYLE - shared by every block type (Excel-like border
+//controls in the panel). Optional so pre-existing blocks keep working;
+//absent = no border.
+export type BorderSides = "none" | "all" | "top" | "bottom" | "left" | "right" | "top-bottom" | "left-right"
+export type BorderLineStyle = "solid" | "dashed" | "dotted" | "double"
+export interface DetailBlockStyle {
+  borderSides?: BorderSides
+  borderWidth?: number   //px
+  borderStyle?: BorderLineStyle
+}
+
 export interface DetailBlock {
   id:       string
   type:     DetailBlockType
+  style?:   DetailBlockStyle
   //Grid coords on the 3-col desktop layout. Each unit = 1 column wide.
   //Row units = 1 grid row of fixed height (set in CSS, ~200px).
   x:        number    //0..2
