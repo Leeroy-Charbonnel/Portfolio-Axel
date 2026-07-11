@@ -1,4 +1,4 @@
-import { ref, type Ref } from "vue"
+import { shallowRef, type Ref } from "vue"
 
 //SHARED admin-actions state - module scoped (project rule #7). Pages
 //that own a save round-trip (the detail-page editor today) register
@@ -12,7 +12,12 @@ export interface AdminSaveAction {
   run:    () => void
 }
 
-const saveAction = ref<AdminSaveAction | null>(null)
+//shallowRef ON PURPOSE: a deep ref() would run the registered object
+//through reactive(), which UNWRAPS the nested dirty / saving refs -
+//AdminGear's `.dirty.value` reads would then hit undefined and the Save
+//button would stay disabled forever. shallowRef keeps the inner refs
+//intact; reading them in a template still tracks reactivity.
+const saveAction = shallowRef<AdminSaveAction | null>(null)
 
 export function useAdminActions() {
   function registerSave(action: AdminSaveAction) {

@@ -561,21 +561,29 @@ async function onSave() {
   if (saving.value) return
   saving.value = true
   status.value = "Saving..."
+  //Optimistically clear dirty NOW: edits made while the request is in
+  //flight re-set it (and re-schedule an autosave), so nothing is lost.
+  dirty.value = false
   const payload: DetailPage = {
     blocks: blocks.value.map((b) => ({ ...b, content: sanitizeContent(b) })),
   }
   try {
     //updateMainProject reloads the shared cache on success, so every
     //other section (MainProject cards etc.) sees the new blocks too.
+    //We deliberately do NOT resync the local blocks / undo stack here:
+    //with autosave, Ctrl+Z must keep working across saves (undoing past
+    //a save is fine - the next autosave persists the undone state).
     await updateMainProject(projectId.value, { detailPage: payload })
-    dirty.value = false
     status.value = "Saved"
-    syncFromPortfolio()
     setTimeout(() => { if (status.value === "Saved") status.value = "" }, 1500)
   } catch (e) {
+    dirty.value = true
     status.value = `Save failed: ${(e as Error).message}`
   } finally {
     saving.value = false
+    //Edits made while saving re-flagged dirty - make sure they get
+    //their own autosave pass even if their debounce already fired.
+    if (dirty.value) scheduleAutosave()
   }
 }
 
