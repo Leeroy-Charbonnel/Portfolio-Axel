@@ -76,19 +76,33 @@ export const MAIN_PROJECT_LAYOUTS: { key: MainProjectLayout; label: string }[] =
 //DETAIL PAGE - per-project content grid (bento-style). Authored via the
 //page editor, rendered on the public detail page route.
 //- text:      markdown source per language
+//- heading:   big brutalist section title (structure / separator)
+//- quote:     large typographic quote + optional author
 //- image:     file row + resolved url (animated gifs render natively here)
 //- video:     uploaded video file; gif-style playback via autoplay+loop+muted
 //- carousel:  ordered list of images with arrows + dots
-//- compare:   before/after pair split by a mouse-driven divider
+//- marquee:   continuously scrolling image strip (separator use)
+//- compare:   before/after pair split by a draggable divider
 //- accordion: collapsible sections, markdown body per language
+//- specs:     key/value sheet (software, polycount, role, ...)
+//- counters:  animated number counters (reuses AnimatedCounter)
+//- button:    single CTA link
+//- embed:     iframe embed (YouTube / Sketchfab / any url)
 //- viewer3d:  embeds a reusable model_3d asset via named views
 export type DetailBlockType =
   | "text"
+  | "heading"
+  | "quote"
   | "image"
   | "video"
   | "carousel"
+  | "marquee"
   | "compare"
   | "accordion"
+  | "specs"
+  | "counters"
+  | "button"
+  | "embed"
   | "viewer3d"
 
 export interface DetailBlock {
@@ -115,10 +129,21 @@ export interface DetailBlock {
 export interface TextBlockContent {
   text: Bilingual
 }
+export interface HeadingBlockContent {
+  text: Bilingual
+}
+export interface QuoteBlockContent {
+  text:   Bilingual
+  author: string
+}
+//object-fit behaviour of the rendered <img>. Optional so pre-existing
+//blocks keep working; absent = "cover" (the historical behaviour).
+export type ImageFit = "cover" | "contain" | "fill" | "none"
 export interface ImageBlockContent {
   fileId: string | null
   url:    string | null
   alt?:   Bilingual
+  fit?:   ImageFit
 }
 export interface VideoBlockContent {
   fileId:   string | null
@@ -146,6 +171,29 @@ export interface CompareBlockContent {
   afterUrl:     string | null
   beforeLabel:  Bilingual
   afterLabel:   Bilingual
+  //true = the divider tracks the pointer on hover; false (default) = the
+  //divider only moves while clicking / dragging.
+  followMouse?: boolean
+}
+//MARQUEE - same item shape as the carousel (fileId is what the server
+//ref-count scans), scrolling continuously. speedPxs is px per second.
+export interface MarqueeBlockContent {
+  items:    { fileId: string; url: string | null }[]
+  speedPxs: number
+}
+export interface SpecsBlockContent {
+  rows: Array<{ label: Bilingual; value: Bilingual }>
+}
+export interface CountersBlockContent {
+  items: Array<{ label: Bilingual; value: number }>
+}
+export interface ButtonBlockContent {
+  label:  Bilingual
+  url:    string
+  newTab: boolean
+}
+export interface EmbedBlockContent {
+  url: string
 }
 export interface AccordionItem {
   title: Bilingual
@@ -163,11 +211,18 @@ export interface Viewer3dBlockContent {
 //Union narrowed by DetailBlock.type at usage sites.
 export type DetailBlockContent =
   | TextBlockContent
+  | HeadingBlockContent
+  | QuoteBlockContent
   | ImageBlockContent
   | VideoBlockContent
   | CarouselBlockContent
+  | MarqueeBlockContent
   | CompareBlockContent
   | AccordionBlockContent
+  | SpecsBlockContent
+  | CountersBlockContent
+  | ButtonBlockContent
+  | EmbedBlockContent
   | Viewer3dBlockContent
 
 export interface DetailPage {

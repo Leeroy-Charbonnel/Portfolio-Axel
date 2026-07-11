@@ -6,12 +6,26 @@ import Viewer3dBlock from "../Viewer3dBlock.vue"
 import CompareSlider from "./CompareSlider.vue"
 import BlockCarousel from "./BlockCarousel.vue"
 import BlockAccordion from "./BlockAccordion.vue"
+import BlockHeading from "./BlockHeading.vue"
+import BlockQuote from "./BlockQuote.vue"
+import BlockButton from "./BlockButton.vue"
+import BlockEmbed from "./BlockEmbed.vue"
+import BlockSpecs from "./BlockSpecs.vue"
+import BlockCounters from "./BlockCounters.vue"
+import BlockMarquee from "./BlockMarquee.vue"
 import type {
   AccordionBlockContent,
+  ButtonBlockContent,
   CarouselBlockContent,
   CompareBlockContent,
+  CountersBlockContent,
   DetailBlock,
+  EmbedBlockContent,
+  HeadingBlockContent,
   ImageBlockContent,
+  MarqueeBlockContent,
+  QuoteBlockContent,
+  SpecsBlockContent,
   TextBlockContent,
   VideoBlockContent,
   Viewer3dBlockContent,
@@ -20,11 +34,10 @@ import type {
 //DETAIL BLOCK RENDERER - one component per block regardless of type,
 //shared by the public view and the edit-mode canvas. In edit mode the
 //parent bento tile wraps this in a pointer-events:none container so the
-//interactive blocks (carousel, compare, accordion) render as static
-//previews and the tile keeps acting as the drag handle.
-//viewer3d is the exception: the live ThreeViewer is heavy and grabs
-//pointer input for orbit, so edit mode renders a placeholder instead
-//(handled by the parent, not here).
+//interactive blocks render as static previews and the tile keeps acting
+//as the drag handle. viewer3d is the exception: the live ThreeViewer is
+//heavy and grabs pointer input for orbit, so edit mode renders a
+//placeholder instead (handled by the parent, not here).
 
 const props = defineProps<{
   block:   DetailBlock
@@ -34,11 +47,18 @@ const props = defineProps<{
 const { lang } = useLanguage()
 
 const asText      = computed(() => props.block.content as TextBlockContent)
+const asHeading   = computed(() => props.block.content as HeadingBlockContent)
+const asQuote     = computed(() => props.block.content as QuoteBlockContent)
 const asImage     = computed(() => props.block.content as ImageBlockContent)
 const asVideo     = computed(() => props.block.content as VideoBlockContent)
 const asCarousel  = computed(() => props.block.content as CarouselBlockContent)
+const asMarquee   = computed(() => props.block.content as MarqueeBlockContent)
 const asCompare   = computed(() => props.block.content as CompareBlockContent)
 const asAccordion = computed(() => props.block.content as AccordionBlockContent)
+const asSpecs     = computed(() => props.block.content as SpecsBlockContent)
+const asCounters  = computed(() => props.block.content as CountersBlockContent)
+const asButton    = computed(() => props.block.content as ButtonBlockContent)
+const asEmbed     = computed(() => props.block.content as EmbedBlockContent)
 const asViewer    = computed(() => props.block.content as Viewer3dBlockContent)
 </script>
 
@@ -49,11 +69,16 @@ const asViewer    = computed(() => props.block.content as Viewer3dBlockContent)
     v-html="renderMd(pickBilingual(asText.text, lang))"
   ></div>
 
+  <BlockHeading v-else-if="block.type === 'heading'" :content="asHeading" />
+
+  <BlockQuote v-else-if="block.type === 'quote'" :content="asQuote" />
+
   <img
     v-else-if="block.type === 'image' && asImage.url"
     :src="asImage.url"
     :alt="pickBilingual(asImage.alt, lang)"
     class="block-img"
+    :style="{ objectFit: asImage.fit ?? 'cover' }"
   />
 
   <video
@@ -69,9 +94,19 @@ const asViewer    = computed(() => props.block.content as Viewer3dBlockContent)
 
   <BlockCarousel v-else-if="block.type === 'carousel'" :content="asCarousel" />
 
+  <BlockMarquee v-else-if="block.type === 'marquee'" :content="asMarquee" />
+
   <CompareSlider v-else-if="block.type === 'compare'" :content="asCompare" />
 
   <BlockAccordion v-else-if="block.type === 'accordion'" :content="asAccordion" />
+
+  <BlockSpecs v-else-if="block.type === 'specs'" :content="asSpecs" />
+
+  <BlockCounters v-else-if="block.type === 'counters'" :content="asCounters" />
+
+  <BlockButton v-else-if="block.type === 'button'" :content="asButton" />
+
+  <BlockEmbed v-else-if="block.type === 'embed'" :content="asEmbed" />
 
   <div v-else-if="block.type === 'viewer3d'" class="block-viewer">
     <Viewer3dBlock :content="asViewer" :mobile="mobile" />

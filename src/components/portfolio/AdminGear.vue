@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue"
 import { useRouter } from "vue-router"
-import { Settings as Gear, Pencil, SlidersHorizontal, Paintbrush, LogOut } from "lucide-vue-next"
+import { Settings as Gear, BookOpen, Pencil, SlidersHorizontal, Paintbrush, LogOut } from "lucide-vue-next"
 import { useAdmin } from "../../composables/useAdmin"
 import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 
-//Admin-only entry point. Renders nothing for visitors. For admins, a small
-//gear icon top-right opens a dropdown with: edit-mode toggle, settings link
-//(theme/accent/language live there), sign-out.
+//Admin-only entry point. Renders nothing for visitors. For admins, TWO
+//buttons top-right: a book/pen toggle (book = read mode, pen = edit mode,
+//click to switch) and a gear dropdown with settings / css / sign-out.
 
 const router = useRouter()
 const { isAdmin, editMode, toggleEdit, signOut } = useAdmin()
@@ -55,24 +55,31 @@ async function handleSignOut() {
 
 <template>
   <div v-if="isAdmin" ref="dropdownRef" class="admin-gear">
+    <!--READ / EDIT toggle - book means "you are reading", pen means "you
+    are editing". One click flips the mode.-->
     <button
       type="button"
       class="admin-gear__btn"
       :class="{ 'admin-gear__btn--active': editMode }"
+      :aria-label="editMode ? 'Editing — switch to read mode' : 'Reading — switch to edit mode'"
+      :data-tooltip="editMode ? 'Editing — click to read' : 'Reading — click to edit'"
+      @click="toggleEdit()"
+    >
+      <component :is="editMode ? Pencil : BookOpen" :size="18" />
+    </button>
+
+    <button
+      type="button"
+      class="admin-gear__btn"
       :aria-expanded="open"
-      :aria-label="editMode ? 'Editing — click for menu' : 'Admin menu'"
+      aria-label="Admin menu"
       @click="open = !open"
     >
       <Gear :size="18" />
-      <span v-if="editMode" class="admin-gear__dot" aria-hidden="true"></span>
     </button>
 
     <Transition name="admin-gear">
       <div v-if="open" class="admin-gear__menu" role="menu">
-        <button class="admin-gear__item" role="menuitem" @click="toggleEdit(); close()">
-          <Pencil :size="14" />
-          <span>{{ editMode ? "Stop editing" : "Edit content" }}</span>
-        </button>
         <button class="admin-gear__item" role="menuitem" @click="openCssPanel">
           <Paintbrush :size="14" />
           <span>Customize CSS</span>
@@ -97,6 +104,8 @@ async function handleSignOut() {
   top:   var(--spacing-md);
   right: calc(var(--spacing-md) + var(--spacing-5xl));
   z-index: 200;
+  display: flex;
+  gap: var(--spacing-xxs);
 }
 
 .admin-gear__btn {
@@ -121,13 +130,21 @@ async function handleSignOut() {
   border-color: var(--color-accent);
 }
 
-.admin-gear__dot {
+/*Tooltip under the toggle so the icon meaning is discoverable.*/
+.admin-gear__btn[data-tooltip] { position: relative; }
+.admin-gear__btn[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
   position: absolute;
-  top:   var(--spacing-xxs);
-  right: var(--spacing-xxs);
-  width:  6px;
-  height: 6px;
-  background-color: var(--color-accent);
+  top: calc(100% + var(--spacing-xs));
+  right: 0;
+  padding: var(--spacing-xxs) var(--spacing-sm);
+  background-color: var(--color-background-secondary);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-tight);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
 }
 
 /*DROPDOWN*/

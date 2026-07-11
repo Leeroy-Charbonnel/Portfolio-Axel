@@ -4,11 +4,13 @@ import { useLanguage } from "../../../composables/useLanguage"
 import { pickBilingual } from "../../../lib/markdown"
 import type { CompareBlockContent } from "../../../types/portfolio"
 
-//COMPARE SLIDER - two stacked images split by a vertical divider that
-//follows the pointer while dragging (touch included). The "after" image
-//paints fully underneath; the "before" image is clipped to the left of
-//the divider via clip-path so both stay pixel-aligned regardless of
-//object-fit cropping.
+//COMPARE SLIDER - two stacked images split by a vertical divider (a bare
+//line, no handle). Default interaction: the divider only moves while the
+//pointer is held down (click / drag, touch included). The per-block
+//followMouse option switches to hover-tracking instead. The "after"
+//image paints fully underneath; the "before" image is clipped to the
+//left of the divider via clip-path so both stay pixel-aligned regardless
+//of object-fit cropping.
 
 const props = defineProps<{ content: CompareBlockContent }>()
 
@@ -46,10 +48,10 @@ function onDocPointerUp() {
   document.removeEventListener("pointerup",   onDocPointerUp)
 }
 
-//Hover tracking (no click needed) - the classic comparison UX where the
-//split just follows the mouse. Dragging still works for touch devices.
+//Hover tracking is OPT-IN per block (followMouse). Without it the split
+//only responds to click / drag.
 function onPointerMove(e: PointerEvent) {
-  if (e.pointerType === "mouse") positionFromEvent(e)
+  if (props.content.followMouse && e.pointerType === "mouse") positionFromEvent(e)
 }
 
 onBeforeUnmount(() => {
@@ -80,9 +82,7 @@ onBeforeUnmount(() => {
       :style="{ clipPath: `inset(0 ${(1 - position) * 100}% 0 0)` }"
       draggable="false"
     />
-    <div class="compare__divider" :style="{ left: `${position * 100}%` }">
-      <span class="compare__handle" aria-hidden="true"></span>
-    </div>
+    <div class="compare__divider" :style="{ left: `${position * 100}%` }"></div>
     <span v-if="beforeLabel" class="compare__label compare__label--before">{{ beforeLabel }}</span>
     <span v-if="afterLabel"  class="compare__label compare__label--after">{{ afterLabel }}</span>
   </div>
@@ -117,15 +117,6 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   z-index: 4;
   pointer-events: none;
-}
-.compare__handle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: var(--spacing-lg);
-  height: var(--spacing-lg);
-  background-color: var(--color-accent-neutral);
 }
 .compare__label {
   position: absolute;

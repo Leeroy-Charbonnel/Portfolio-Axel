@@ -1,31 +1,45 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, type Component } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import {
-  ArrowDown,
   ArrowLeft,
-  ArrowUp,
   Box,
   Columns2,
   Film,
+  GalleryHorizontalEnd,
+  Hash,
+  Heading1,
   ImageIcon,
   Images,
   ListCollapse,
-  Plus,
+  MonitorPlay,
+  MousePointerClick,
+  Quote,
   Save,
+  Table,
   Trash2,
   Type,
-  Upload,
-  X,
 } from "lucide-vue-next"
 import { useLanguage } from "../composables/useLanguage"
 import { useAdmin } from "../composables/useAdmin"
 import { usePortfolio } from "../composables/usePortfolio"
 import { pickBilingual as pickBi } from "../lib/markdown"
-import ModelPicker from "../components/portfolio/ModelPicker.vue"
-import DetailBlockRenderer from "../components/portfolio/blocks/DetailBlockRenderer.vue"
+import DetailBlockRenderer from "../components/portfolio/detail/DetailBlockRenderer.vue"
+import TextEditor      from "../components/portfolio/detail/editors/TextEditor.vue"
+import HeadingEditor   from "../components/portfolio/detail/editors/HeadingEditor.vue"
+import QuoteEditor     from "../components/portfolio/detail/editors/QuoteEditor.vue"
+import ImageEditor     from "../components/portfolio/detail/editors/ImageEditor.vue"
+import VideoEditor     from "../components/portfolio/detail/editors/VideoEditor.vue"
+import CarouselEditor  from "../components/portfolio/detail/editors/CarouselEditor.vue"
+import MarqueeEditor   from "../components/portfolio/detail/editors/MarqueeEditor.vue"
+import CompareEditor   from "../components/portfolio/detail/editors/CompareEditor.vue"
+import AccordionEditor from "../components/portfolio/detail/editors/AccordionEditor.vue"
+import SpecsEditor     from "../components/portfolio/detail/editors/SpecsEditor.vue"
+import CountersEditor  from "../components/portfolio/detail/editors/CountersEditor.vue"
+import ButtonEditor    from "../components/portfolio/detail/editors/ButtonEditor.vue"
+import EmbedEditor     from "../components/portfolio/detail/editors/EmbedEditor.vue"
+import Viewer3dEditor  from "../components/portfolio/detail/editors/Viewer3dEditor.vue"
 import type {
-  AccordionBlockContent,
   CarouselBlockContent,
   CompareBlockContent,
   DetailBlock,
@@ -34,6 +48,7 @@ import type {
   DetailPage,
   ImageBlockContent,
   MainProjectDto,
+  MarqueeBlockContent,
   TextBlockContent,
   VideoBlockContent,
   Viewer3dBlockContent,
@@ -50,9 +65,10 @@ import type {
 //Vue's reactivity. With CSS Grid + a tiny pointer-event state machine
 //we get exact snap-to-cell behaviour in ~150 lines.
 //
-//Block RENDERING is delegated to DetailBlockRenderer (shared with the
-//public view) - this file only owns layout, drag state, and the side
-//panel editors.
+//Block rendering lives in detail/DetailBlockRenderer.vue (one file per
+//block component); the side-panel editors live in detail/editors/ (one
+//file per type, shared upload / bilingual-field / item-card code). This
+//page only owns layout, drag state, undo, and the save round-trip.
 
 const route  = useRoute()
 const router = useRouter()
@@ -61,7 +77,7 @@ const { editMode } = useAdmin()
 //All data flows through the shared portfolio cache - this page used to
 //refetch /api/portfolio by hand, which bypassed (and desynced) the cache
 //every other section reads.
-const { data: portfolioData, loaded: portfolioLoaded, reload: reloadPortfolio, uploadFile, updateMainProject } = usePortfolio()
+const { data: portfolioData, loaded: portfolioLoaded, reload: reloadPortfolio, updateMainProject } = usePortfolio()
 
 const projectId   = computed(() => parseInt(String(route.params.id ?? ""), 10))
 const project     = ref<MainProjectDto | null>(null)
@@ -83,29 +99,26 @@ const blocks      = ref<DetailBlock[]>([])
 const selectedId  = ref<string | null>(null)
 const selectedBlock = computed(() => blocks.value.find((b) => b.id === selectedId.value) ?? null)
 
-//Typed accessors for the panel editors - one cast per type, template
-//stays clean. Only valid while selectedBlock.type matches.
-const selText      = computed(() => selectedBlock.value?.content as TextBlockContent)
-const selImage     = computed(() => selectedBlock.value?.content as ImageBlockContent)
-const selVideo     = computed(() => selectedBlock.value?.content as VideoBlockContent)
-const selCarousel  = computed(() => selectedBlock.value?.content as CarouselBlockContent)
-const selCompare   = computed(() => selectedBlock.value?.content as CompareBlockContent)
-const selAccordion = computed(() => selectedBlock.value?.content as AccordionBlockContent)
-const selViewer    = computed(() => selectedBlock.value?.content as Viewer3dBlockContent)
-
 //BLOCK TYPE REGISTRY - one entry per addable type: panel button label +
-//icon, phantom icon during create-drag.
-const BLOCK_TYPES: { type: DetailBlockType; label: string; icon: unknown }[] = [
-  { type: "text",      label: "Text",      icon: Type },
-  { type: "image",     label: "Image / GIF", icon: ImageIcon },
-  { type: "video",     label: "Video",     icon: Film },
-  { type: "carousel",  label: "Carousel",  icon: Images },
-  { type: "compare",   label: "Compare",   icon: Columns2 },
-  { type: "accordion", label: "Accordion", icon: ListCollapse },
-  { type: "viewer3d",  label: "3D Viewer", icon: Box },
+//icon (also the phantom icon during create-drag) + its panel editor.
+const BLOCK_TYPES: { type: DetailBlockType; label: string; icon: Component; editor: Component }[] = [
+  { type: "text",      label: "Text",        icon: Type,                editor: TextEditor },
+  { type: "heading",   label: "Heading",     icon: Heading1,            editor: HeadingEditor },
+  { type: "quote",     label: "Quote",       icon: Quote,               editor: QuoteEditor },
+  { type: "image",     label: "Image / GIF", icon: ImageIcon,           editor: ImageEditor },
+  { type: "video",     label: "Video",       icon: Film,                editor: VideoEditor },
+  { type: "carousel",  label: "Carousel",    icon: Images,              editor: CarouselEditor },
+  { type: "marquee",   label: "Marquee",     icon: GalleryHorizontalEnd, editor: MarqueeEditor },
+  { type: "compare",   label: "Compare",     icon: Columns2,            editor: CompareEditor },
+  { type: "accordion", label: "Accordion",   icon: ListCollapse,        editor: AccordionEditor },
+  { type: "specs",     label: "Specs",       icon: Table,               editor: SpecsEditor },
+  { type: "counters",  label: "Counters",    icon: Hash,                editor: CountersEditor },
+  { type: "button",    label: "Button",      icon: MousePointerClick,   editor: ButtonEditor },
+  { type: "embed",     label: "Embed",       icon: MonitorPlay,         editor: EmbedEditor },
+  { type: "viewer3d",  label: "3D Viewer",   icon: Box,                 editor: Viewer3dEditor },
 ]
-function iconFor(type: DetailBlockType | undefined): unknown {
-  return BLOCK_TYPES.find((t) => t.type === type)?.icon ?? Type
+function entryFor(type: DetailBlockType | undefined) {
+  return BLOCK_TYPES.find((t) => t.type === type)
 }
 
 //INLINE TEXT EDIT - double-click a text block to swap its rendered
@@ -147,10 +160,10 @@ function markDirty() { dirty.value = true }
 
 //===========================================================================
 //UNDO STACK - snapshot the blocks array BEFORE every structural mutation
-//(add, remove, move, resize, media swap, list reorder). Ctrl+Z (or Cmd+Z)
-//pops the last snapshot and restores it. Text content edits are not
-//snapshotted - the textarea's native undo handles them, and capturing
-//every keystroke would drown the stack. Reset on (re)load.
+//(add, remove, move, resize, media swap, list reorder - editors emit
+//"structural" right before those). Ctrl+Z pops the last snapshot. Text
+//content edits are not snapshotted - the textarea's native undo handles
+//them, and capturing every keystroke would drown the stack.
 const undoStack = ref<DetailBlock[][]>([])
 const UNDO_LIMIT = 100
 
@@ -521,7 +534,7 @@ function sanitizeContent(b: DetailBlock): DetailBlockContent {
   switch (b.type) {
     case "image": {
       const c = b.content as ImageBlockContent
-      return { fileId: c.fileId, url: null, alt: c.alt }
+      return { fileId: c.fileId, url: null, alt: c.alt, fit: c.fit }
     }
     case "video": {
       const c = b.content as VideoBlockContent
@@ -530,6 +543,10 @@ function sanitizeContent(b: DetailBlock): DetailBlockContent {
     case "carousel": {
       const c = b.content as CarouselBlockContent
       return { intervalMs: c.intervalMs, items: c.items.map((i) => ({ ...i, url: null })) }
+    }
+    case "marquee": {
+      const c = b.content as MarqueeBlockContent
+      return { speedPxs: c.speedPxs, items: c.items.map((i) => ({ ...i, url: null })) }
     }
     case "compare": {
       const c = b.content as CompareBlockContent
@@ -569,19 +586,26 @@ function uniqueId(): string {
 }
 //Per-type default content. viewer3d defaults model3dId to null so the
 //placeholder ("No model") shows and the user is forced through the
-//ModelPicker before publish. Video defaults to gif-style playback
-//(autoplay + loop + muted, no controls) since that's the main use case.
+//ModelPicker before publish. Video defaults to gif-style playback.
 const DEFAULT_CONTENT: Record<DetailBlockType, () => DetailBlockContent> = {
   text:      () => ({ text: { en: "", fr: "" } }),
-  image:     () => ({ fileId: null, url: null, alt: { en: "", fr: "" } }),
+  heading:   () => ({ text: { en: "Section", fr: "Section" } }),
+  quote:     () => ({ text: { en: "", fr: "" }, author: "" }),
+  image:     () => ({ fileId: null, url: null, alt: { en: "", fr: "" }, fit: "cover" }),
   video:     () => ({ fileId: null, url: null, autoplay: true, loop: true, muted: true, controls: false }),
   carousel:  () => ({ items: [], intervalMs: 0 }),
+  marquee:   () => ({ items: [], speedPxs: 60 }),
   compare:   () => ({
     beforeFileId: null, beforeUrl: null, afterFileId: null, afterUrl: null,
     beforeLabel: { en: "Before", fr: "Avant" },
     afterLabel:  { en: "After",  fr: "Après" },
+    followMouse: false,
   }),
   accordion: () => ({ items: [{ title: { en: "Section 1", fr: "Section 1" }, body: { en: "", fr: "" } }] }),
+  specs:     () => ({ rows: [{ label: { en: "Software", fr: "Logiciel" }, value: { en: "", fr: "" } }] }),
+  counters:  () => ({ items: [{ label: { en: "Vertices", fr: "Sommets" }, value: 0 }] }),
+  button:    () => ({ label: { en: "See more", fr: "Voir plus" }, url: "", newTab: true }),
+  embed:     () => ({ url: "" }),
   viewer3d:  () => ({ model3dId: null, desktopView: "", mobileView: "" }),
 }
 
@@ -609,114 +633,6 @@ function removeSelected() {
   snapshot()
   blocks.value = blocks.value.filter((b) => b.id !== id)
   selectedId.value = null
-  markDirty()
-}
-
-//===========================================================================
-//UPLOADS - shared pick-then-upload helper for every media block type.
-//Native picker; cancelling resolves to []. Upload failures surface via
-//the shared uploadFile toast + local status.
-function pickFiles(accept: string, multiple = false): Promise<File[]> {
-  return new Promise((resolve) => {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = accept
-    input.multiple = multiple
-    input.onchange = () => resolve(Array.from(input.files ?? []))
-    input.oncancel = () => resolve([])
-    input.click()
-  })
-}
-
-async function uploadPicked(accept: string, multiple = false): Promise<{ id: string; url: string }[]> {
-  const files = await pickFiles(accept, multiple)
-  if (!files.length) return []
-  status.value = "Uploading..."
-  try {
-    const rows: { id: string; url: string }[] = []
-    for (const f of files) rows.push(await uploadFile(f))
-    status.value = ""
-    return rows
-  } catch (e) {
-    status.value = `Upload failed: ${(e as Error).message}`
-    return []
-  }
-}
-
-async function onPickImage() {
-  if (!selectedBlock.value || selectedBlock.value.type !== "image") return
-  const [row] = await uploadPicked("image/*")
-  if (!row) return
-  snapshot()
-  selImage.value.fileId = row.id
-  selImage.value.url    = row.url
-  markDirty()
-}
-
-async function onPickVideo() {
-  if (!selectedBlock.value || selectedBlock.value.type !== "video") return
-  const [row] = await uploadPicked("video/*")
-  if (!row) return
-  snapshot()
-  selVideo.value.fileId = row.id
-  selVideo.value.url    = row.url
-  markDirty()
-}
-
-async function onAddCarouselImages() {
-  if (!selectedBlock.value || selectedBlock.value.type !== "carousel") return
-  const rows = await uploadPicked("image/*", true)
-  if (!rows.length) return
-  snapshot()
-  for (const row of rows) {
-    selCarousel.value.items.push({ fileId: row.id, url: row.url, caption: { en: "", fr: "" } })
-  }
-  markDirty()
-}
-
-function removeCarouselItem(i: number) {
-  snapshot()
-  selCarousel.value.items.splice(i, 1)
-  markDirty()
-}
-function moveCarouselItem(i: number, delta: number) {
-  const items = selCarousel.value.items
-  const j = i + delta
-  if (j < 0 || j >= items.length) return
-  snapshot()
-  const [it] = items.splice(i, 1)
-  items.splice(j, 0, it!)
-  markDirty()
-}
-
-async function onPickCompare(side: "before" | "after") {
-  if (!selectedBlock.value || selectedBlock.value.type !== "compare") return
-  const [row] = await uploadPicked("image/*")
-  if (!row) return
-  snapshot()
-  if (side === "before") { selCompare.value.beforeFileId = row.id; selCompare.value.beforeUrl = row.url }
-  else                   { selCompare.value.afterFileId  = row.id; selCompare.value.afterUrl  = row.url }
-  markDirty()
-}
-
-function addAccordionItem() {
-  snapshot()
-  const n = selAccordion.value.items.length + 1
-  selAccordion.value.items.push({ title: { en: `Section ${n}`, fr: `Section ${n}` }, body: { en: "", fr: "" } })
-  markDirty()
-}
-function removeAccordionItem(i: number) {
-  snapshot()
-  selAccordion.value.items.splice(i, 1)
-  markDirty()
-}
-function moveAccordionItem(i: number, delta: number) {
-  const items = selAccordion.value.items
-  const j = i + delta
-  if (j < 0 || j >= items.length) return
-  snapshot()
-  const [it] = items.splice(i, 1)
-  items.splice(j, 0, it!)
   markDirty()
 }
 
@@ -805,7 +721,6 @@ onBeforeUnmount(() => {
               v-for="block in blocks"
               :key="block.id"
               class="detail-page__block"
-              :class="`detail-page__block--${block.type}`"
               :style="{
                 gridColumnStart: block.x + 1,
                 gridColumnEnd:   `span ${block.w}`,
@@ -905,7 +820,7 @@ onBeforeUnmount(() => {
                 gridRowEnd:      `span ${drag.currentH}`,
               }"
             >
-              <component :is="iconFor(drag.type)" :size="28" />
+              <component :is="entryFor(drag.type)?.icon ?? Type" :size="28" />
             </div>
           </div>
         </template>
@@ -915,7 +830,7 @@ onBeforeUnmount(() => {
       <aside v-if="editMode" class="detail-page__panel">
         <div class="detail-page__panel-group">
           <h2 class="detail-page__panel-title">Add block</h2>
-          <p class="detail-page__panel-hint">Click to append, or drag onto the grid to place anywhere.</p>
+          <p class="dp-hint">Click to append, or drag onto the grid to place anywhere.</p>
           <div class="detail-page__add-grid">
             <button
               v-for="bt in BLOCK_TYPES"
@@ -932,204 +847,21 @@ onBeforeUnmount(() => {
 
         <div v-if="selectedBlock" class="detail-page__panel-group">
           <div class="detail-page__panel-head">
-            <h2 class="detail-page__panel-title">Edit {{ selectedBlock.type }}</h2>
-            <button type="button" class="detail-page__remove" @click="removeSelected" title="Delete block">
+            <h2 class="detail-page__panel-title">Edit {{ entryFor(selectedBlock.type)?.label ?? selectedBlock.type }}</h2>
+            <button type="button" class="dp-icon-btn dp-icon-btn--danger" @click="removeSelected" title="Delete block">
               <Trash2 :size="14" />
             </button>
           </div>
-
-          <!--=== TEXT ========================================================-->
-          <template v-if="selectedBlock.type === 'text'">
-            <p class="detail-page__panel-hint">Markdown supported. Double-click the block to edit inline (current language).</p>
-            <label class="detail-page__field">
-              <span>FR (markdown source)</span>
-              <textarea
-                rows="6"
-                :value="selText.text.fr"
-                @input="(e) => { selText.text.fr = (e.target as HTMLTextAreaElement).value; markDirty() }"
-              ></textarea>
-            </label>
-            <label class="detail-page__field">
-              <span>EN (markdown source)</span>
-              <textarea
-                rows="6"
-                :value="selText.text.en"
-                @input="(e) => { selText.text.en = (e.target as HTMLTextAreaElement).value; markDirty() }"
-              ></textarea>
-            </label>
-          </template>
-
-          <!--=== IMAGE / GIF =================================================-->
-          <template v-else-if="selectedBlock.type === 'image'">
-            <p class="detail-page__panel-hint">Static images and animated GIFs both work here.</p>
-            <button type="button" class="detail-page__upload" @click="onPickImage">
-              <Upload :size="14" />
-              <span>{{ selImage.fileId ? "Replace image" : "Upload image" }}</span>
-            </button>
-            <label class="detail-page__field">
-              <span>Alt (FR)</span>
-              <input
-                type="text"
-                :value="selImage.alt?.fr ?? ''"
-                @input="(e) => { if (!selImage.alt) selImage.alt = { en: '', fr: '' }; selImage.alt.fr = (e.target as HTMLInputElement).value; markDirty() }"
-              />
-            </label>
-            <label class="detail-page__field">
-              <span>Alt (EN)</span>
-              <input
-                type="text"
-                :value="selImage.alt?.en ?? ''"
-                @input="(e) => { if (!selImage.alt) selImage.alt = { en: '', fr: '' }; selImage.alt.en = (e.target as HTMLInputElement).value; markDirty() }"
-              />
-            </label>
-          </template>
-
-          <!--=== VIDEO =======================================================-->
-          <template v-else-if="selectedBlock.type === 'video'">
-            <p class="detail-page__panel-hint">
-              Default is gif-style playback (autoplay, loop, muted). Enable
-              controls for a regular video player.
-            </p>
-            <button type="button" class="detail-page__upload" @click="onPickVideo">
-              <Upload :size="14" />
-              <span>{{ selVideo.fileId ? "Replace video" : "Upload video" }}</span>
-            </button>
-            <label class="detail-page__toggle">
-              <input type="checkbox" :checked="selVideo.autoplay" @change="(e) => { selVideo.autoplay = (e.target as HTMLInputElement).checked; markDirty() }" />
-              <span>Autoplay</span>
-            </label>
-            <label class="detail-page__toggle">
-              <input type="checkbox" :checked="selVideo.loop" @change="(e) => { selVideo.loop = (e.target as HTMLInputElement).checked; markDirty() }" />
-              <span>Loop</span>
-            </label>
-            <label class="detail-page__toggle">
-              <input type="checkbox" :checked="selVideo.muted" @change="(e) => { selVideo.muted = (e.target as HTMLInputElement).checked; markDirty() }" />
-              <span>Muted (required for autoplay)</span>
-            </label>
-            <label class="detail-page__toggle">
-              <input type="checkbox" :checked="selVideo.controls" @change="(e) => { selVideo.controls = (e.target as HTMLInputElement).checked; markDirty() }" />
-              <span>Show controls</span>
-            </label>
-          </template>
-
-          <!--=== CAROUSEL ====================================================-->
-          <template v-else-if="selectedBlock.type === 'carousel'">
-            <button type="button" class="detail-page__upload" @click="onAddCarouselImages">
-              <Upload :size="14" />
-              <span>Add image(s)</span>
-            </button>
-            <label class="detail-page__field">
-              <span>Auto-advance</span>
-              <select
-                :value="String(selCarousel.intervalMs)"
-                @change="(e) => { selCarousel.intervalMs = parseInt((e.target as HTMLSelectElement).value, 10); markDirty() }"
-              >
-                <option value="0">Manual only</option>
-                <option value="3000">Every 3s</option>
-                <option value="5000">Every 5s</option>
-                <option value="8000">Every 8s</option>
-              </select>
-            </label>
-            <p v-if="!selCarousel.items.length" class="detail-page__panel-hint">No slides yet - add images above.</p>
-            <div v-for="(item, i) in selCarousel.items" :key="item.fileId + i" class="detail-page__item">
-              <div class="detail-page__item-head">
-                <img v-if="item.url" :src="item.url" alt="" class="detail-page__item-thumb" />
-                <span class="detail-page__item-label">Slide {{ i + 1 }}</span>
-                <button type="button" class="detail-page__item-btn" :disabled="i === 0" title="Move up" @click="moveCarouselItem(i, -1)"><ArrowUp :size="12" /></button>
-                <button type="button" class="detail-page__item-btn" :disabled="i === selCarousel.items.length - 1" title="Move down" @click="moveCarouselItem(i, 1)"><ArrowDown :size="12" /></button>
-                <button type="button" class="detail-page__item-btn detail-page__item-btn--danger" title="Remove slide" @click="removeCarouselItem(i)"><X :size="12" /></button>
-              </div>
-              <label class="detail-page__field">
-                <span>Caption (FR)</span>
-                <input type="text" :value="item.caption?.fr ?? ''" @input="(e) => { if (!item.caption) item.caption = { en: '', fr: '' }; item.caption.fr = (e.target as HTMLInputElement).value; markDirty() }" />
-              </label>
-              <label class="detail-page__field">
-                <span>Caption (EN)</span>
-                <input type="text" :value="item.caption?.en ?? ''" @input="(e) => { if (!item.caption) item.caption = { en: '', fr: '' }; item.caption.en = (e.target as HTMLInputElement).value; markDirty() }" />
-              </label>
-            </div>
-          </template>
-
-          <!--=== COMPARE =====================================================-->
-          <template v-else-if="selectedBlock.type === 'compare'">
-            <p class="detail-page__panel-hint">Two images split by a divider that follows the mouse.</p>
-            <div class="detail-page__compare-row">
-              <button type="button" class="detail-page__upload" @click="onPickCompare('before')">
-                <Upload :size="14" />
-                <span>{{ selCompare.beforeFileId ? "Replace before" : "Upload before" }}</span>
-              </button>
-              <img v-if="selCompare.beforeUrl" :src="selCompare.beforeUrl" alt="" class="detail-page__item-thumb" />
-            </div>
-            <div class="detail-page__compare-row">
-              <button type="button" class="detail-page__upload" @click="onPickCompare('after')">
-                <Upload :size="14" />
-                <span>{{ selCompare.afterFileId ? "Replace after" : "Upload after" }}</span>
-              </button>
-              <img v-if="selCompare.afterUrl" :src="selCompare.afterUrl" alt="" class="detail-page__item-thumb" />
-            </div>
-            <label class="detail-page__field">
-              <span>Before label (FR)</span>
-              <input type="text" :value="selCompare.beforeLabel.fr" @input="(e) => { selCompare.beforeLabel.fr = (e.target as HTMLInputElement).value; markDirty() }" />
-            </label>
-            <label class="detail-page__field">
-              <span>Before label (EN)</span>
-              <input type="text" :value="selCompare.beforeLabel.en" @input="(e) => { selCompare.beforeLabel.en = (e.target as HTMLInputElement).value; markDirty() }" />
-            </label>
-            <label class="detail-page__field">
-              <span>After label (FR)</span>
-              <input type="text" :value="selCompare.afterLabel.fr" @input="(e) => { selCompare.afterLabel.fr = (e.target as HTMLInputElement).value; markDirty() }" />
-            </label>
-            <label class="detail-page__field">
-              <span>After label (EN)</span>
-              <input type="text" :value="selCompare.afterLabel.en" @input="(e) => { selCompare.afterLabel.en = (e.target as HTMLInputElement).value; markDirty() }" />
-            </label>
-          </template>
-
-          <!--=== ACCORDION ===================================================-->
-          <template v-else-if="selectedBlock.type === 'accordion'">
-            <p class="detail-page__panel-hint">Collapsible sections. Body supports markdown.</p>
-            <button type="button" class="detail-page__upload" @click="addAccordionItem">
-              <Plus :size="14" />
-              <span>Add section</span>
-            </button>
-            <div v-for="(item, i) in selAccordion.items" :key="i" class="detail-page__item">
-              <div class="detail-page__item-head">
-                <span class="detail-page__item-label">Section {{ i + 1 }}</span>
-                <button type="button" class="detail-page__item-btn" :disabled="i === 0" title="Move up" @click="moveAccordionItem(i, -1)"><ArrowUp :size="12" /></button>
-                <button type="button" class="detail-page__item-btn" :disabled="i === selAccordion.items.length - 1" title="Move down" @click="moveAccordionItem(i, 1)"><ArrowDown :size="12" /></button>
-                <button type="button" class="detail-page__item-btn detail-page__item-btn--danger" title="Remove section" @click="removeAccordionItem(i)"><X :size="12" /></button>
-              </div>
-              <label class="detail-page__field">
-                <span>Title (FR)</span>
-                <input type="text" :value="item.title.fr" @input="(e) => { item.title.fr = (e.target as HTMLInputElement).value; markDirty() }" />
-              </label>
-              <label class="detail-page__field">
-                <span>Title (EN)</span>
-                <input type="text" :value="item.title.en" @input="(e) => { item.title.en = (e.target as HTMLInputElement).value; markDirty() }" />
-              </label>
-              <label class="detail-page__field">
-                <span>Body FR (markdown)</span>
-                <textarea rows="4" :value="item.body.fr" @input="(e) => { item.body.fr = (e.target as HTMLTextAreaElement).value; markDirty() }"></textarea>
-              </label>
-              <label class="detail-page__field">
-                <span>Body EN (markdown)</span>
-                <textarea rows="4" :value="item.body.en" @input="(e) => { item.body.en = (e.target as HTMLTextAreaElement).value; markDirty() }"></textarea>
-              </label>
-            </div>
-          </template>
-
-          <!--=== 3D VIEWER ===================================================-->
-          <template v-else-if="selectedBlock.type === 'viewer3d'">
-            <p class="detail-page__panel-hint">
-              Pick which 3D model to embed and which named view to show on
-              desktop / mobile. Models + views are managed in Settings →
-              3D Models and per-model from the Views tab of the 3D editor.
-            </p>
-            <ModelPicker
-              :model-value="selViewer"
-              @update:model-value="(v: Viewer3dBlockContent) => { Object.assign(selectedBlock!.content, v); markDirty() }"
-            />
-          </template>
+          <!--One editor component per block type (detail/editors/). They
+          mutate the content directly, emit "structural" right before a
+          list/media mutation (undo snapshot) and "dirty" after any edit.-->
+          <component
+            :is="entryFor(selectedBlock.type)!.editor"
+            :key="selectedBlock.id"
+            :content="selectedBlock.content"
+            @structural="snapshot"
+            @dirty="markDirty"
+          />
         </div>
 
         <p v-else class="detail-page__panel-empty">Click a block on the page to edit its content.</p>
@@ -1152,15 +884,15 @@ onBeforeUnmount(() => {
   --detail-max-w: var(--detail-grid-max-width, 1200px);
 }
 
-/*===== TOP BAR - brutalist header: hard border, index stamp, uppercase
-title. The accent square next to the title is the only colored element,
-everything else is monochrome + structure. =====*/
+/*===== TOP BAR - brutalist header: index stamp + uppercase title. The
+accent square next to the title is the only colored element.=====*/
 .detail-page__top {
   display: flex; align-items: center; gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: var(--border-width-md) solid var(--color-border-primary);
   flex-shrink: 0;
 }
+/*Back is borderless (user rule) - background appears on hover only.*/
 .detail-page__back {
   display: inline-flex; align-items: center; gap: var(--spacing-xxs);
   padding: var(--spacing-xs) var(--spacing-sm);
@@ -1168,11 +900,11 @@ everything else is monochrome + structure. =====*/
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
   background: transparent; color: hsl(var(--foreground));
-  border: var(--border-width-sm) solid var(--color-border-muted);
+  border: none;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color var(--transition-fast) ease, background-color var(--transition-fast) ease;
 }
-.detail-page__back:hover { color: var(--color-accent); border-color: var(--color-accent); }
+.detail-page__back:hover { color: var(--color-accent); background-color: var(--color-background-gray-100); }
 .detail-page__index {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
@@ -1204,7 +936,7 @@ everything else is monochrome + structure. =====*/
   color: var(--color-accent);
   border: var(--border-width-sm) solid var(--color-accent);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
 }
 .detail-page__save:hover:not(:disabled) { background-color: var(--color-accent); color: hsl(0 0% 0%); }
 .detail-page__save:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -1230,7 +962,7 @@ everything else is monochrome + structure. =====*/
 }
 .detail-page__msg--err { color: hsl(var(--destructive)); }
 
-/*===== VIEW MODE GRID - square corners, structural borders ===============*/
+/*===== VIEW MODE GRID =====================================================*/
 .detail-page__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1386,15 +1118,17 @@ this rule restores normal text cursor + selection. */
   opacity: 1;
 }
 
-/*===== SIDE PANEL =========================================================*/
+/*===== SIDE PANEL - background LEVELS delimit the parts, no borders. The
+panel itself is level 1 (secondary bg), groups are transparent, item
+cards inside the editors are level 2 (dp-item), inputs level 3.=====*/
 .detail-page__panel {
-  width: 320px;
+  width: 340px;
   flex-shrink: 0;
   padding: var(--spacing-lg);
-  border-left: var(--border-width-md) solid var(--color-border-primary);
+  background-color: var(--color-background-secondary);
   overflow-y: auto;
   display: flex; flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-xl);
 }
 .detail-page__panel-group {
   display: flex; flex-direction: column;
@@ -1413,120 +1147,33 @@ this rule restores normal text cursor + selection. */
   padding-left: var(--spacing-xs);
   border-left: var(--border-width-lg) solid var(--color-accent);
 }
-.detail-page__panel-empty,
-.detail-page__panel-hint {
+.detail-page__panel-empty {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
-  margin: 0 0 var(--spacing-xs) 0;
-  line-height: 1.4;
+  margin: 0;
+  font-style: italic;
 }
-.detail-page__panel-empty { font-style: italic; }
-/*Add-block buttons lay out 2-up so 7 types stay compact.*/
+/*Add-block buttons lay out 2-up. Background does the delimiting.*/
 .detail-page__add-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-xxs);
 }
-.detail-page__add,
-.detail-page__upload {
+.detail-page__add {
   display: flex; align-items: center; gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-tight);
-  background: transparent; color: hsl(var(--foreground));
-  border: var(--border-width-sm) solid var(--color-gray-medium);
+  background-color: var(--color-background-gray-100);
+  color: hsl(var(--foreground));
+  border: none;
   cursor: pointer;
   touch-action: none;   /* drag from buttons works on touch */
   user-select: none;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
 }
-.detail-page__add:hover,
-.detail-page__upload:hover { color: var(--color-accent); border-color: var(--color-accent); }
-.detail-page__remove {
-  display: inline-flex; align-items: center;
-  padding: var(--spacing-xxs) var(--spacing-xs);
-  background: transparent; color: var(--color-text-tertiary);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  cursor: pointer;
-}
-.detail-page__remove:hover { color: hsl(var(--destructive)); border-color: hsl(var(--destructive)); }
-.detail-page__field {
-  display: flex; flex-direction: column; gap: var(--spacing-xxs);
-  font-size: var(--font-size-xs);
-}
-.detail-page__field > span {
-  color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
-}
-.detail-page__field input,
-.detail-page__field textarea,
-.detail-page__field select {
-  padding: var(--spacing-xs);
-  font-family: inherit;
-  font-size: var(--font-size-xs);
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  resize: vertical;
-}
-.detail-page__field textarea {
-  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
-  line-height: 1.4;
-}
-.detail-page__field input:focus,
-.detail-page__field textarea:focus,
-.detail-page__field select:focus { outline: none; border-color: var(--color-accent); }
-
-/*Checkbox toggle rows for the video options.*/
-.detail-page__toggle {
-  display: flex; align-items: center; gap: var(--spacing-xs);
-  font-size: var(--font-size-xs);
-  color: hsl(var(--foreground));
-  cursor: pointer;
-}
-.detail-page__toggle input { accent-color: var(--color-accent); cursor: pointer; }
-
-/*List items in the panel (carousel slides, accordion sections).*/
-.detail-page__item {
-  display: flex; flex-direction: column; gap: var(--spacing-xs);
-  padding: var(--spacing-xs);
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-}
-.detail-page__item-head {
-  display: flex; align-items: center; gap: var(--spacing-xs);
-}
-.detail-page__item-label {
-  flex: 1 1 auto;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-tight);
-  color: var(--color-text-secondary);
-}
-.detail-page__item-thumb {
-  width: var(--spacing-2xl); height: var(--spacing-xl);
-  object-fit: cover;
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  flex-shrink: 0;
-}
-.detail-page__item-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: var(--spacing-lg); height: var(--spacing-lg);
-  background: transparent;
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  color: var(--color-text-tertiary);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.detail-page__item-btn:hover:not(:disabled) { color: var(--color-accent); border-color: var(--color-accent); }
-.detail-page__item-btn--danger:hover:not(:disabled) { color: hsl(var(--destructive)); border-color: hsl(var(--destructive)); }
-.detail-page__item-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.detail-page__compare-row {
-  display: flex; align-items: center; gap: var(--spacing-xs);
-}
+.detail-page__add:hover { background-color: var(--color-background-gray-150); color: var(--color-accent); }
 
 /*===== MOBILE (view mode) - 1 col forced ==================================*/
 /* The grid switches to a single column and consumes the per-block

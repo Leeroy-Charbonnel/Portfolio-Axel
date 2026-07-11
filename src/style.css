@@ -413,6 +413,153 @@ from the --font-size-* scale so they follow the rest of the type system.*/
 }
 .md-content img { max-width: 100%; }
 
+/*===========================================================================
+DETAIL-PAGE PANEL primitives (dp-*) - shared by every block editor under
+src/components/portfolio/detail/editors/. GLOBAL on purpose: the editors
+are separate components and would otherwise each re-declare this. Design
+rule from the user: background LEVELS delimit the parts, not borders.
+Level 0 = page background, level 1 = panel group, level 2 = item card,
+level 3 = inputs / buttons.*/
+.dp-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin: 0;
+  line-height: 1.4;
+}
+.dp-label,
+.dp-field > span {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+.dp-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+  font-size: var(--font-size-xs);
+}
+.dp-input,
+.dp-select {
+  width: 100%;
+  padding: var(--spacing-xs);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  background-color: var(--color-background-gray-100);
+  color: var(--color-text);
+  border: none;
+  resize: vertical;
+  transition: background-color var(--transition-fast) ease;
+}
+.dp-input:focus,
+.dp-select:focus {
+  outline: none;
+  background-color: var(--color-background-gray-150);
+}
+.dp-input--mono {
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  line-height: 1.4;
+}
+.dp-select { cursor: pointer; }
+.dp-bilingual { display: flex; flex-direction: column; gap: var(--spacing-xxs); }
+.dp-bilingual__pair { display: flex; flex-direction: column; gap: var(--spacing-xxs); }
+.dp-bilingual__col { display: flex; flex-direction: column; gap: 0; position: relative; }
+.dp-lang-tag {
+  position: absolute;
+  top: var(--spacing-xxs);
+  right: var(--spacing-xxs);
+  font-size: 0.6rem;
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+  z-index: 1;
+}
+.dp-upload,
+.dp-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+  background-color: var(--color-background-gray-150);
+  color: var(--color-text);
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
+}
+.dp-upload:hover,
+.dp-action:hover {
+  background-color: var(--color-background-gray-200);
+  color: var(--color-accent);
+}
+.dp-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.dp-toggle input { accent-color: var(--color-accent); cursor: pointer; }
+/*Item card - level 2 surface, no border. Head row holds the reorder /
+remove icon buttons.*/
+.dp-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  background-color: var(--color-background-gray-50);
+}
+.dp-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+.dp-item__title {
+  flex: 1 1 auto;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--spacing-lg);
+  height: var(--spacing-lg);
+  background-color: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
+}
+.dp-icon-btn:hover:not(:disabled) {
+  background-color: var(--color-background-gray-150);
+  color: var(--color-text-hover);
+}
+.dp-icon-btn--danger:hover:not(:disabled) { color: hsl(var(--destructive)); }
+.dp-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.dp-thumb {
+  width: var(--spacing-2xl);
+  height: var(--spacing-xl);
+  object-fit: cover;
+  flex-shrink: 0;
+  background-color: var(--color-background-gray-100);
+}
+.dp-row { display: flex; align-items: center; gap: var(--spacing-xs); }
+
 /*Full-bleed film-grain overlay - position:absolute so the grain SCROLLS
 with the page (fixed-position grain felt locked-in-place and the user
 explicitly rejected that). The grain stretches inset:0 over .portfolio-app,

@@ -1230,7 +1230,7 @@ app.get("/api/portfolio", async (_req, res) => {
               afterFileId:  after,  afterUrl:  urlOf(after),
             } }
           }
-          if (b.type === "carousel") {
+          if (b.type === "carousel" || b.type === "marquee") {
             const items = Array.isArray(b.content?.items) ? b.content.items as Array<Record<string, unknown>> : []
             return { ...b, content: {
               ...b.content,
