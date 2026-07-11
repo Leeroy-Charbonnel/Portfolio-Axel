@@ -1,34 +1,32 @@
 <script setup lang="ts">
-import {
-  Ban,
-  PanelBottom,
-  PanelLeft,
-  PanelRight,
-  PanelTop,
-  Square,
-  UnfoldHorizontal,
-  UnfoldVertical,
-} from "lucide-vue-next"
+import BorderSideIcon from "./BorderSideIcon.vue"
 import type { BorderLineStyle, BorderSides, DetailBlock } from "../../../../types/portfolio"
 
 //SHARED STYLE EDITOR - Excel-like border controls, shown for EVERY
 //selected block above its type-specific editor. Side presets are icon
-//toggles; width and line type are selects.
+//toggles (square with the active sides drawn on, like Excel's picker);
+//width and line type are selects.
 
 const props = defineProps<{ block: DetailBlock }>()
 const emit = defineEmits<{ (e: "dirty"): void }>()
 
-const SIDES: { value: BorderSides; icon: unknown; label: string }[] = [
-  { value: "none",       icon: Ban,              label: "No border" },
-  { value: "all",        icon: Square,           label: "All sides" },
-  { value: "top",        icon: PanelTop,         label: "Top" },
-  { value: "bottom",     icon: PanelBottom,      label: "Bottom" },
-  { value: "left",       icon: PanelLeft,        label: "Left" },
-  { value: "right",      icon: PanelRight,       label: "Right" },
-  { value: "top-bottom", icon: UnfoldVertical,   label: "Top + bottom" },
-  { value: "left-right", icon: UnfoldHorizontal, label: "Left + right" },
+const SIDES: { value: BorderSides; label: string }[] = [
+  { value: "none",       label: "No border" },
+  { value: "all",        label: "All sides" },
+  { value: "top",        label: "Top" },
+  { value: "bottom",     label: "Bottom" },
+  { value: "left",       label: "Left" },
+  { value: "right",      label: "Right" },
+  { value: "top-bottom", label: "Top + bottom" },
+  { value: "left-right", label: "Left + right" },
 ]
-const LINE_STYLES: BorderLineStyle[] = ["solid", "dashed", "dotted", "double"]
+const LINE_STYLES: { value: BorderLineStyle; label: string }[] = [
+  { value: "solid",    label: "Solid" },
+  { value: "dashed",   label: "Dashed" },
+  { value: "dotted",   label: "Dotted (square)" },
+  { value: "dash-dot", label: "Dash-dot" },
+  { value: "double",   label: "Double" },
+]
 
 function ensureStyle() {
   if (!props.block.style) props.block.style = {}
@@ -62,7 +60,7 @@ function setLineStyle(v: string) {
         :title="s.label"
         @click="setSides(s.value)"
       >
-        <component :is="s.icon" :size="14" />
+        <BorderSideIcon :sides="s.value" />
       </button>
     </div>
   </div>
@@ -78,7 +76,7 @@ function setLineStyle(v: string) {
     <label class="dp-field style-editor__half">
       <span>Line type</span>
       <select class="dp-select" :value="block.style?.borderStyle ?? 'solid'" @change="setLineStyle(($event.target as HTMLSelectElement).value)">
-        <option v-for="ls in LINE_STYLES" :key="ls" :value="ls">{{ ls }}</option>
+        <option v-for="ls in LINE_STYLES" :key="ls.value" :value="ls.value">{{ ls.label }}</option>
       </select>
     </label>
   </div>

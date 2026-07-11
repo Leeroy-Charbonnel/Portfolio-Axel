@@ -109,7 +109,9 @@ export type DetailBlockType =
 //controls in the panel). Optional so pre-existing blocks keep working;
 //absent = no border.
 export type BorderSides = "none" | "all" | "top" | "bottom" | "left" | "right" | "top-bottom" | "left-right"
-export type BorderLineStyle = "solid" | "dashed" | "dotted" | "double"
+//dash-dot = alternating dash / square dot (the Excel "trait-point");
+//rendered by BlockBorder.vue since CSS has no native equivalent.
+export type BorderLineStyle = "solid" | "dashed" | "dotted" | "dash-dot" | "double"
 export interface DetailBlockStyle {
   borderSides?: BorderSides
   borderWidth?: number   //px

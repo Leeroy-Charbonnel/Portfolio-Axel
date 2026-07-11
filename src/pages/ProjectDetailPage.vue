@@ -25,7 +25,7 @@ import { useAdminActions } from "../composables/useAdminActions"
 import { usePortfolio } from "../composables/usePortfolio"
 import { pickBilingual as pickBi } from "../lib/markdown"
 import DetailBlockRenderer from "../components/portfolio/detail/DetailBlockRenderer.vue"
-import { blockBorderStyle } from "../components/portfolio/detail/blockStyle"
+import BlockBorder from "../components/portfolio/detail/BlockBorder.vue"
 import BlockStyleEditor from "../components/portfolio/detail/editors/BlockStyleEditor.vue"
 import TextEditor      from "../components/portfolio/detail/editors/TextEditor.vue"
 import HeadingEditor   from "../components/portfolio/detail/editors/HeadingEditor.vue"
@@ -736,10 +736,10 @@ onBeforeUnmount(() => {
                 gridRowEnd:      `span ${block.h}`,
                 '--mobile-row-start': mobileY(block) + 1,
                 '--mobile-row-span':  mobileH(block),
-                ...blockBorderStyle(block),
               }"
             >
               <DetailBlockRenderer :block="block" />
+              <BlockBorder :bstyle="block.style" />
             </div>
           </div>
         </template>
@@ -801,8 +801,9 @@ onBeforeUnmount(() => {
               renderer, wrapped pointer-events:none so the tile keeps
               acting as the drag handle. Interactive blocks (carousel,
               compare, accordion) show as static previews.-->
-              <div v-else class="bento-block__preview" :style="blockBorderStyle(block)">
+              <div v-else class="bento-block__preview">
                 <DetailBlockRenderer :block="block" />
+                <BlockBorder :bstyle="block.style" />
               </div>
 
               <!--SE resize handle - fades in on hover; selected blocks
@@ -982,6 +983,8 @@ separates blocks.*/
 .detail-page__block {
   display: flex; align-items: stretch; justify-content: stretch;
   overflow: hidden;
+  /*Anchor for the BlockBorder overlay strips.*/
+  position: relative;
 }
 
 /*===== EDIT MODE GRID =====================================================*/
@@ -1076,6 +1079,8 @@ pointer input; the whole tile is the drag handle.*/
 .bento-block__preview {
   width: 100%; height: 100%;
   pointer-events: none;
+  /*Anchor for the BlockBorder overlay strips.*/
+  position: relative;
 }
 /* Inline source editor - swapped in on dbl-click for the active lang.
 Stops the parent move-drag via @pointerdown.stop in the template;
