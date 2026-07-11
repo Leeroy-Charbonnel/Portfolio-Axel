@@ -1120,10 +1120,19 @@ this rule restores normal text cursor + selection. */
 
 /*===== SIDE PANEL - background LEVELS delimit the parts, no borders. The
 panel itself is level 1 (secondary bg), groups are transparent, item
-cards inside the editors are level 2 (dp-item), inputs level 3.=====*/
+cards inside the editors are level 2 (dp-item), inputs level 3.
+STICKY: the panel follows the page scroll so the editor tools stay
+reachable however far down the grid goes; it scrolls internally when
+its own content is taller than the viewport. z-index 2 lifts it above
+the global grain overlay (z 1) so no grain texture sits on the tools.*/
 .detail-page__panel {
   width: 340px;
   flex-shrink: 0;
+  align-self: flex-start;
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  z-index: 2;
   padding: var(--spacing-lg);
   background-color: var(--color-background-secondary);
   overflow-y: auto;
