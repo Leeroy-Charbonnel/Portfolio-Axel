@@ -15,13 +15,13 @@ import {
   MonitorPlay,
   MousePointerClick,
   Quote,
-  Save,
   Table,
   Trash2,
   Type,
 } from "lucide-vue-next"
 import { useLanguage } from "../composables/useLanguage"
 import { useAdmin } from "../composables/useAdmin"
+import { useAdminActions } from "../composables/useAdminActions"
 import { usePortfolio } from "../composables/usePortfolio"
 import { pickBilingual as pickBi } from "../lib/markdown"
 import DetailBlockRenderer from "../components/portfolio/detail/DetailBlockRenderer.vue"
@@ -667,13 +667,20 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
+//SAVE lives in the fixed admin cluster (left of the read/edit toggle) -
+//the page registers its action + state there instead of rendering its
+//own header button.
+const { registerSave, unregisterSave } = useAdminActions()
+
 onMounted(() => {
   loadProject()
   window.addEventListener("keydown", onKeyDown)
+  registerSave({ dirty, saving, run: () => { void onSave() } })
 })
 onBeforeUnmount(() => {
   detachDocumentListeners()
   window.removeEventListener("keydown", onKeyDown)
+  unregisterSave()
 })
 </script>
 
@@ -687,15 +694,6 @@ onBeforeUnmount(() => {
       <span class="detail-page__index" aria-hidden="true">{{ projectIndex }}</span>
       <h1 class="detail-page__title">{{ projectTitle }}</h1>
       <span v-if="editMode" class="detail-page__status">{{ status }}</span>
-      <button
-        v-if="editMode"
-        type="button" class="detail-page__save"
-        :disabled="!dirty || saving"
-        @click="onSave"
-      >
-        <Save :size="14" />
-        <span>{{ saving ? "Saving..." : "Save" }}</span>
-      </button>
     </header>
 
     <div class="detail-page__body">
@@ -926,21 +924,6 @@ accent square next to the title is the only colored element.=====*/
   color: var(--color-text-tertiary);
   font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
 }
-.detail-page__save {
-  display: inline-flex; align-items: center; gap: var(--spacing-xxs);
-  padding: var(--spacing-xs) var(--spacing-md);
-  font-size: var(--font-size-xs); font-weight: var(--font-weight-bold);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
-  background-color: transparent;
-  color: var(--color-accent);
-  border: var(--border-width-sm) solid var(--color-accent);
-  cursor: pointer;
-  transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
-}
-.detail-page__save:hover:not(:disabled) { background-color: var(--color-accent); color: hsl(0 0% 0%); }
-.detail-page__save:disabled { opacity: 0.4; cursor: not-allowed; }
-
 /*===== BODY ===============================================================*/
 /*EDIT MODE is a fullscreen app layout: the page locks to the viewport
 and the grid + panel become two INDEPENDENT scroll areas, so the editor

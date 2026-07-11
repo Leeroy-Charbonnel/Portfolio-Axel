@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue"
 import { useRouter } from "vue-router"
-import { Settings as Gear, BookOpen, Pencil, SlidersHorizontal, Paintbrush, LogOut } from "lucide-vue-next"
+import { Settings as Gear, BookOpen, Pencil, Save, SlidersHorizontal, Paintbrush, LogOut } from "lucide-vue-next"
 import { useAdmin } from "../../composables/useAdmin"
+import { useAdminActions } from "../../composables/useAdminActions"
 import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 
-//Admin-only entry point. Renders nothing for visitors. For admins, TWO
-//buttons top-right: a book/pen toggle (book = read mode, pen = edit mode,
-//click to switch) and a gear dropdown with settings / css / sign-out.
+//Admin-only entry point. Renders nothing for visitors. For admins, a
+//button cluster top-right: an optional Save button (registered by pages
+//that own a save round-trip, e.g. the detail-page editor), a book/pen
+//toggle (book = read mode, pen = edit mode, click to switch) and a gear
+//dropdown with settings / css / sign-out.
 
 const router = useRouter()
 const { isAdmin, editMode, toggleEdit, signOut } = useAdmin()
+const { saveAction } = useAdminActions()
 const { show: showCssPanel } = useCssVarsPanel()
 
 const open        = ref(false)
@@ -55,6 +59,21 @@ async function handleSignOut() {
 
 <template>
   <div v-if="isAdmin" ref="dropdownRef" class="admin-gear">
+    <!--SAVE - shown when the current page registered a save action and
+    edit mode is on. Accent-tinted while there are unsaved changes.-->
+    <button
+      v-if="saveAction && editMode"
+      type="button"
+      class="admin-gear__btn"
+      :class="{ 'admin-gear__btn--active': saveAction.dirty.value }"
+      :disabled="!saveAction.dirty.value || saveAction.saving.value"
+      :data-tooltip="saveAction.saving.value ? 'Saving...' : saveAction.dirty.value ? 'Save changes' : 'No changes'"
+      aria-label="Save changes"
+      @click="saveAction.run()"
+    >
+      <Save :size="18" />
+    </button>
+
     <!--READ / EDIT toggle - book means "you are reading", pen means "you
     are editing". One click flips the mode.-->
     <button
@@ -123,7 +142,8 @@ async function handleSignOut() {
   transition: color var(--transition-fast) ease, border-color var(--transition-fast) ease;
 }
 
-.admin-gear__btn:hover { color: var(--color-text-hover); }
+.admin-gear__btn:hover:not(:disabled) { color: var(--color-text-hover); }
+.admin-gear__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .admin-gear__btn--active {
   color: var(--color-accent);
