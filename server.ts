@@ -78,17 +78,19 @@ function hasForwardSecret(req: express.Request): boolean {
   return typeof header === "string" && header === FILES_FORWARD_SECRET
 }
 
-//HARD RULE: files live ONLY on the prod volume. A dev server without the
-//forward tunnel configured must REFUSE file writes instead of silently
-//dropping binaries on the local disk (which desyncs prod DB rows from the
-//prod volume and 404s every /media URL). Returns false after sending the
-//error so handlers can just early-return.
+//HARD RULE: files live ONLY on the prod volume. Dev is READ-ONLY for
+//files (reads hit prod's /media via the vite proxy); every upload /
+//delete happens on the prod site directly, in admin edit mode. A dev
+//server without the optional forward tunnel therefore REFUSES file
+//writes instead of silently dropping binaries on the local disk (which
+//desyncs prod DB rows from the prod volume and 404s every /media URL).
+//Returns false after sending the error so handlers can just early-return.
 function requireProdStorage(res: express.Response): boolean {
   if (isProd || FILES_FORWARD_URL) return true
-  console.error("[files] REFUSED local write: FILES_FORWARD_URL / FILES_FORWARD_SECRET not set in .env - dev must tunnel every file op to prod")
+  console.error("[files] REFUSED local write - upload files from the PROD site (admin edit mode); dev never stores binaries locally")
   res.status(500).json({
-    error: "file storage misconfigured",
-    detail: "dev server has no FILES_FORWARD_URL - files must go to the prod volume, local storage is forbidden",
+    error: "uploads are disabled in dev",
+    detail: "files live on the prod volume only - do this upload on the prod site (admin edit mode)",
   })
   return false
 }
