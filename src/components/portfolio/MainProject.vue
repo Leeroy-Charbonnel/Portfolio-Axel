@@ -137,12 +137,6 @@ const showImageLayer = computed(() =>
   activeSurface.value === "image"
   || (activeSurface.value === "sketchfab" && (!showSketchfab.value || isLoading.value)))
 
-//Wireframe state is local to this layout - the composable doesn't own it.
-//Wireframe button only swaps the still-image sources (main image +
-//thumbnails) to their `wireframeUrl` variants. It does NOT touch the
-//Sketchfab viewer (no setWireframe, no material override, no light
-//override) and it does NOT touch the local Three.js viewer either -
-//the ThreeViewer has its own wireframe button for the 3D model itself.
 const statRows = computed(() => [
   { key: "vertices"  as const, value: props.project.stats.vertices  ?? 0 },
   { key: "edges"     as const, value: props.project.stats.edges     ?? 0 },

@@ -33,6 +33,9 @@ export function useProjectCard(project: Ref<MainProjectDto>, opts: { mobile?: bo
   //looking at the model, not a property of the project
   watch(editMode, (isEditing) => { if (isEditing === false) isWireframe.value = false })
 
+  //The button swaps the still images (main + thumbnails) to their wireframe
+  //variants and nothing else: it does not drive the Sketchfab embed, and the
+  //Three.js viewer carries its own wireframe control for the model itself.
   function toggleWireframe(e: Event) {
     e.preventDefault()
     isWireframe.value = !isWireframe.value
