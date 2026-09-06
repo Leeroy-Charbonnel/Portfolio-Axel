@@ -71,10 +71,10 @@ When you (or Claude) extend this template, drop new code in the right place. The
 | An API route | `server.ts`, always behind `requireAuth` unless deliberately public, scope by `req.user.id` |
 | A user setting | Call `useSettings().update(key, value, {type, description, group, options})` once anywhere - it self-seeds. Add the `SETTING_<key>_LABEL` and `SETTING_<key>_DESC` translations |
 | A composable | `src/composables/`. If it is reusable across projects, add it to the template so future clones get it |
-| A reusable Vue component | `src/components/` for project-only. shadcn-vue primitives in `src/components/ui/<name>/` |
+| A reusable Vue component | `src/components/` for cross-page pieces, `src/components/portfolio/` for the site itself |
 | A shadcn-vue component the template doesn't ship yet | Copy the component folder from a fit-tracker / trading-bot installation, or run `npx shadcn-vue add <name>` |
 | A chart | Add `chart.js + vue-chartjs` to deps if needed; chart components live in `src/components/charts/` per project (not shared - too domain-specific) |
-| A modal / dialog | Use the shadcn-vue `Dialog` primitives (already in the template). Don't reinvent. |
+| A modal / dialog | `src/components/ConfirmDialog.vue` for a confirmation. There are no shadcn primitives in this repo: `src/components/ui/` was removed because nothing imported it. |
 | A toast | `useToast()` from `src/composables/useToast`. `<ToastHost />` is already mounted in `src/App.vue`. |
 | A new env var | `.env.example` (with empty / placeholder value), then your local `.env`, then production env in Dokploy. Never commit a real value. |
 

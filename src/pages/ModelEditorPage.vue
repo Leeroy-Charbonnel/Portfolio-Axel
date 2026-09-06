@@ -153,8 +153,6 @@ const CAMERA_FAR                   = 1000
 //Renderer
 const MAX_PIXEL_RATIO              = 1.5
 //OrbitControls range. Generous so a saved start view at any radius is fine.
-const ORBIT_MIN_DISTANCE           = 0.5
-const ORBIT_MAX_DISTANCE           = 20
 //Directional-link line opacity
 const DIRECTIONAL_LINK_OPACITY     = 0.4
 //PointerUp click vs drag (px)
@@ -900,8 +898,8 @@ onMounted(() => {
   controls = new OrbitControls(camera, c)
   controls.enableDamping = true
   controls.dampingFactor = 0.08
-  controls.minDistance = ORBIT_MIN_DISTANCE
-  controls.maxDistance = ORBIT_MAX_DISTANCE
+  controls.minDistance = VIEWER_DEFAULTS.orbitMinDistance
+  controls.maxDistance = VIEWER_DEFAULTS.orbitMaxDistance
   controls.addEventListener("change", () => requestRender(500))
 
   //TRANSFORM CONTROLS (single instance, switchable target)
@@ -2899,7 +2897,7 @@ function frameModel() {
   if (dir.lengthSq() < 0.000001) dir.set(1, 1, 1)
   dir.normalize()
   const fov = (perspectiveCamera?.fov ?? CAMERA_FOV) * (Math.PI / 180)
-  const distance = Math.max(sceneRadius / Math.sin(fov / 2) * 1.2, ORBIT_MIN_DISTANCE)
+  const distance = Math.max(sceneRadius / Math.sin(fov / 2) * 1.2, VIEWER_DEFAULTS.orbitMinDistance)
   const toPos = focus.clone().add(dir.multiplyScalar(distance))
   if (cameraMode.value === "ortho") {
     cameraRef.position.copy(toPos)
@@ -4462,8 +4460,8 @@ group, matching the .editor__group gap used by materials / lights).*/
 .editor__views-input {
   flex: 1 1 auto;
   padding: var(--spacing-xs) var(--spacing-sm);
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
   border: var(--border-width-sm) solid var(--color-gray-medium);
   border-radius: var(--radius);
   font-size: var(--font-size-xs);

@@ -16,6 +16,12 @@ export const VIEWER_DEFAULTS = {
   //an unlit material with no colour of its own
   normalColor:        "#ffffff",
   wireframeOverlayOn: true,
+  //ORBIT LIMITS, SHARED WITH THE EDITOR ON PURPOSE. They used to be declared in
+  //both files and had drifted: the editor clamped to 0.5 / 20 while the viewer
+  //allowed 0.05 / 200, so a view authored beyond 20 played in production and
+  //could not be reached again in the editor.
+  orbitMinDistance:   0.05,
+  orbitMaxDistance:   200,
 } as const
 
 export const VIEWER_PREF_KEYS = {

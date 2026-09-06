@@ -198,6 +198,13 @@ const ALLOWED_EXTENSIONS = new Set([
 
 //a .glb arrives as application/octet-stream or model/gltf-binary depending on
 //the browser, and an .hdr has no registered type at all
+//A file refused here is a bad request, and the client is an admin who needs to
+//read why. Without the status the global handler below answers "internal server
+//error" with a 500 for a wrong extension.
+function refused(message: string): Error & { status?: number } {
+  return Object.assign(new Error(message), { status: 400 })
+}
+
 const ALLOWED_MIME_PREFIXES = [
   "image/",
   "video/",
@@ -234,11 +241,11 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const ext = extname(file.originalname).toLowerCase()
     if (!ALLOWED_EXTENSIONS.has(ext)) {
-      cb(new Error(`extension not allowed: ${ext || "(none)"}`))
+      cb(refused(`extension not allowed: ${ext || "(none)"}`))
       return
     }
     if (!ALLOWED_MIME_PREFIXES.some(prefix => file.mimetype.startsWith(prefix))) {
-      cb(new Error(`content type not allowed: ${file.mimetype}`))
+      cb(refused(`content type not allowed: ${file.mimetype}`))
       return
     }
     cb(null, true)
@@ -1170,8 +1177,14 @@ if (isProd) {
 }
 
 //GLOBAL ERROR HANDLER
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+//An error that names its own status says so on purpose - a refused upload, for
+//one. Anything else is ours and stays a 500 with no detail.
+app.use((err: Error & { status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err)
+  if (err.status && err.status < 500) {
+    res.status(err.status).json({ error: err.message })
+    return
+  }
   res.status(500).json({ error: "internal server error" })
 })
 

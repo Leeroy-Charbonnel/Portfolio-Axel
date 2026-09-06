@@ -188,8 +188,6 @@ const FLY_IN_MIN_POLAR_RAD         = 0.05
 const FLY_IN_DURATION_MS           = 2800
 //OrbitControls range - wide enough that a saved start view at any sane
 //radius doesn't get clamped when controls re-sync at the end of the fly-in.
-const ORBIT_MIN_DISTANCE           = 0.05
-const ORBIT_MAX_DISTANCE           = 200
 //Wireframe overlay - matches the editor's values so editor + production
 //render identically (polygonOffset pushes surface back, lines land just
 //in front without z-fighting).
@@ -972,8 +970,8 @@ onMounted(() => {
   controls.dampingFactor = 0.08
   //Wide range so a saved start view at any radius isn't clamped when
   //OrbitControls re-syncs at the end of the intro fly-in (see consts).
-  controls.minDistance = ORBIT_MIN_DISTANCE
-  controls.maxDistance = ORBIT_MAX_DISTANCE
+  controls.minDistance = VIEWER_DEFAULTS.orbitMinDistance
+  controls.maxDistance = VIEWER_DEFAULTS.orbitMaxDistance
   controls.addEventListener("change", () => requestRender(500))
 
   const renderTarget = new WebGLRenderTarget(w, h, { type: HalfFloatType, samples: 4 })

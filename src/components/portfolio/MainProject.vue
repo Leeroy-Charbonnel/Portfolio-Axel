@@ -136,12 +136,6 @@ const hasAnyWireframeImage = computed(() => {
   return props.project.thumbnails.some((t) => t.wireframeUrl)
 })
 const layoutClass       = computed(() => `main-project--layout-${props.project.layout}`)
-//PHONE QUINCONCE - alternates the thumbs+desc side based on index so the
-//mobile column reads as a staggered cascade. Desktop ignores this class.
-const phoneSideClass    = computed(() => props.index % 2 === 0
-  ? "main-project__article--phone-left"
-  : "main-project__article--phone-right")
-
 //ICON used for each layout choice in the picker (visually communicates the arrangement)
 const LAYOUT_ICONS: Record<MainProjectLayout, typeof PanelLeft> = {
   "thumbs-left":   PanelLeft,
@@ -306,7 +300,7 @@ function replaceThumbnailWireframe(idx: number) {
     :threshold="0.1"
     class="main-project"
   >
-    <article ref="containerRef" :class="['container', 'main-project__article', layoutClass, phoneSideClass, { 'main-project__article--wireframe': isWireframe }]">
+    <article ref="containerRef" :class="['container', 'main-project__article', layoutClass, { 'main-project__article--wireframe': isWireframe }]">
       <RemoveButton v-if="editMode" label="Delete project" @click="onDelete" />
 
       <!--Layout picker - absolute top-right of the article so overflow on the
@@ -523,18 +517,6 @@ function replaceThumbnailWireframe(idx: number) {
             <ExternalLink :size="14" />
           </a>
         </div>
-
-        <!--PHONE-ONLY description overlay - hidden on desktop via CSS. Lives
-        inside the stage so it can be absolutely positioned over the viewer
-        and spill past the stage bottom for the quinconce cascade.-->
-        <EditableText
-          tag="p"
-          class="main-project__description main-project__description--phone"
-          :value="project.description[lang]"
-          :multiline="true"
-          placeholder="Project description..."
-          @save="onDescriptionSave"
-        />
       </div>
 
       <!--DETAILS - 2-col grid: description LEFT (wide), stats sidebar RIGHT.
@@ -1223,7 +1205,6 @@ Unselected entries fade slightly so the active set reads at a glance.*/
 
 /*PHONE-ONLY description overlay - hidden on desktop. The phone media
 query / simulate-phone block below flips display:block and positions it.*/
-.main-project__description--phone { display: none; }
 
 /*RESPONSIVE - desktop fallbacks stay until we hit phone width. The phone
 breakpoint switches to the "quinconce" staggered layout: thumbnails +
@@ -1231,246 +1212,8 @@ description share ONE side, viewer takes the opposite side, and the desc
 spills past the stage bottom into the next project.*/
 
 /*=== PHONE QUINCONCE - shared rules + the @media + simulate-phone wrappers ==*/
-@media (max-width: 480px) {
-  /*Edge-to-edge in phone - kill the .container's 80% width and inner
-  padding so the cascade reads as a single column with no gutter.
-  !important is intentional: .container is global, has same specificity
-  as our scoped rule, and it's the one bug we keep hitting.*/
-  .main-project__article {
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  /*Negative margin-bottom is the load-bearing trick: each project pulls
-  the NEXT one up by 35vh, so projects literally overlap instead of
-  reading as separated blocks.*/
-  .main-project { padding: 0; margin-bottom: -35vh; position: relative; z-index: 1; }
-  /*Stagger z-index so EACH project paints on a different layer. Even
-  rows go under their neighbors, odd rows over - this is what blends
-  the two stages instead of clean-cutting one block to the next.*/
-  .main-project:nth-child(even) { z-index: 0; }
-
-  /*Each project takes ~one screen so the overlap can show two projects
-  visible at the same time during scroll.*/
-  .main-project__stage {
-    aspect-ratio: auto;
-    height: 92vh;
-    min-height: 0;
-    /*Mask the top and bottom into transparency so two overlapping
-    stages bleed into each other instead of cutting at hard edges -
-    this IS the "blurry boundary" the user keeps asking for.*/
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
-            mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
-  }
-
-  /*Kill the opaque tile fill on the static-image fallback so overlap
-  doesn't read as one rectangle painting over another.*/
-  .main-project__viewer-image,
-  .main-project__viewer-embed { background-color: transparent; }
-
-  /*Header floats over the stage so it doesn't add height that would
-  push the cascade off the screen.*/
-  .main-project__header {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    padding: var(--spacing-sm) var(--spacing-md);
-    margin: 0;
-    border-bottom: none;
-    z-index: 8;
-    background: transparent;
-  }
-
-  /*Hide the layout picker, details (description / stats / software /
-  model-id) in phone. The cascade IS the project - extra rows below
-  just break the continuous-scroll illusion.*/
-  .main-project__layout-picker { display: none; }
-  .main-project__details       { display: none; }
-
-  /*Thumbs - vertical strip, flush to one edge. Side decided by the
-  phone-left / phone-right modifier.*/
-  .main-project__thumbnails {
-    top: 10vh;
-    bottom: auto;
-    transform: none;
-    flex-direction: column;
-    width: 32vw;
-    max-width: 140px;
-    height: auto;
-    max-height: 78vh;
-    gap: var(--spacing-xs);
-  }
-  .main-project__article--phone-left  .main-project__thumbnails { left:  0; right: auto; }
-  .main-project__article--phone-right .main-project__thumbnails { right: 0; left:  auto; }
-
-  .main-project__thumbnail,
-  .main-project__thumbnail-add {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 1 / 1;
-  }
-
-  /*Viewer fills the side OPPOSITE the thumbs - edge-to-edge so the
-  column reads as one big image, not a small framed picture.*/
-  .main-project__article--phone-left  .main-project__viewer { left:  32vw; right: 0; }
-  .main-project__article--phone-right .main-project__viewer { right: 32vw; left:  0; }
-
-  /*Phone description overlay - SAME side as thumbs, anchored low in the
-  stage with a soft blurred bg. Lives inside the overlap zone with the
-  next project, which is what makes the boundary feel blurry.*/
-  .main-project__description--phone {
-    display: block;
-    position: absolute;
-    bottom: 4vh;
-    width: 55%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    background-color: hsl(var(--background) / 0.65);
-    backdrop-filter: blur(var(--filter-blur));
-    border: var(--border-width-sm) solid var(--color-gray-medium);
-    color: var(--color-text);
-    font-size: var(--font-size-sm);
-    line-height: 1.5;
-    z-index: 12;
-  }
-  .main-project__article--phone-left  .main-project__description--phone { left:  0; right: auto; }
-  .main-project__article--phone-right .main-project__description--phone { right: 0; left:  auto; }
-}
-
-/*simulate-phone mirror - CssVarsPanel preview without resizing the actual
-window. Must mirror the @media rules above 1:1, including !important on
-the .container overrides.*/
-html.simulate-phone .main-project__article {
-  width: 100% !important;
-  max-width: 100% !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-html.simulate-phone .main-project { padding: 0; margin-bottom: -35vh; position: relative; z-index: 1; }
-html.simulate-phone .main-project:nth-child(even) { z-index: 0; }
-html.simulate-phone .main-project__stage {
-  aspect-ratio: auto;
-  height: 92vh;
-  min-height: 0;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
-          mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
-}
-html.simulate-phone .main-project__viewer-image,
-html.simulate-phone .main-project__viewer-embed { background-color: transparent; }
-
-html.simulate-phone .main-project__header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding: var(--spacing-sm) var(--spacing-md);
-  margin: 0;
-  border-bottom: none;
-  z-index: 8;
-  background: transparent;
-}
-
-html.simulate-phone .main-project__layout-picker { display: none; }
-html.simulate-phone .main-project__details       { display: none; }
-
-html.simulate-phone .main-project__thumbnails {
-  top: 10vh;
-  bottom: auto;
-  transform: none;
-  flex-direction: column;
-  width: 32vw;
-  max-width: 140px;
-  height: auto;
-  max-height: 78vh;
-  gap: var(--spacing-xs);
-}
-html.simulate-phone .main-project__article--phone-left  .main-project__thumbnails { left:  0; right: auto; }
-html.simulate-phone .main-project__article--phone-right .main-project__thumbnails { right: 0; left:  auto; }
-html.simulate-phone .main-project__thumbnail,
-html.simulate-phone .main-project__thumbnail-add {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1 / 1;
-}
-html.simulate-phone .main-project__article--phone-left  .main-project__viewer { left:  32vw; right: 0; }
-html.simulate-phone .main-project__article--phone-right .main-project__viewer { right: 32vw; left:  0; }
-
-html.simulate-phone .main-project__description--phone {
-  display: block;
-  position: absolute;
-  bottom: 4vh;
-  width: 55%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background-color: hsl(var(--background) / 0.65);
-  backdrop-filter: blur(var(--filter-blur));
-  border: var(--border-width-sm) solid var(--color-gray-medium);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-  z-index: 12;
-}
-html.simulate-phone .main-project__article--phone-left  .main-project__description--phone { left:  0; right: auto; }
-html.simulate-phone .main-project__article--phone-right .main-project__description--phone { right: 0; left:  auto; }
-</style>
-
-<style>
-/*UNSCOPED phone overlap - the scoped rules above were not winning over
-the global .container (in style.css) and .main-project base rules in
-some HMR / class-pass-through scenarios. Replicating the load-bearing
-rules unscoped with !important guarantees the cascade actually applies.*/
-@media (max-width: 480px) {
-  .main-projects-section__list .main-project {
-    margin-bottom: -35vh !important;
-    margin-top:    0       !important;
-    padding:       0       !important;
-    position:      relative;
-    z-index:       1;
-  }
-  .main-projects-section__list .main-project:nth-child(even) { z-index: 0; }
-  .main-projects-section__list .main-project:first-child     { margin-top: 0 !important; }
-  .main-projects-section__list .main-project:last-child      { margin-bottom: 0 !important; }
-
-  .main-projects-section__list .main-project .main-project__article {
-    width:        100% !important;
-    max-width:    100% !important;
-    padding:      0    !important;
-    margin:       0    !important;
-  }
-
-  .main-projects-section__list .main-project .main-project__stage {
-    aspect-ratio: auto !important;
-    height:       92vh !important;
-    min-height:   0    !important;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
-            mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
-  }
-}
-
-html.simulate-phone .main-projects-section__list .main-project {
-  margin-bottom: -35vh !important;
-  margin-top:    0     !important;
-  padding:       0     !important;
-  position:      relative;
-  z-index:       1;
-}
-html.simulate-phone .main-projects-section__list .main-project:nth-child(even) { z-index: 0; }
-html.simulate-phone .main-projects-section__list .main-project:first-child     { margin-top: 0 !important; }
-html.simulate-phone .main-projects-section__list .main-project:last-child      { margin-bottom: 0 !important; }
-
-html.simulate-phone .main-projects-section__list .main-project .main-project__article {
-  width:        100% !important;
-  max-width:    100% !important;
-  padding:      0    !important;
-  margin:       0    !important;
-}
-
-html.simulate-phone .main-projects-section__list .main-project .main-project__stage {
-  aspect-ratio: auto !important;
-  height:       92vh !important;
-  min-height:   0    !important;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
-          mask-image: linear-gradient(to bottom, transparent 0, black 18%, black 82%, transparent 100%);
-}
+/*The phone rules that used to close this file are gone: MainProjects.vue only
+mounts MainProject in its v-else, so useIsPhone() is false whenever this
+component exists. Neither the 480px media query nor html.simulate-phone could
+ever match one. The phone layout lives in MainProjectPhone.vue.*/
 </style>

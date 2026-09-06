@@ -148,7 +148,6 @@ function onInlineInput(e: Event, block: DetailBlock) {
   const c = block.content as TextBlockContent
   if (!c.text) c.text = { en: "", fr: "" }
   c.text[lang.value] = v
-  markDirty()
 }
 function onInlineKeyDown(e: KeyboardEvent) {
   if (e.key === "Escape") {
@@ -157,8 +156,6 @@ function onInlineKeyDown(e: KeyboardEvent) {
   }
 }
 
-const dirty = ref(false)
-function markDirty() { dirty.value = true }
 
 //===========================================================================
 //UNDO STACK - snapshot the blocks array BEFORE every structural mutation
@@ -183,7 +180,6 @@ function undo() {
   if (selectedId.value && !prev.find((b) => b.id === selectedId.value)) {
     selectedId.value = null
   }
-  markDirty()
 }
 
 //===========================================================================
@@ -477,7 +473,6 @@ function onDocPointerUp(_e: PointerEvent) {
         snapshot()
         block.x = d.currentX
         block.y = d.currentY
-        markDirty()
       }
     }
   } else if (d.mode === "resize") {
@@ -487,7 +482,6 @@ function onDocPointerUp(_e: PointerEvent) {
         snapshot()
         block.w = d.currentW
         block.h = d.currentH
-        markDirty()
       }
     }
   } else if (d.mode === "create") {
@@ -563,9 +557,8 @@ async function onSave() {
   if (saving.value) return
   saving.value = true
   status.value = "Saving..."
-  //Optimistically clear dirty NOW: edits made while the request is in
+  //edits made while the request is in
   //flight re-set it (and re-schedule an autosave), so nothing is lost.
-  dirty.value = false
   const payload: DetailPage = {
     blocks: blocks.value.map((b) => ({ ...b, content: sanitizeContent(b) })),
   }
@@ -579,14 +572,12 @@ async function onSave() {
     status.value = "Saved"
     setTimeout(() => { if (status.value === "Saved") status.value = "" }, 1500)
   } catch (e) {
-    dirty.value = true
     status.value = `Save failed: ${(e as Error).message}`
   } finally {
     saving.value = false
-    //Edits made while saving re-flagged dirty; the Save button picks them up.
-    //This used to call scheduleAutosave(), which no longer exists since the
-    //page moved to an explicit Save button - in a finally block, that threw a
-    //ReferenceError at the end of every save that overlapped an edit.
+    //Save is always enabled, so an edit made during a save needs no flag: the
+    //next click sends it. The dirty ref that used to be set here was written in
+    //three places and read in none.
   }
 }
 
@@ -633,7 +624,6 @@ function addBlockAt(type: DetailBlockType, x: number, y: number) {
   const block: DetailBlock = { id, type, x: clampedX, y: clampedY, w, h, content: DEFAULT_CONTENT[type]() }
   blocks.value = [...blocks.value, block]
   selectedId.value = id
-  markDirty()
 }
 function addBlock(type: DetailBlockType) {
   addBlockAt(type, 0, maxBottom(desktopY, desktopH))
@@ -644,7 +634,6 @@ function removeSelected() {
   snapshot()
   blocks.value = blocks.value.filter((b) => b.id !== id)
   selectedId.value = null
-  markDirty()
 }
 
 //===========================================================================
@@ -865,7 +854,7 @@ onBeforeUnmount(() => {
           </div>
           <!--SHARED STYLE controls (Excel-like borders) - identical for
           every block type, above the type-specific editor.-->
-          <BlockStyleEditor :block="selectedBlock" :key="`style-${selectedBlock.id}`" @dirty="markDirty" />
+          <BlockStyleEditor :block="selectedBlock" :key="`style-${selectedBlock.id}`" />
           <!--One editor component per block type (detail/editors/). They
           mutate the content directly, emit "structural" right before a
           list/media mutation (undo snapshot) and "dirty" after any edit.-->
@@ -874,7 +863,7 @@ onBeforeUnmount(() => {
             :key="selectedBlock.id"
             :content="selectedBlock.content"
             @structural="snapshot"
-            @dirty="markDirty"
+           
           />
         </div>
 

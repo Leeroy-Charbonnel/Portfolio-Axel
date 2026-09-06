@@ -3,14 +3,14 @@
 @tailwind utilities;
 
 /*PORTFOLIO color system - dark-only design layered on shadcn-vue HSL.
-useAccent (from vue-shared-ui) writes accent_color directly to --primary,
+CssVarsPanel writes accent_color directly to --primary,
 so changing the cyan accent retints buttons, focus rings, and any var(--color-primary).
 The light theme block exists but the portfolio forces .dark on <html> at boot.*/
 
 @layer base {
   :root {
     /*Light fallback - never displayed in this project (dark is forced).
-    Kept so theme toggle from vue-shared-ui still functions if user opts in.*/
+    Kept so the theme toggle still works if it is ever exposed.*/
     --background:             0 0% 98%;
     --foreground:             0 0% 12%;
     --card:                   0 0% 100%;
@@ -249,7 +249,7 @@ through the whole UI.*/
   --exp-bullet-gap:           0.4rem;
   --exp-line-height:          1.6;
 
-  /*vue-shared-ui surface tokens - mapped to shadcn so its components inherit the theme*/
+  /*shared surface tokens - mapped to shadcn so the components inherit the theme*/
   --vsui-nav-bg:                 hsl(var(--background));
   --vsui-nav-border:             hsl(var(--border-color));
   --vsui-nav-fg:                 hsl(var(--foreground));
@@ -325,7 +325,7 @@ button {
   color: inherit;
 }
 
-/*LAYOUT - .vsui-app comes from vue-shared-ui/styles*/
+/*LAYOUT - .vsui-app is defined in tokens.css*/
 .vsui-app {
   position: relative;
   z-index: 1;
