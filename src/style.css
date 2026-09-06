@@ -172,6 +172,16 @@ through the whole UI.*/
   it directly with a flat color and the change propagates everywhere.*/
   --tag-bg: hsl(var(--foreground) / 0.1);
 
+  /*THE 3D EDITOR SURFACES. The editor panel sits over the viewer canvas, so it
+  needs a flat ground of its own rather than the page background, and rules that
+  read against it. These were written literally on about thirty declarations in
+  ModelEditorPage and CssVarsPanel.*/
+  --editor-panel-bg: hsl(0 0% 0%);
+  --editor-border:   hsl(0 0% 20%);
+  --editor-rule:     hsl(var(--foreground) / 0.06);
+  /*the one warning colour in the editor: amber, readable on the panel ground*/
+  --editor-warning:  hsl(34 100% 63%);
+
   /*--panel-width starts at 0 and is raised by .css-panel-open on the root
   when the CSS variables side panel is open, so body and all the fixed-right
   UI (lang switch, admin gear) reserve real space for the panel instead of

@@ -62,6 +62,7 @@ import {
   pushSweepUniforms,
   type WfSweepPatch,
 } from "../composables/wfMaterials"
+import { VIEWER_DEFAULTS, VIEWER_PREF_KEYS } from "../lib/viewer-defaults"
 
 //MODEL EDITOR - 4-tab side panel design:
 //  - Materials  : per-material accordion. Click a mesh in scene to open it
@@ -351,12 +352,12 @@ const { getString, update: updateSetting, loaded: settingsLoaded } = useSettings
 //Mode color tints emissive picks + is the default for new wf lights.
 //Global like the line color + material params: lives in the settings
 //table so a tweak in one project follows the author into every other.
-const wireframeColor = ref(getString("editor3d_wireframe_mode_color", "#14b8a6"))
-const WF_LINE_COLOR_KEY  = "editor3d_wireframe_line_color"
-const WF_MAT_PARAMS_KEY  = "editor3d_wireframe_material"
-const WF_MODE_COLOR_KEY  = "editor3d_wireframe_mode_color"
+const wireframeColor = ref(getString(VIEWER_PREF_KEYS.modeColor, VIEWER_DEFAULTS.wireframeModeColor))
+const WF_LINE_COLOR_KEY  = VIEWER_PREF_KEYS.lineColor
+const WF_MAT_PARAMS_KEY  = VIEWER_PREF_KEYS.materialParams
+const WF_MODE_COLOR_KEY  = VIEWER_PREF_KEYS.modeColor
 
-const wireframeOverlayColor = ref(getString(WF_LINE_COLOR_KEY, "#000000"))
+const wireframeOverlayColor = ref(getString(WF_LINE_COLOR_KEY, VIEWER_DEFAULTS.wireframeLineColor))
 //Wireframe line thickness (pixels). Stored as a global pref like the
 //line color. Uses Line2/LineMaterial under the hood (screen-space
 //quads), so width is real on every platform - WebGL's gl.LINES width
@@ -1434,7 +1435,7 @@ function applyPendingHydration() {
           tx:    seed.tx, ty: seed.ty, tz: seed.tz,
           range: seed.range,
           normalIntensity: normal?.intensity ?? wf?.intensity ?? 1,
-          normalColor:     normal?.color ?? "#ffffff",
+          normalColor:     normal?.color ?? VIEWER_DEFAULTS.normalColor,
           wfIntensity:     wf?.intensity ?? normal?.intensity ?? 1,
           wfColor:         wf?.color ?? wireframeColor.value,
         })
@@ -4056,14 +4057,14 @@ the viewport-box means they always cross at the canvas centre.*/
   left: 50%;
   top: 0;
   bottom: 0;
-  width: 1px;
+  width: var(--border-width-sm);
   transform: translateX(-0.5px);
 }
 .editor__viewport-crosshair::after {
   top: 50%;
   left: 0;
   right: 0;
-  height: 1px;
+  height: var(--border-width-sm);
   transform: translateY(-0.5px);
 }
 
@@ -4078,7 +4079,7 @@ crosshair toggle so the author can preview both public layouts.*/
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 4;
-  border: 1px dashed hsl(0 0% 100% / 0.45);
+  border: var(--border-width-sm) dashed hsl(0 0% 100% / 0.45);
 }
 .editor__viewport-frame--desktop {
   /*16:9 = the largest box that fits both axes. width = min(100%, height * 16/9). */
@@ -4206,8 +4207,8 @@ narrows - the status readout keeps priority.*/
 .editor__panel {
   flex: 0 0 28rem;
   display: flex; flex-direction: column;
-  background-color: hsl(0 0% 0%);
-  border-left: 1px solid hsl(0 0% 20%);
+  background-color: var(--editor-panel-bg);
+  border-left: var(--border-width-sm) solid var(--editor-border);
   min-height: 0;
 }
 
@@ -4239,8 +4240,8 @@ spacing between cards is tight (--spacing-xxs) so the panel feels dense.*/
   display: flex;
   flex-direction: column;
   background-color: hsl(0 0% 100% / 0.04);
-  border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
-  margin-bottom: 1px;       /*just enough for the next card's border to read as a seam*/
+  border: var(--border-width-sm) solid var(--editor-rule);
+  margin-bottom: var(--border-width-sm);       /*just enough for the next card's border to read as a seam*/
   padding: 0 var(--spacing-sm);
   transition: background-color 0.15s ease;
 }
@@ -4261,14 +4262,14 @@ spacing between cards is tight (--spacing-xxs) so the panel feels dense.*/
   flex-direction: column;
   gap: var(--spacing-xxs);
   padding: var(--spacing-xs) 0;
-  border-top: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
+  border-top: var(--border-width-sm) solid var(--editor-rule);
 }
 .editor__mat--selected {
   background-color: hsl(var(--primary) / 0.12);
   border-color: hsl(var(--primary) / 0.35);
 }
 
-.editor__sub { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-sm); border-top: var(--border-width-sm) solid hsl(0 0% 100% / 0.06); }
+.editor__sub { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-sm); border-top: var(--border-width-sm) solid var(--editor-rule); }
 
 /*ACCORDION sections - SAME card treatment but a notch darker so when a
 section contains item-cards inside, the two layers are visually distinct.*/
@@ -4276,8 +4277,8 @@ section contains item-cards inside, the two layers are visually distinct.*/
   display: flex;
   flex-direction: column;
   background-color: hsl(0 0% 100% / 0.025);
-  border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
-  margin-bottom: 1px;
+  border: var(--border-width-sm) solid var(--editor-rule);
+  margin-bottom: var(--border-width-sm);
   padding: 0 var(--spacing-sm);
 }
 .editor__section:last-child { margin-bottom: 0; }
@@ -4291,7 +4292,7 @@ section contains item-cards inside, the two layers are visually distinct.*/
   flex-direction: column;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) 0;
-  border-top: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
+  border-top: var(--border-width-sm) solid var(--editor-rule);
 }
 
 /*GLOBAL-WARNING variant - applied to the Wireframe-tab Material section
@@ -4404,7 +4405,7 @@ we draw our own around the input element.*/
 .editor__check { width: var(--spacing-md); height: var(--spacing-md); cursor: pointer; accent-color: var(--color-accent); }
 .editor__empty { font-size: var(--font-size-sm); color: var(--color-text-tertiary); font-style: italic; text-align: center; padding: var(--spacing-lg) 0; }
 .editor__error { font-size: var(--font-size-xs); color: hsl(var(--destructive)); padding: var(--spacing-xs) 0; }
-.editor__warning { font-size: var(--font-size-xs); color: #ffae42; padding: var(--spacing-xs) 0; line-height: 1.4; }
+.editor__warning { font-size: var(--font-size-xs); color: var(--editor-warning); padding: var(--spacing-xs) 0; line-height: 1.4; }
 
 .editor__drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing-xs); padding: var(--spacing-xl) var(--spacing-md); background-color: hsl(var(--background) / 0.4); border: var(--border-width-sm) dashed var(--color-gray-medium); color: var(--color-text-secondary); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); text-align: center; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease; }
 .editor__drop:hover { border-color: var(--color-accent); color: var(--color-text-hover); }
@@ -4422,8 +4423,8 @@ group, matching the .editor__group gap used by materials / lights).*/
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
   background-color: hsl(0 0% 100% / 0.04);
-  border: var(--border-width-sm) solid hsl(0 0% 100% / 0.06);
-  margin-bottom: 1px;       /*matches .editor__mat + .editor__section seam*/
+  border: var(--border-width-sm) solid var(--editor-rule);
+  margin-bottom: var(--border-width-sm);       /*matches .editor__mat + .editor__section seam*/
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   transition: background-color 0.15s ease;

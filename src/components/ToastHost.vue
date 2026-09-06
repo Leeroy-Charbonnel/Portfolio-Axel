@@ -55,8 +55,8 @@ const { toasts, dismiss } = useToast()
   padding: var(--vsui-space-md) var(--vsui-space-lg);
   border-radius: var(--vsui-radius);
   box-shadow: var(--vsui-shadow);
-  background: #fff;
-  color: #111;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
   font-size: var(--vsui-text-sm);
   line-height: 1.4;
 }

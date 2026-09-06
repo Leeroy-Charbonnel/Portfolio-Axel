@@ -746,8 +746,8 @@ still track the user's accent choice.*/
   z-index: 9990;
   display: flex;
   flex-direction: column;
-  background-color: hsl(0 0% 0%);
-  border-left: 1px solid hsl(0 0% 20%);
+  background-color: var(--editor-panel-bg);
+  border-left: var(--border-width-sm) solid var(--editor-border);
 }
 
 /*Resize handle - thin invisible grab strip on the LEFT edge of the panel

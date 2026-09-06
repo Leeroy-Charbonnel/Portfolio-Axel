@@ -48,6 +48,7 @@ import {
   pushSweepUniforms,
   type WfSweepPatch,
 } from "../../composables/wfMaterials"
+import { VIEWER_DEFAULTS } from "../../lib/viewer-defaults"
 
 //VIEW-ONLY THREE.JS VIEWER - replaces the Sketchfab iframe on a main
 //project when a .glb has been uploaded for it. Reads the viewerSettings
@@ -478,7 +479,7 @@ function migrateLegacyLights(
       tx:    seed.tx, ty: seed.ty, tz: seed.tz,
       range: seed.range,
       normalIntensity: normal?.intensity ?? wf?.intensity ?? 1,
-      normalColor:     normal?.color ?? "#ffffff",
+      normalColor:     normal?.color ?? VIEWER_DEFAULTS.normalColor,
       wfIntensity:     wf?.intensity ?? normal?.intensity ?? 1,
       wfColor:         wf?.color ?? wfModeColor,
     })
@@ -609,7 +610,7 @@ function pushSweepPbrUniforms(): void {
     roughness:         wf.roughness,
     envIntensity:      wf.envMapIntensity,
     specularIntensity: wf.specularIntensity,
-    emissiveColor:     props.settings?.wireframeMode?.color ?? "#14b8a6",
+    emissiveColor:     props.settings?.wireframeMode?.color ?? VIEWER_DEFAULTS.wireframeModeColor,
   })
 }
 
@@ -794,7 +795,11 @@ function finalizeEnterWireframe() {
   //load so syncWireframeOverlays leaves them clean.
   const emissiveUuids = new Set<string>()
   for (const m of emissivePickMeshes) emissiveUuids.add(m.uuid)
-  syncWireframeOverlays(wf?.overlayOn ?? true, wf?.overlayColor ?? "#000000", emissiveUuids)
+  syncWireframeOverlays(
+    wf?.overlayOn ?? VIEWER_DEFAULTS.wireframeOverlayOn,
+    wf?.overlayColor ?? VIEWER_DEFAULTS.wireframeLineColor,
+    emissiveUuids,
+  )
   setOverlayOpacityAll(0)
   wfOverlayFade = {
     startTime: performance.now(),
@@ -1051,7 +1056,7 @@ onMounted(() => {
         : migrateLegacyLights(
             props.settings?.normalMode?.lights,
             props.settings?.wireframeMode?.lights,
-            props.settings?.wireframeMode?.color ?? "#14b8a6",
+            props.settings?.wireframeMode?.color ?? VIEWER_DEFAULTS.wireframeModeColor,
           )
       for (const spec of sharedSpecs) {
         const entry = spawnSharedLight(spec)
