@@ -63,6 +63,7 @@ import {
   type WfSweepPatch,
 } from "../composables/wfMaterials"
 import { VIEWER_DEFAULTS, VIEWER_PREF_KEYS } from "../lib/viewer-defaults"
+import { useConfirm } from "../composables/useConfirm"
 
 //MODEL EDITOR - 4-tab side panel design:
 //  - Materials  : per-material accordion. Click a mesh in scene to open it
@@ -346,6 +347,7 @@ const sweepSliderStep = computed(() => {
 //they show up grouped on the /settings page if the admin wants to see
 //them. update() is self-seeding, so first write also creates the row.
 const { getString, update: updateSetting, loaded: settingsLoaded } = useSettings()
+const { confirm } = useConfirm()
 
 //Mode color tints emissive picks + is the default for new wf lights.
 //Global like the line color + material params: lives in the settings
@@ -1850,7 +1852,13 @@ function onHdrDragLeave() { hdrDragOver.value = false }
 //If it was the active selection in either mode we fall back to procedural
 //sky so the live env doesn't keep pointing at a missing /media URL.
 async function deleteHdr(entry: HdrEntry) {
-  if (!window.confirm(`Delete ${entry.name}?`)) return
+  const ok = await confirm({
+    title:  "Delete this environment?",
+    what:   entry.name,
+    action: "Delete",
+    destructive: true,
+  })
+  if (!ok) return
   try {
     const res = await fetch(`/api/files/${entry.id}`, { method: "DELETE", credentials: "include" })
     if (!res.ok) {
@@ -3074,7 +3082,13 @@ async function overwriteViewWithCurrentCamera(viewName: string) {
 }
 
 async function deleteView(viewName: string) {
-  if (!confirm(`Delete view "${viewName}"?`)) return
+  const ok = await confirm({
+    title:  "Delete this view?",
+    what:   viewName,
+    action: "Delete",
+    destructive: true,
+  })
+  if (!ok) return
   await persistViews(views.value.filter((v) => v.name !== viewName))
 }
 
@@ -3934,7 +3948,7 @@ the editor's solid bg and the canvas.*/
 .editor__back, .editor__upload-glb {
   display: inline-flex; align-items: center; gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-text-secondary);
   color: var(--color-text-hover);
   font-size: var(--font-size-xs);
@@ -3954,7 +3968,7 @@ the editor's solid bg and the canvas.*/
   color: var(--color-text-hover);
   font-size: var(--font-size-sm); font-weight: var(--font-weight-bold);
   text-transform: uppercase; letter-spacing: var(--letter-spacing-wide);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   padding: var(--spacing-xs) var(--spacing-md);
   backdrop-filter: blur(var(--filter-blur));
 }
@@ -3996,7 +4010,7 @@ never covers the model dead-center. Same glass styling as the toolbar.*/
   right: calc(var(--spacing-md) + 2rem + var(--spacing-sm));
   bottom: calc(128px + var(--spacing-md));
   width: 20rem;
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-text-secondary);
   backdrop-filter: blur(var(--filter-blur));
   z-index: 6;
@@ -4110,7 +4124,7 @@ crosshair toggle so the author can preview both public layouts.*/
 .editor__viewport-tool {
   width: 2rem; height: 2rem;
   display: inline-flex; align-items: center; justify-content: center;
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-text-secondary);
   color: var(--color-text-hover);
   cursor: pointer;
@@ -4156,7 +4170,7 @@ ViewHelper's 128px corner so the axis cube stays clickable.*/
   justify-content: space-between;
   gap: var(--spacing-md);
   padding: var(--spacing-xs) var(--spacing-md);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-gray-medium);
   backdrop-filter: blur(var(--filter-blur));
   pointer-events: none;

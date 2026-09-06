@@ -97,6 +97,10 @@ const projectIndex = computed(() => {
   return i >= 0 ? String(i + 1).padStart(2, "0") : "--"
 })
 
+//enough rows to fill the fold at the real row height; the exact count does not
+//matter once the blocks land, only that the page does not grow from one line
+const SKELETON_ROWS = 6
+
 const blocks      = ref<DetailBlock[]>([])
 const selectedId  = ref<string | null>(null)
 const selectedBlock = computed(() => blocks.value.find((b) => b.id === selectedId.value) ?? null)
@@ -698,7 +702,11 @@ onBeforeUnmount(() => {
 
     <div class="detail-page__body">
       <main class="detail-page__main">
-        <p v-if="loading" class="detail-page__msg">Loading...</p>
+        <!--placeholder rows at the real row height, so the grid does not jump
+        into place when the blocks arrive-->
+        <div v-if="loading" class="detail-page__skeleton" aria-hidden="true">
+          <div v-for="i in SKELETON_ROWS" :key="i" class="detail-page__skeleton-row"></div>
+        </div>
         <p v-else-if="loadError" class="detail-page__msg detail-page__msg--err">{{ loadError }}</p>
 
         <!--===== VIEW MODE - read-only =========================================-->
@@ -1199,5 +1207,28 @@ mobileY / mobileH, falling back to desktop y / h when unauthored). */
   }
   .detail-page__title { font-size: var(--font-size-md); }
   .detail-page__index { font-size: var(--font-size-lg); }
+}
+
+.detail-page__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.detail-page__skeleton-row {
+  height: var(--detail-row-h);
+  background-color: var(--tag-bg);
+  border-radius: var(--radius);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .detail-page__skeleton-row {
+    animation: detail-skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes detail-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
 }
 </style>

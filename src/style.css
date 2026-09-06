@@ -165,6 +165,17 @@ through the whole UI.*/
   --filter-blur:   6px;
   --tooltip-delay: 0.7s;
   --transition-fast: 0.2s;
+  /*the slower of the two, for anything that travels across the viewport*/
+  --transition-slow: 0.3s;
+
+  /*THE DARK GROUND UNDER ANYTHING THAT FLOATS. Written literally as
+  hsl(0 0% 0% / 0.6) in six components before this existed.*/
+  --overlay-bg: hsl(0 0% 0% / 0.6);
+
+  /*the confirmation sits above the lightbox and the side panel: it is the only
+  thing that can be asked while one of them is open*/
+  --z-confirm: 10000;
+  --confirm-width: 26rem;
 
   /*--tag-bg drives every stat-badge / pill / empty-viewer surface in the
   portfolio. Defaults to a translucent foreground tint so it visually maps

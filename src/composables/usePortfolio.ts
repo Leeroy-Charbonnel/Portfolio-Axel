@@ -18,6 +18,46 @@ const error   = ref<string | null>(null)
 
 let inFlight: Promise<void> | null = null
 
+//HOW MANY CARDS THE SKELETON SHOULD DRAW. Not a user preference and not a row in
+//the settings table, so localStorage is the right place: it is a note about what
+//this browser saw last time, and it is read before any request goes out. A
+//missing or unreadable value just means the defaults below.
+const SECTION_COUNTS_KEY = "portfolio_section_counts"
+const DEFAULT_SECTION_COUNTS = { projects: 2, gallery: 6, experiences: 3 }
+
+export type SectionCounts = typeof DEFAULT_SECTION_COUNTS
+
+export function lastSectionCounts(): SectionCounts {
+  try {
+    const raw = localStorage.getItem(SECTION_COUNTS_KEY)
+    if (!raw) return DEFAULT_SECTION_COUNTS
+    const saved = JSON.parse(raw) as Partial<SectionCounts>
+    return {
+      projects:    saved.projects    ?? DEFAULT_SECTION_COUNTS.projects,
+      gallery:     saved.gallery     ?? DEFAULT_SECTION_COUNTS.gallery,
+      experiences: saved.experiences ?? DEFAULT_SECTION_COUNTS.experiences,
+    }
+  } catch (e) {
+    //a private window or blocked storage is not a failure worth a toast, but it
+    //should not be invisible either
+    console.warn("[usePortfolio] could not read the last section counts:", e)
+    return DEFAULT_SECTION_COUNTS
+  }
+}
+
+function rememberSectionCounts(portfolio: PortfolioDto | null) {
+  if (!portfolio) return
+  try {
+    localStorage.setItem(SECTION_COUNTS_KEY, JSON.stringify({
+      projects:    portfolio.mainProjects.length,
+      gallery:     portfolio.galleryProjects.length,
+      experiences: portfolio.experiences.length,
+    }))
+  } catch (e) {
+    console.warn("[usePortfolio] could not store the section counts:", e)
+  }
+}
+
 async function fetchPortfolio() {
   if (loading.value) return inFlight ?? Promise.resolve()
   loading.value = true
@@ -29,6 +69,7 @@ async function fetchPortfolio() {
       if (!res.ok) throw new Error(`/api/portfolio returned ${res.status}`)
       data.value = await res.json()
       loaded.value = true
+      rememberSectionCounts(data.value)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       error.value = msg

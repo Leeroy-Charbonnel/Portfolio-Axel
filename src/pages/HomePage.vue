@@ -4,6 +4,7 @@ import Home           from "../components/portfolio/Home.vue"
 import MainProjects   from "../components/portfolio/MainProjects.vue"
 import ProjectGallery from "../components/portfolio/ProjectGallery.vue"
 import Experience     from "../components/portfolio/Experience.vue"
+import PortfolioSkeleton from "../components/portfolio/PortfolioSkeleton.vue"
 
 const { data, loading, error } = usePortfolio()
 </script>
@@ -23,7 +24,7 @@ const { data, loading, error } = usePortfolio()
       />
     </template>
 
-    <p v-else-if="loading" class="portfolio__status">Loading…</p>
+    <PortfolioSkeleton v-else-if="loading" />
 
     <p v-else-if="error" class="portfolio__status portfolio__status--error">
       Failed to load portfolio: {{ error }}

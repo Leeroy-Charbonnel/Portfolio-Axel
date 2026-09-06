@@ -12,6 +12,7 @@ import RemoveButton from "./RemoveButton.vue"
 import ReplaceImageButton from "./ReplaceImageButton.vue"
 import AddButton from "./AddButton.vue"
 import type { GalleryProjectDto } from "../../types/portfolio"
+import { useConfirm } from "../../composables/useConfirm"
 
 const props = defineProps<{ projects: GalleryProjectDto[] }>()
 
@@ -22,6 +23,19 @@ const { replaceImage, updateGalleryProject, deleteGalleryProject, createGalleryP
 //LIGHTBOX hookup - tapping any gallery card opens the carousel with the
 //FULL gallery list and starts at the clicked card's index.
 const { open: openLightbox } = useLightbox()
+const { confirm } = useConfirm()
+
+//deleting a gallery card asked nothing before: the button called the store
+async function onDelete(project: GalleryProjectDto) {
+  const ok = await confirm({
+    title:  "Delete this gallery item?",
+    what:   project.title[lang.value] || undefined,
+    action: "Delete",
+    destructive: true,
+  })
+  if (!ok) return
+  await deleteGalleryProject(project.id)
+}
 const galleryAsLightbox = computed(() => props.projects
   .filter((p) => p.imageUrl)
   .map((p) => ({ url: p.imageUrl as string, alt: p.title[lang.value] }))
@@ -73,7 +87,7 @@ function onReplaceImage(p: GalleryProjectDto) {
           :threshold="0.1"
           class="gallery-item"
         >
-          <RemoveButton v-if="editMode" label="Delete gallery item" @click="deleteGalleryProject(project.id)" />
+          <RemoveButton v-if="editMode" label="Delete gallery item" @click="onDelete(project)" />
 
           <div class="gallery-item__inner">
             <div
@@ -221,7 +235,7 @@ function onReplaceImage(p: GalleryProjectDto) {
   border: var(--border-width-sm) solid hsl(var(--foreground) / 0.1);
   background-color: hsl(var(--card) / 0.5);
   overflow: hidden;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: border-color var(--transition-slow) ease, box-shadow var(--transition-slow) ease;
 }
 
 .gallery-item:hover {
@@ -258,13 +272,13 @@ the main click is reserved for the lightbox.*/
   justify-content: center;
   width:  var(--spacing-xl);
   height: var(--spacing-xl);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-accent);
   color: var(--color-accent);
   text-decoration: none;
   backdrop-filter: blur(var(--filter-blur));
   z-index: 4;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
 }
 .gallery-item__sketchfab:hover {
   background-color: var(--color-accent);
@@ -277,7 +291,7 @@ the main click is reserved for the lightbox.*/
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform var(--transition-slow) ease;
 }
 
 .gallery-item__thumbnail--empty {

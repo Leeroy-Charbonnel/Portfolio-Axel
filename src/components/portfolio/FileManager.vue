@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue"
 import { Trash2, RefreshCw } from "lucide-vue-next"
 import { usePortfolio } from "../../composables/usePortfolio"
+import { useConfirm } from "../../composables/useConfirm"
 
 //Admin-only file manager. Lists every row in the file table with a usage
 //count and lets the admin delete individual files (only when unused).
@@ -28,6 +29,7 @@ interface FileRow {
 }
 
 const { data: portfolioData, reload: reloadPortfolio } = usePortfolio()
+const { confirm } = useConfirm()
 
 const files   = ref<FileRow[]>([])
 const loading = ref(false)
@@ -103,7 +105,13 @@ async function load() {
 
 async function deleteOne(file: FileRow) {
   if (file.referenceCount > 0) return
-  if (!window.confirm(`Delete ${file.originalFilename}?\n\nThis permanently removes the file from disk.`)) return
+  const ok = await confirm({
+    title:  "Delete this file?",
+    what:   `${file.originalFilename} is removed from disk for good.`,
+    action: "Delete",
+    destructive: true,
+  })
+  if (!ok) return
   try {
     const res = await fetch(`/api/files/${file.id}`, { method: "DELETE", credentials: "include" })
     if (!res.ok) {
@@ -156,7 +164,11 @@ onMounted(load)
 
     <p v-if="error" class="file-manager__error">{{ error }}</p>
 
-    <table v-if="!loading" class="file-manager__table">
+    <table
+      v-if="!loading || files.length > 0"
+      class="file-manager__table"
+      :class="{ 'file-manager__table--refreshing': loading }"
+    >
       <thead>
         <tr>
           <th class="file-manager__th file-manager__th--preview"></th>
@@ -433,5 +445,12 @@ onMounted(load)
 @media (max-width: 600px) {
   .file-manager__uuid { display: none; }
   .file-manager__th--preview, .file-manager__preview { display: none; }
+}
+
+/*a reload keeps the rows in place and dims them, rather than replacing the
+table with a line of text and letting the panel collapse*/
+.file-manager__table--refreshing {
+  opacity: 0.55;
+  pointer-events: none;
 }
 </style>

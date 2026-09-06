@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router"
 import ToastHost from "./components/ToastHost.vue"
+import ConfirmDialog from "./components/ConfirmDialog.vue"
 import { useLang } from "./composables/useLang"
 import SideNav      from "./components/portfolio/SideNav.vue"
 import AdminGear    from "./components/portfolio/AdminGear.vue"
@@ -51,6 +52,7 @@ const chromeFreeRoutes = ["/login", "/settings", "/sketchfab-howto", "/forgot-pa
     <LightboxCarousel />
 
     <ToastHost />
+    <ConfirmDialog />
   </div>
 </template>
 

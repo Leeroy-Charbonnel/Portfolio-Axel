@@ -8,12 +8,26 @@ import AnimatedReveal from "./AnimatedReveal.vue"
 import EditableText from "./EditableText.vue"
 import RemoveButton from "./RemoveButton.vue"
 import type { ExperienceDto } from "../../types/portfolio"
+import { useConfirm } from "../../composables/useConfirm"
 
 const props = defineProps<{ experience: ExperienceDto; index: number }>()
 
 const { lang } = useLanguage()
 const { editMode } = useAdmin()
 const { updateExperience, deleteExperience } = usePortfolio()
+const { confirm } = useConfirm()
+
+//deleting an experience asked nothing before
+async function onDelete() {
+  const ok = await confirm({
+    title:  "Delete this experience?",
+    what:   props.experience.company || undefined,
+    action: "Delete",
+    destructive: true,
+  })
+  if (!ok) return
+  await deleteExperience(props.experience.id)
+}
 
 const periodParts = computed(() => props.experience.period[lang.value].split("-"))
 
@@ -76,7 +90,7 @@ async function removeBullet(idx: number) {
     :final-opacity="1"
     class="experience-item"
   >
-    <RemoveButton v-if="editMode" label="Delete experience" @click="deleteExperience(experience.id)" />
+    <RemoveButton v-if="editMode" label="Delete experience" @click="onDelete" />
 
     <!--PERIOD column: fixed width so view-mode (two-line dates) and edit-mode
     (single editable line) stay vertically aligned with the content column.-->

@@ -210,7 +210,7 @@ function onReplaceAvatar() {
   overflow: hidden;
   aspect-ratio: 1;
   width: 100px;
-  transition: box-shadow 0.3s ease;
+  transition: box-shadow var(--transition-slow) ease;
 }
 
 .about__avatar-link {

@@ -37,7 +37,7 @@ const { editMode } = useAdmin()
   border: var(--border-width-md) dashed var(--color-gray-medium);
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  transition: border-color var(--transition-fast) ease, color var(--transition-fast) ease, background-color var(--transition-fast) ease;
 }
 
 .add-button:hover {

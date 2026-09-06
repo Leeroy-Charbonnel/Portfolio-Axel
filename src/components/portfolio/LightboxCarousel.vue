@@ -279,7 +279,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   width:  var(--spacing-2xl);
   height: var(--spacing-2xl);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-text-secondary);
   color: var(--color-text-hover);
   cursor: pointer;

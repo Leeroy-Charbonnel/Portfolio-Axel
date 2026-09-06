@@ -1027,7 +1027,7 @@ the panel is currently editing without checking the toggle buttons.*/
 .css-panel__btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .css-panel-enter-active,
-.css-panel-leave-active { transition: transform 0.2s ease; }
+.css-panel-leave-active { transition: transform var(--transition-fast) ease; }
 .css-panel-enter-from,
 .css-panel-leave-to     { transform: translateX(100%); }
 </style>

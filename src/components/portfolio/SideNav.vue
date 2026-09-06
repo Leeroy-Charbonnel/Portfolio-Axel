@@ -90,7 +90,7 @@ onBeforeUnmount(() => {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition: color var(--transition-fast) ease;
   font-family: inherit;
 }
 
@@ -115,7 +115,7 @@ for the CssVarsPanel preview without needing an actual narrow window.*/
     flex-direction: row;
     gap: var(--spacing-md);
     padding: var(--spacing-xs) var(--spacing-md);
-    background-color: hsl(0 0% 0% / 0.6);
+    background-color: var(--overlay-bg);
     backdrop-filter: blur(var(--filter-blur));
     border: var(--border-width-sm) solid var(--color-gray-medium);
   }
@@ -133,7 +133,7 @@ html.simulate-phone .side-nav {
   flex-direction: row;
   gap: var(--spacing-md);
   padding: var(--spacing-xs) var(--spacing-md);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   backdrop-filter: blur(var(--filter-blur));
   border: var(--border-width-sm) solid var(--color-gray-medium);
 }

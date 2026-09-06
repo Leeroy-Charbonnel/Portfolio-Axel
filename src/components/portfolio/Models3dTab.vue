@@ -4,6 +4,7 @@ import { Box, Edit, Plus, Trash2 } from "lucide-vue-next"
 import { useRouter } from "vue-router"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { pickImageFile } from "../../lib/portfolio-utils"
+import { useConfirm } from "../../composables/useConfirm"
 
 //3D MODELS TAB - grid of reusable model_3d assets. Each tile shows the
 //thumbnail + name, with Edit (open the 3D editor) and Delete buttons.
@@ -14,6 +15,7 @@ import { pickImageFile } from "../../lib/portfolio-utils"
 
 const router = useRouter()
 const { data, createModel, deleteModel } = usePortfolio()
+const { confirm } = useConfirm()
 
 const adding = ref(false)
 const error  = ref<string | null>(null)
@@ -54,7 +56,13 @@ async function onAdd() {
 }
 
 async function onDelete(id: string, name: string) {
-  if (!confirm(`Delete model "${name}"?`)) return
+  const ok = await confirm({
+    title:  "Delete this model?",
+    what:   name,
+    action: "Delete",
+    destructive: true,
+  })
+  if (!ok) return
   try {
     await deleteModel(id)
   } catch (e) {

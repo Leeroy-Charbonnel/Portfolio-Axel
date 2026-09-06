@@ -2,12 +2,10 @@
 import { computed, ref, toRef, watch } from "vue"
 import { Grid, PanelLeft, PanelRight, PanelBottom, Square, Plus, ExternalLink, Box, LayoutTemplate } from "lucide-vue-next"
 import { useRouter } from "vue-router"
-import { useLanguage } from "../../composables/useLanguage"
-import { useAdmin } from "../../composables/useAdmin"
-import { useEffectiveViewerSettings, useResolvedGlbUrl } from "../../composables/useEffectiveViewerSettings"
 import ModelPicker from "./ModelPicker.vue"
 import { useInView } from "../../composables/useInView"
-import { useLightbox } from "../../composables/useLightbox"
+import { useConfirm } from "../../composables/useConfirm"
+import { useProjectCard } from "../../composables/useProjectCard"
 import { usePortfolio } from "../../composables/usePortfolio"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
 import { useWireframeSweep } from "../../composables/useWireframeSweep"
@@ -25,14 +23,17 @@ const props = defineProps<{
   index:   number
 }>()
 
-const { lang } = useLanguage()
-const { editMode } = useAdmin()
-const { data: portfolioData, replaceImage, updateMainProject, deleteMainProject, setMainProjectSoftware } = usePortfolio()
+const { replaceImage, deleteMainProject, setMainProjectSoftware } = usePortfolio()
 
-//Merge per-project viewerSettings with the admin's GLOBAL editor prefs.
-//Logic shared with MainProjectPhone via the composable.
-const effectiveViewerSettings = useEffectiveViewerSettings(toRef(props, "project"), portfolioData)
-const resolvedGlbUrl          = useResolvedGlbUrl(toRef(props, "project"), portfolioData)
+//everything a project card does whatever its layout; what stays below is the
+//desktop-only part: the preview switcher and the Sketchfab lifecycle it drives
+const {
+  lang, editMode, portfolioData, updateMainProject,
+  effectiveViewerSettings, resolvedGlbUrl,
+  isWireframe, toggleWireframe, mainImageUrl, hasAnyWireframeImage,
+  onImageClick, onThumbnailClick, onTitleSave, onDescriptionSave,
+} = useProjectCard(toRef(props, "project"))
+const { confirm } = useConfirm()
 
 //ModelPicker v-model - reads project.model3dId / desktop+mobile view
 //names and writes them back via updateMainProject so the change
@@ -81,7 +82,6 @@ useWireframeSweep(containerRef)
 const iframeRef    = ref<HTMLIFrameElement | null>(null)
 
 const { inView: isInView } = useInView(containerRef, { threshold: 0.3, rootMargin: "0px 0px 200px 0px" })
-const isWireframe = ref(false)
 
 //FALLBACK PREVIEW - the public stage picks its surface automatically:
 //Three.js when a model is attached, else the Sketchfab embed, else the
@@ -120,21 +120,6 @@ const sketchfab = useSketchfabViewer({
 const sketchfabError = sketchfab.error
 const isLoading      = sketchfab.isLoading
 
-const mainImageUrl = computed(() => props.project.mainImageUrl)
-
-//Used to decide whether to render the wireframe button. We show it when
-//ANY of these has a wireframe variant available:
-//- the 3D viewer (we always have one when a .glb is uploaded - the
-//  ThreeViewer carries its own wireframe-mode rig from the editor)
-//- the main image
-//- at least one thumbnail
-//Without a .glb and without any wireframe image variants, the button
-//would be a no-op so we hide it.
-const hasAnyWireframeImage = computed(() => {
-  if (resolvedGlbUrl.value) return true
-  if (props.project.mainWireframeUrl) return true
-  return props.project.thumbnails.some((t) => t.wireframeUrl)
-})
 const layoutClass       = computed(() => `main-project--layout-${props.project.layout}`)
 //ICON used for each layout choice in the picker (visually communicates the arrangement)
 const LAYOUT_ICONS: Record<MainProjectLayout, typeof PanelLeft> = {
@@ -146,35 +131,6 @@ const LAYOUT_ICONS: Record<MainProjectLayout, typeof PanelLeft> = {
 
 const showThumbnails = computed(() => props.project.layout !== "viewer-only")
 
-//LIGHTBOX - opening a clicked image presents the project's main + thumbs
-//as an infinite horizontal carousel. Wireframe variant is picked based
-//on the current isWireframe toggle so the lightbox matches the page state.
-const { open: openLightbox } = useLightbox()
-const lightboxImages = computed(() => {
-  const list: { url: string; alt?: string }[] = []
-  const main = isWireframe.value ? props.project.mainWireframeUrl ?? props.project.mainImageUrl : props.project.mainImageUrl
-  if (main) list.push({ url: main, alt: props.project.title[lang.value] })
-  for (const t of props.project.thumbnails) {
-    const u = isWireframe.value ? t.wireframeUrl ?? t.url : t.url
-    if (u) list.push({ url: u, alt: t.description?.[lang.value] ?? "" })
-  }
-  return list
-})
-function onImageClick(startIndex: number) {
-  if (editMode.value) return
-  openLightbox(lightboxImages.value, startIndex)
-}
-
-//Thumbnails map to lightbox slots by URL, not by position - lightboxImages
-//skips the main image when missing and skips url-less thumbs, so i+1 would
-//open the wrong image. The url is guaranteed present in the array because
-//it's built from the same thumbnails with the same wireframe resolution.
-function onThumbnailClick(thumb: { url: string | null; wireframeUrl: string | null }) {
-  if (editMode.value || !thumb.url) return
-  const url = isWireframe.value ? thumb.wireframeUrl ?? thumb.url : thumb.url
-  openLightbox(lightboxImages.value, lightboxImages.value.findIndex((img) => img.url === url))
-}
-
 const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && activeSurface.value === "sketchfab"))
 //The flat image doubles as the Sketchfab poster while the embed loads.
 const showImageLayer = computed(() =>
@@ -182,18 +138,11 @@ const showImageLayer = computed(() =>
   || (activeSurface.value === "sketchfab" && (!showSketchfab.value || isLoading.value)))
 
 //Wireframe state is local to this layout - the composable doesn't own it.
-watch(editMode, (newVal) => { if (newVal === false) isWireframe.value = false })
-
 //Wireframe button only swaps the still-image sources (main image +
 //thumbnails) to their `wireframeUrl` variants. It does NOT touch the
 //Sketchfab viewer (no setWireframe, no material override, no light
 //override) and it does NOT touch the local Three.js viewer either -
 //the ThreeViewer has its own wireframe button for the 3D model itself.
-function toggleWireframe(e: Event) {
-  e.preventDefault()
-  isWireframe.value = !isWireframe.value
-}
-
 const statRows = computed(() => [
   { key: "vertices"  as const, value: props.project.stats.vertices  ?? 0 },
   { key: "edges"     as const, value: props.project.stats.edges     ?? 0 },
@@ -203,18 +152,6 @@ const statRows = computed(() => [
 
 
 //ADMIN MUTATIONS - each save fires a PUT and the parent's reload picks up the new state
-async function onTitleSave(newVal: string) {
-  await updateMainProject(props.project.id, {
-    title: { ...props.project.title, [lang.value]: newVal },
-  })
-}
-
-async function onDescriptionSave(newVal: string) {
-  await updateMainProject(props.project.id, {
-    description: { ...props.project.description, [lang.value]: newVal },
-  })
-}
-
 async function onModelIdSave(newVal: string) {
   await updateMainProject(props.project.id, { modelId: newVal.trim() })
 }
@@ -245,6 +182,13 @@ function onReplaceWireframeImage() {
 }
 
 async function onDelete() {
+  const ok = await confirm({
+    title:  "Delete this project?",
+    what:   props.project.title[lang.value] || `Project ${props.index + 1}`,
+    action: "Delete",
+    destructive: true,
+  })
+  if (!ok) return
   await deleteMainProject(props.project.id)
 }
 
@@ -846,7 +790,7 @@ wireframe toggle + sketchfab link as a horizontal pair.*/
   align-items: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-text-secondary);
   color: var(--color-text-hover);
   font-size: var(--font-size-xs);
@@ -854,7 +798,7 @@ wireframe toggle + sketchfab link as a horizontal pair.*/
   letter-spacing: var(--letter-spacing-wide);
   cursor: pointer;
   backdrop-filter: blur(var(--filter-blur));
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: background-color var(--transition-fast) ease, border-color var(--transition-fast) ease, color var(--transition-fast) ease;
 }
 
 .main-project__wireframe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -869,12 +813,12 @@ makes both buttons share the wireframe's intrinsic height).*/
   justify-content: center;
   aspect-ratio: 1 / 1;
   padding: 0 var(--spacing-xs);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-accent);
   color: var(--color-accent);
   text-decoration: none;
   backdrop-filter: blur(var(--filter-blur));
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color var(--transition-fast) ease, color var(--transition-fast) ease;
 }
 
 .main-project__sketchfab-link:hover {
@@ -1024,7 +968,7 @@ img.main-project__viewer-image.main-project__wf-layer { object-fit: contain; }
   border: var(--border-width-md) dashed var(--color-text-hover);
   color: var(--color-text-hover);
   cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  transition: border-color var(--transition-fast) ease, color var(--transition-fast) ease, background-color var(--transition-fast) ease;
 }
 
 .main-project__thumbnail-add:hover {
@@ -1171,7 +1115,7 @@ end of the visible content (admin model-id row goes below the line).*/
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-normal);
   font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
-  transition: border-color 0.2s ease, color 0.2s ease;
+  transition: border-color var(--transition-fast) ease, color var(--transition-fast) ease;
 }
 
 .main-project__software:hover {
@@ -1200,7 +1144,7 @@ Unselected entries fade slightly so the active set reads at a glance.*/
   font-style: italic;
 }
 
-.main-project__software img { filter: brightness(0.8); transition: filter 0.2s ease; }
+.main-project__software img { filter: brightness(0.8); transition: filter var(--transition-fast) ease; }
 .main-project__software:hover img { filter: brightness(1); }
 
 /*PHONE-ONLY description overlay - hidden on desktop. The phone media

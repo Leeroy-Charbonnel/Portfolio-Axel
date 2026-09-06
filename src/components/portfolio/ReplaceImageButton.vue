@@ -38,7 +38,7 @@ const { editMode } = useAdmin()
   text-transform: uppercase;
   cursor: pointer;
   opacity: 0;
-  transition: background-color 0.2s ease, opacity 0.2s ease;
+  transition: background-color var(--transition-fast) ease, opacity var(--transition-fast) ease;
   z-index: 15;
 }
 

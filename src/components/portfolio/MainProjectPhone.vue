@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from "vue"
+import { computed, ref, toRef } from "vue"
 import { Grid } from "lucide-vue-next"
-import { useLanguage } from "../../composables/useLanguage"
-import { useAdmin } from "../../composables/useAdmin"
-import { useEffectiveViewerSettings, useResolvedGlbUrl } from "../../composables/useEffectiveViewerSettings"
 import { useInView } from "../../composables/useInView"
-import { useLightbox } from "../../composables/useLightbox"
-import { usePortfolio } from "../../composables/usePortfolio"
+import { useProjectCard } from "../../composables/useProjectCard"
 import { useSketchfabViewer } from "../../composables/useSketchfabViewer"
 import { useWireframeSweep } from "../../composables/useWireframeSweep"
 import AnimatedReveal from "./AnimatedReveal.vue"
@@ -33,12 +29,13 @@ const props = defineProps<{
   index:   number
 }>()
 
-const { lang } = useLanguage()
-const { editMode } = useAdmin()
-const { data: portfolioData, updateMainProject } = usePortfolio()
-
-const effectiveViewerSettings = useEffectiveViewerSettings(toRef(props, "project"), portfolioData, { mobile: true })
-const resolvedGlbUrl          = useResolvedGlbUrl(toRef(props, "project"), portfolioData)
+//everything a project card does regardless of layout lives in the composable;
+//what is left below is what the phone card does differently
+const {
+  lang, editMode, effectiveViewerSettings, resolvedGlbUrl,
+  isWireframe, toggleWireframe, mainImageUrl, hasAnyWireframeImage,
+  onImageClick, onThumbnailClick: onThumbClick, onTitleSave, onDescriptionSave,
+} = useProjectCard(toRef(props, "project"), { mobile: true })
 
 const containerRef = ref<{ $el: HTMLElement } | HTMLElement | null>(null)
 useWireframeSweep(containerRef)
@@ -51,7 +48,6 @@ const containerEl = computed<HTMLElement | null>(() => {
   return raw && "$el" in raw ? raw.$el : raw
 })
 const { inView: isInView } = useInView(containerEl, { threshold: 0.15, rootMargin: "0px 0px 200px 0px" })
-const isWireframe = ref(false)
 
 const sketchfab = useSketchfabViewer({
   iframeRef,
@@ -62,14 +58,6 @@ const sketchfab = useSketchfabViewer({
 })
 const sketchfabError = sketchfab.error
 const isLoading      = sketchfab.isLoading
-
-const mainImageUrl = computed(() => props.project.mainImageUrl)
-
-const hasAnyWireframeImage = computed(() => {
-  if (resolvedGlbUrl.value) return true
-  if (props.project.mainWireframeUrl) return true
-  return props.project.thumbnails.some((t) => t.wireframeUrl)
-})
 
 const showSketchfab = computed(() => Boolean(props.project.modelId && !sketchfabError.value && isInView.value && !editMode.value))
 const showMainImage = computed(() => !showSketchfab.value || isLoading.value)
@@ -82,54 +70,7 @@ const thumbCells = computed(() => {
   return real
 })
 
-watch(editMode, (newVal) => { if (newVal === false) isWireframe.value = false })
 
-function toggleWireframe(e: Event) {
-  e.preventDefault()
-  isWireframe.value = !isWireframe.value
-}
-
-
-//LIGHTBOX hookup - tapping a thumbnail (or the static main-image fallback)
-//opens the project's images as an infinite carousel.
-const { open: openLightbox } = useLightbox()
-const lightboxImages = computed(() => {
-  const list: { url: string; alt?: string }[] = []
-  const main = isWireframe.value ? props.project.mainWireframeUrl ?? props.project.mainImageUrl : props.project.mainImageUrl
-  if (main) list.push({ url: main, alt: props.project.title[lang.value] })
-  for (const t of props.project.thumbnails) {
-    const u = isWireframe.value ? t.wireframeUrl ?? t.url : t.url
-    if (u) list.push({ url: u, alt: t.description?.[lang.value] ?? "" })
-  }
-  return list
-})
-function onImageClick(startIndex: number) {
-  if (editMode.value) return
-  openLightbox(lightboxImages.value, startIndex)
-}
-
-//Thumbs map to lightbox slots by URL, not by position - lightboxImages
-//skips the main image when missing and skips url-less thumbs, so i+1 would
-//open the wrong image. Padded empty cells (url null) are ignored. The url
-//is guaranteed present in the array because it's built from the same
-//thumbnails with the same wireframe resolution.
-function onThumbClick(thumb: { url: string | null; wireframeUrl: string | null }) {
-  if (editMode.value || !thumb.url) return
-  const url = isWireframe.value ? thumb.wireframeUrl ?? thumb.url : thumb.url
-  openLightbox(lightboxImages.value, lightboxImages.value.findIndex((img) => img.url === url))
-}
-
-async function onTitleSave(newVal: string) {
-  await updateMainProject(props.project.id, {
-    title: { ...props.project.title, [lang.value]: newVal },
-  })
-}
-
-async function onDescriptionSave(newVal: string) {
-  await updateMainProject(props.project.id, {
-    description: { ...props.project.description, [lang.value]: newVal },
-  })
-}
 </script>
 
 <template>
@@ -370,7 +311,7 @@ header, the viewer image, the thumbs - all anchored on the same line.*/
   justify-content: center;
   width:  var(--spacing-xl);
   height: var(--spacing-xl);
-  background-color: hsl(0 0% 0% / 0.6);
+  background-color: var(--overlay-bg);
   border: var(--border-width-sm) solid var(--color-text-secondary);
   color: var(--color-text-hover);
   cursor: pointer;
