@@ -14,7 +14,9 @@
 #Trade-off: Dokploy's managed database backups only apply to its own database
 #service type. Here the data lives in the volumes below, so set up a Volume
 #Backup on this compose service instead.
-name: stack
+#
+#The Dokploy service that runs this file is itself named "stack". No `name:` key
+#here: Dokploy launches the file with its own -p, which would override it anyway.
 
 services:
   app:
