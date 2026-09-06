@@ -34,3 +34,4 @@ seed-files/
 # Local working files - seed payload for the prod-push scripts + session notes
 src/tmp/
 todo.txt
+!.env.example

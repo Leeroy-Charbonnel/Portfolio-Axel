@@ -2,29 +2,24 @@ FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-#GITHUB_TOKEN is required at build time to install @leeroy-charbonnel/vue-shared-ui
-#from the private GitHub Packages registry. Pass it as a build arg in Dokploy
-#(Build > Build Args > GITHUB_TOKEN=ghp_...) and Dokploy will forward it here.
-ARG GITHUB_TOKEN
-ENV GITHUB_TOKEN=${GITHUB_TOKEN}
-
-COPY package.json bun.lock .npmrc ./
-RUN bun install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
 COPY . .
 RUN bun run build
-
-#scrub the token from the runtime image - it was only needed for bun install
-ENV GITHUB_TOKEN=""
+RUN chmod +x docker-entrypoint.sh
 
 EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
-#NOTE: no VOLUME directive on /app/storage. The bind-mount configured in
-#Dokploy (Volumes tab: /home/dokploy/axel/medias -> /app/storage) already
-#handles persistence. Keeping a VOLUME directive AND a bind mount confuses
-#Dokploy's deploy step (it builds the image but never swaps the container).
+#NO VOLUME DIRECTIVE on /app/storage: the compose file declares the named volume
+#and mounts it. Declaring both confuses Dokploy's deploy step, which builds the
+#image and then never swaps the container.
+#
+#The private registry this used to install from is gone with the shared package:
+#no GITHUB_TOKEN build arg, no .npmrc, nothing to scrub from the image.
 
-CMD ["bun", "server.ts"]
+#the entrypoint applies migrations and seeds the interface labels before serving
+CMD ["./docker-entrypoint.sh"]

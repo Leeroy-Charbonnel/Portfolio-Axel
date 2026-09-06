@@ -1,5 +1,5 @@
 import { ref } from "vue"
-import { useToast } from "vue-shared-ui"
+import { useToast } from "./useToast"
 import type { PortfolioDto } from "../types/portfolio"
 import { pickImageFile } from "../lib/portfolio-utils"
 

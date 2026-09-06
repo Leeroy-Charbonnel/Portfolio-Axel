@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, markRaw, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { useSettings, useToast } from "vue-shared-ui"
+import { useSettings } from "../composables/useSettings"
+import { useToast } from "../composables/useToast"
 import { ArrowLeft, Box, ChevronDown, Circle, CircleHelp, Crosshair, Eye, EyeOff, Grid, Lightbulb, LightbulbOff, Save, Square, Sun, Upload, X } from "lucide-vue-next"
 import {
   Box3,

@@ -583,9 +583,10 @@ async function onSave() {
     status.value = `Save failed: ${(e as Error).message}`
   } finally {
     saving.value = false
-    //Edits made while saving re-flagged dirty - make sure they get
-    //their own autosave pass even if their debounce already fired.
-    if (dirty.value) scheduleAutosave()
+    //Edits made while saving re-flagged dirty; the Save button picks them up.
+    //This used to call scheduleAutosave(), which no longer exists since the
+    //page moved to an explicit Save button - in a finally block, that threw a
+    //ReferenceError at the end of every save that overlapped an edit.
   }
 }
 

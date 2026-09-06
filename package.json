@@ -17,7 +17,9 @@
     "push:files": "bun scripts/push-local-files-to-prod.ts",
     "restore:tmp": "bun scripts/restore-tmp-to-prod.ts",
     "migrate:model3d": "bun scripts/migrate-model3d.ts",
-    "migrate:model3d-uuid": "bun scripts/migrate-model3d-uuid.ts"
+    "migrate:model3d-uuid": "bun scripts/migrate-model3d-uuid.ts",
+    "db:push:prod": "drizzle-kit push --config=drizzle.config.prod.ts",
+    "db:studio:prod": "drizzle-kit studio --config=drizzle.config.prod.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.5.3",
@@ -40,8 +42,7 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.184.0",
     "vue": "^3.5.24",
-    "vue-router": "^5.0.3",
-    "vue-shared-ui": "npm:@leeroy-charbonnel/vue-shared-ui@^0.4.0"
+    "vue-router": "^5.0.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

@@ -1,3 +1,6 @@
+//FIRST IMPORT ON PURPOSE: it refuses to start when a required variable is
+//missing, before anything else opens a pool or builds an auth instance
+import { ALLOWED_ORIGINS } from "./env"
 import express from "express"
 import cors from "cors"
 import helmet from "helmet"
@@ -7,7 +10,7 @@ import { mkdirSync, unlinkSync, readdirSync, copyFileSync, existsSync } from "fs
 import { fileURLToPath } from "url"
 import { randomUUID } from "crypto"
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node"
-import { auth } from "./auth"
+import { auth, enforceSingleAccount } from "./auth"
 import { db } from "./db/index"
 import {
   settings,
@@ -25,12 +28,11 @@ import { eq, and, asc, sql, type SQL } from "drizzle-orm"
 
 const app       = express()
 const isProd    = process.env.NODE_ENV === "production"
-const AUTH_MODE = process.env.VITE_AUTH_MODE ?? "open"
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
 
 type SessionUser = typeof auth.$Infer.Session.user
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") ?? ["http://localhost:5173"]
+const allowedOrigins = ALLOWED_ORIGINS
 
 //SECURITY HEADERS
 app.use(helmet({
@@ -114,17 +116,11 @@ async function requireAuth(
     res.status(401).json({ error: "unauthorized" })
     return
   }
-  //banned users cannot access the API (all modes)
-  if ((session.user as SessionUser).role === "banned") {
-    res.status(403).json({ error: "banned" })
-    return
-  }
-
-  //in restricted mode, pending users cannot access the API
-  if (AUTH_MODE === "restricted" && (session.user as SessionUser).role === "pending") {
-    res.status(403).json({ error: "pending" })
-    return
-  }
+  //There is one account on this site and it is the admin, so a session is only
+  //the first half of the question - requireAdmin below asks the other half. The
+  //"banned" and "pending" branches that used to sit here are gone with the roles
+  //themselves: an account that is not the admin can do nothing, and the boot
+  //deletes it.
   ;(req as any).user = session.user as SessionUser
   next()
 }
@@ -265,87 +261,12 @@ try {
 
 console.log(`[boot] ============================`)
 
-//PUBLIC diagnostic page - no auth. Visit /diag in the browser to see at a
-//glance whether the container is running the latest code (build marker),
-//whether the storage volume bootstrapped correctly, etc. Plain HTML so it
-//renders even with browser caching turned off.
-//
-//Bumped build marker on every commit so you can SEE the version with one
-//URL. If the marker doesn't match the latest commit hash on GitHub, the
-//container is stale.
-const BUILD_MARKER = "diag-v3-2976663-plus"
-
-app.get(["/diag", "/api/_diag"], (_req, res) => {
-  const storageNow = (() => {
-    try { return readdirSync(storageDir) } catch { return [] }
-  })()
-
-  const ok    = (txt: string) => `<span style="color:#4ade80">${txt}</span>`
-  const bad   = (txt: string) => `<span style="color:#f87171">${txt}</span>`
-  const muted = (txt: string) => `<span style="color:#9ca3af">${txt}</span>`
-  const yesno = (b: boolean) => b ? ok("yes") : bad("no")
-
-  res.setHeader("Content-Type", "text/html; charset=utf-8")
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate")
-  res.send(`<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Portfolio-Axel diag</title>
-  <style>
-    body { background:#0a0a0a; color:#e5e5e5; font-family:ui-monospace,Consolas,monospace; padding:2rem; line-height:1.6; }
-    h1 { font-size:1.6rem; margin:0 0 .5rem; color:#fff; letter-spacing:.05em; text-transform:uppercase; }
-    h2 { font-size:.95rem; margin:1.5rem 0 .25rem; color:#9ca3af; letter-spacing:.1em; text-transform:uppercase; border-bottom:1px solid #333; padding-bottom:.25rem; }
-    .marker { font-size:1.1rem; background:#1f2937; padding:.5rem 1rem; border-left:3px solid #4ade80; display:inline-block; margin-bottom:1rem; }
-    .grid { display:grid; grid-template-columns:max-content 1fr; gap:.25rem 1.5rem; }
-    .grid > .key { color:#9ca3af; }
-    .grid > .val { color:#e5e5e5; font-weight:bold; }
-    pre { background:#1f2937; padding:.75rem; border:1px solid #333; overflow:auto; font-size:.85rem; margin:.5rem 0; }
-    .small { color:#6b7280; font-size:.85rem; }
-  </style>
-</head>
-<body>
-  <h1>Portfolio-Axel diagnostics</h1>
-
-  <div class="marker">build marker: ${BUILD_MARKER}</div>
-  <p class="small">If you don't see this marker (or the green color), your container is on an OLD image - the new build hasn't taken effect.</p>
-
-  <h2>Storage volume</h2>
-  <div class="grid">
-    <span class="key">Mount path (container)</span>     <span class="val">${storageDir}</span>
-    <span class="key">Existed at boot</span>             <span class="val">${yesno(bootDiag.storageExisted)}</span>
-    <span class="key">mkdir at boot</span>               <span class="val">${bootDiag.mkdirOk ? ok("ok") : bad(bootDiag.mkdirError ?? "failed")}</span>
-    <span class="key">Files after mkdir</span>           <span class="val">${bootDiag.storageFilesAfterMkdir}</span>
-    <span class="key">Files RIGHT NOW</span>             <span class="val">${storageNow.length}</span>
-  </div>
-
-  <h2>Seed bootstrap (from baked image)</h2>
-  <div class="grid">
-    <span class="key">Seed dir (in image)</span>        <span class="val">${seedDir}</span>
-    <span class="key">Seed exists in image</span>        <span class="val">${yesno(bootDiag.seedExisted)}</span>
-    <span class="key">Seed file count</span>             <span class="val">${bootDiag.seedFileCount}</span>
-    <span class="key">Copied at boot</span>              <span class="val">${bootDiag.seedCopied > 0 ? ok(String(bootDiag.seedCopied)) : muted(String(bootDiag.seedCopied))}</span>
-    <span class="key">Skipped reason</span>              <span class="val">${bootDiag.seedSkippedReason ?? muted("(none)")}</span>
-  </div>
-  ${bootDiag.seedErrors.length > 0 ? `<pre>${bootDiag.seedErrors.join("\n")}</pre>` : ""}
-
-  <h2>Environment</h2>
-  <div class="grid">
-    <span class="key">NODE_ENV</span>             <span class="val">${process.env.NODE_ENV ?? muted("(unset)")}</span>
-    <span class="key">VITE_AUTH_MODE</span>       <span class="val">${AUTH_MODE}</span>
-    <span class="key">DATABASE_URL set</span>     <span class="val">${yesno(Boolean(process.env.DATABASE_URL))}</span>
-    <span class="key">BETTER_AUTH_SECRET set</span> <span class="val">${yesno(Boolean(process.env.BETTER_AUTH_SECRET))}</span>
-    <span class="key">RESEND_API_KEY set</span>   <span class="val">${yesno(Boolean(process.env.RESEND_API_KEY))}</span>
-    <span class="key">GOOGLE_CLIENT_ID set</span> <span class="val">${yesno(Boolean(process.env.GOOGLE_CLIENT_ID))}</span>
-  </div>
-
-  <h2>Boot started at</h2>
-  <p>${bootDiag.startedAt}</p>
-
-  ${storageNow.length > 0 ? `<h2>First 5 files currently in storage</h2><pre>${storageNow.slice(0, 5).join("\n")}</pre>` : ""}
-</body>
-</html>`)
-})
+//The public /diag page that used to sit here has been removed. It served the
+//server's absolute paths, a listing of the storage directory and which of
+//DATABASE_URL, BETTER_AUTH_SECRET, RESEND_API_KEY and GOOGLE_CLIENT_ID were
+//set, to anyone who asked for it. The boot log above carries the same numbers
+//for whoever can read the container's output, which is the only audience it
+//ever had.
 
 //UPLOAD ROUTING - uploads are sorted into sub-directories by extension so
 //the single storage volume stays organized:
@@ -355,6 +276,28 @@ app.get(["/diag", "/api/_diag"], (_req, res) => {
 //Existing files at the root of storage/files/ (pre-split) keep working
 //because their stored_filename has no sub-dir prefix and express.static
 //still resolves /media/<flat-file> against the root.
+//200 MB - a .glb can be chunky
+const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+
+//No .svg and no .html: both are documents that carry script, and /media serves
+//this directory to the browser on the site's own origin. Raster images, video,
+//3D models and environment maps only.
+const ALLOWED_EXTENSIONS = new Set([
+  ".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif",
+  ".mp4", ".webm",
+  ".glb", ".gltf",
+  ".hdr", ".exr", ".hdri",
+])
+
+//a .glb arrives as application/octet-stream or model/gltf-binary depending on
+//the browser, and an .hdr has no registered type at all
+const ALLOWED_MIME_PREFIXES = [
+  "image/",
+  "video/",
+  "model/",
+  "application/octet-stream",
+]
+
 function uploadSubdirFor(filename: string): "models" | "hdri" | "images" {
   if (/\.(glb|gltf)$/i.test(filename))       return "models"
   if (/\.(hdr|exr|hdri)$/i.test(filename))   return "hdri"
@@ -375,7 +318,24 @@ const upload = multer({
       cb(null, `${id}${ext}`)
     },
   }),
-  limits: { fileSize: 200 * 1024 * 1024 }, //200 MB - .glb can be chunky
+  limits: { fileSize: MAX_UPLOAD_BYTES },
+  //WHAT MAY BE STORED, DECIDED HERE AND NOWHERE ELSE. /media serves this
+  //directory as static files on the site's own origin, so an .svg or an .html
+  //accepted here runs its script in a visitor's browser as if the site had
+  //written it. The extension comes from the client's filename and cannot be
+  //trusted on its own: both it and the declared type have to be on the list.
+  fileFilter: (_req, file, cb) => {
+    const ext = extname(file.originalname).toLowerCase()
+    if (!ALLOWED_EXTENSIONS.has(ext)) {
+      cb(new Error(`extension not allowed: ${ext || "(none)"}`))
+      return
+    }
+    if (!ALLOWED_MIME_PREFIXES.some(prefix => file.mimetype.startsWith(prefix))) {
+      cb(new Error(`content type not allowed: ${file.mimetype}`))
+      return
+    }
+    cb(null, true)
+  },
 })
 
 //For each upload we store the path RELATIVE to storageDir (with the
@@ -1339,8 +1299,8 @@ const mediaDir = join(__dirname, "storage", "files")
 app.use("/media", express.static(mediaDir, {
   immutable: true,
   maxAge:    "30d",
-  //Uploads have no extension allowlist, so make sure the browser never
-  //sniffs a stored file into active content on this origin.
+  //Belt on top of the upload allowlist: whatever is stored here, the browser
+  //must not sniff it into active content on this origin.
   setHeaders: (res) => {
     res.setHeader("X-Content-Type-Options", "nosniff")
   },
@@ -1363,4 +1323,21 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 })
 
 const port = process.env.PORT ?? 3001
-app.listen(port, () => console.log(`server running on http://localhost:${port}`))
+
+app.listen(port, async () => {
+  console.log(`server running on http://localhost:${port}`)
+
+  //ONE ACCOUNT ON THIS SITE. Promotion to admin is an UPDATE run in the
+  //database, so this is the first moment the app can see it: once an admin
+  //exists, every other account is deleted. Registration is already refused
+  //while any account exists, so this only has something to remove when someone
+  //got there before the promotion did.
+  try {
+    const removed = await enforceSingleAccount()
+    if (removed > 0) console.log(`[boot] removed ${removed} account(s) that were not the admin`)
+  } catch (err) {
+    //not fatal, and not silent: the server has no useful work without the
+    //database anyway, and the next boot tries again
+    console.error("[boot] could not enforce the single-account rule:", err)
+  }
+})

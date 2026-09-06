@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router"
-import { ToastHost, useAccent, useLang } from "vue-shared-ui"
+import ToastHost from "./components/ToastHost.vue"
+import { useLang } from "./composables/useLang"
 import SideNav      from "./components/portfolio/SideNav.vue"
 import AdminGear    from "./components/portfolio/AdminGear.vue"
 import CssVarsPanel from "./components/portfolio/CssVarsPanel.vue"
 import LightboxCarousel from "./components/portfolio/LightboxCarousel.vue"
 
-//ensure accent_color is seeded then applied to --primary (HSL). In public auth
-//mode the DB seed call no-ops gracefully if there is no user session.
-useAccent()
-
 //Theme is dark-only for this portfolio: html.dark is hardcoded in index.html
-//and no toggle is exposed. We deliberately don't call useTheme() to avoid
-//auto-seeding a `theme` setting row that would show up in /settings.
+//and no toggle is exposed. useTheme() is deliberately not called either, to
+//avoid auto-seeding a `theme` row that would then show up in /settings.
+//The accent used to be applied here through the shared package, but that call
+//needed a session and did nothing for a visitor: the public accent has always
+//come from style.css, and CssVarsPanel is what overrides it for the admin.
 
 const { toggleLang, lang } = useLang()
 

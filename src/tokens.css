@@ -1,0 +1,108 @@
+/*STRUCTURAL VARIABLES - spacing, radius, typography, z-index, shadows*/
+/*colors are NOT defined here - each project owns its palette*/
+
+:root {
+  /*SPACING*/
+  --vsui-space-2xs: 2px;
+  --vsui-space-xs:  4px;
+  --vsui-space-sm:  8px;
+  --vsui-space-md:  12px;
+  --vsui-space-lg:  16px;
+  --vsui-space-xl:  24px;
+  --vsui-space-2xl: 32px;
+  --vsui-space-3xl: 48px;
+
+  /*RADIUS*/
+  --vsui-radius-sm:   4px;
+  --vsui-radius:      8px;
+  --vsui-radius-lg:   12px;
+  --vsui-radius-xl:   16px;
+  --vsui-radius-full: 9999px;
+
+  /*CONTROL SIZES*/
+  --vsui-control-xs: 26px;
+  --vsui-control-sm: 32px;
+  --vsui-control:    38px;
+  --vsui-toggle-w:   36px;
+  --vsui-toggle-h:   20px;
+
+  /*READABLE PAGE WIDTH*/
+  --vsui-page-width: 64rem;
+
+  /*PANEL WIDTHS*/
+  --vsui-panel-xs: 130px;
+  --vsui-panel-sm: 200px;
+  --vsui-panel-md: 240px;
+  --vsui-panel-lg: 360px;
+  --vsui-panel-xl: 400px;
+
+  /*HAIRLINE - 1px separators and borders*/
+  --vsui-hairline: 1px;
+
+  /*THIN PROGRESS BAR laid on a surface*/
+  --vsui-progress-thin: 3px;
+
+  /*LETTER-SPACING*/
+  --vsui-tracking-wide:  0.08em;
+  --vsui-tracking-tight: 0.04em;
+
+  /*inset of a drawn rule inside a menu panel*/
+  --vsui-menu-rule-inset: var(--vsui-space-sm);
+
+  /*a control held shut by its caller reads as unavailable at this opacity*/
+  --vsui-disabled-opacity: 0.5;
+
+  /*NAV HEIGHTS*/
+  --vsui-nav-height-desktop: 56px;
+  --vsui-nav-height-mobile:  60px;
+
+  /*TYPOGRAPHY SCALE*/
+  --vsui-text-2xs: 11px;
+  --vsui-text-xs:  12px;
+  --vsui-text-sm:  13px;
+  --vsui-text-base: 15px;
+  --vsui-text-lg:  17px;
+  --vsui-text-xl:  20px;
+  --vsui-text-2xl: 24px;
+  --vsui-text-3xl: 30px;
+
+  /*TRANSITIONS*/
+  --vsui-transition-fast: 0.15s;
+  --vsui-transition:      0.2s;
+  --vsui-transition-slow: 0.35s;
+
+  /*Z-INDEX SCALE*/
+  --vsui-z-dropdown: 50;
+  --vsui-z-nav:      100;
+  --vsui-z-modal:    1000;
+  --vsui-z-toast:    2000;
+
+  /*SHADOWS*/
+  --vsui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --vsui-shadow:    0 4px 12px rgba(0, 0, 0, 0.08);
+  --vsui-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.15);
+
+  /*BREAKPOINTS (used in CSS only as reference; the JS breakpoint lives in useIsMobile)*/
+  --vsui-bp-mobile: 720px;
+}
+
+/*RESPONSIVE NAV HOST SLOT*/
+/*projects can rely on these to position content below/above the nav*/
+.vsui-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.vsui-app__main {
+  flex: 1;
+  padding-top:    var(--vsui-space-lg);
+  padding-bottom: var(--vsui-space-lg);
+}
+
+@media (max-width: 720px) {
+  .vsui-app__main {
+    /*leave room for the bottom nav on mobile*/
+    padding-bottom: calc(var(--vsui-nav-height-mobile) + var(--vsui-space-lg));
+  }
+}

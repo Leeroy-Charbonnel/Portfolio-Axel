@@ -1,5 +1,5 @@
 import { computed, ref } from "vue"
-import { authClient, type SessionUser } from "vue-shared-ui"
+import { authClient, type SessionUser } from "../lib/authClient"
 
 //SHARED admin state - one session lookup per app load, cached in module scope.
 //editMode is a simple toggle the admin flips from the gear dropdown.

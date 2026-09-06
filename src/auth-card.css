@@ -1,0 +1,192 @@
+/*AUTH CARD - the one shell every auth page shares (login, verify-email,
+pending, banned, forgot/reset password). Global on purpose: these pages are
+plain markup over the same classes. Colors come from the surface tokens that
+style.css maps onto the shadcn palette - no fallbacks here, a missing token
+should be visible, not painted over.*/
+
+.vsui-auth-page {
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--vsui-space-xl);
+}
+
+.vsui-auth-card {
+  position: relative;
+  width: 100%;
+  max-width: var(--vsui-panel-xl);
+  padding: var(--vsui-space-3xl);
+}
+
+.vsui-auth-card__topline {
+  position: absolute;
+  top: 0;
+  left: var(--vsui-space-3xl);
+  right: var(--vsui-space-3xl);
+  height: var(--vsui-hairline);
+  background: var(--vsui-line-accent);
+  opacity: 0.2;
+}
+
+.vsui-auth-card__title {
+  font-size: var(--vsui-text-2xl);
+  font-weight: 600;
+  margin-bottom: var(--vsui-space-2xl);
+}
+
+.vsui-auth-card__google {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vsui-space-sm);
+  padding: var(--vsui-space-md);
+  background: var(--vsui-google-btn-bg);
+  border: var(--vsui-hairline) solid var(--vsui-google-btn-border);
+  border-radius: var(--vsui-radius);
+  font-size: var(--vsui-text-sm);
+  font-weight: 500;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background var(--vsui-transition-fast);
+}
+
+.vsui-auth-card__google:hover:not(:disabled) {
+  background: var(--vsui-google-btn-hover-bg);
+}
+
+.vsui-auth-card__google:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vsui-auth-card__divider {
+  display: flex;
+  align-items: center;
+  margin: var(--vsui-space-xl) 0;
+}
+
+.vsui-auth-card__divider::before,
+.vsui-auth-card__divider::after {
+  content: '';
+  flex: 1;
+  height: var(--vsui-hairline);
+  background: var(--vsui-divider);
+}
+
+.vsui-auth-card__divider span {
+  padding: 0 var(--vsui-space-md);
+  font-size: var(--vsui-text-xs);
+  opacity: 0.6;
+}
+
+.vsui-auth-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vsui-space-lg);
+}
+
+.vsui-auth-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vsui-space-sm);
+}
+
+.vsui-auth-card__label {
+  font-size: var(--vsui-text-sm);
+  opacity: 0.7;
+}
+
+.vsui-auth-card__input {
+  width: 100%;
+  padding: var(--vsui-space-md) var(--vsui-space-lg);
+  font-size: var(--vsui-text-base);
+  font-family: inherit;
+  background: var(--vsui-input-bg);
+  border: var(--vsui-hairline) solid var(--vsui-input-border);
+  border-radius: var(--vsui-radius);
+  color: inherit;
+  outline: none;
+  transition: background var(--vsui-transition-fast), border-color var(--vsui-transition-fast);
+}
+
+.vsui-auth-card__input:focus {
+  background: var(--vsui-input-focus-bg);
+  border-color: var(--vsui-input-focus-border);
+}
+
+.vsui-auth-card__error {
+  font-size: var(--vsui-text-sm);
+  color: var(--vsui-danger-fg);
+}
+
+.vsui-auth-card__submit {
+  width: 100%;
+  padding: var(--vsui-space-md);
+  margin-top: var(--vsui-space-sm);
+  background: var(--vsui-btn-bg);
+  color: var(--vsui-btn-fg);
+  border: none;
+  border-radius: var(--vsui-radius);
+  font-size: var(--vsui-text-sm);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity var(--vsui-transition-fast);
+}
+
+.vsui-auth-card__submit:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.vsui-auth-card__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*worn by a link and by a button alike, so the button reset comes with it*/
+.vsui-auth-card__forgot {
+  align-self: center;
+  margin-top: var(--vsui-space-sm);
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  font-size: var(--vsui-text-sm);
+  opacity: 0.7;
+  text-decoration: none;
+  color: inherit;
+  transition: opacity var(--vsui-transition-fast);
+}
+
+.vsui-auth-card__forgot:hover {
+  opacity: 1;
+}
+
+.vsui-auth-card__switch {
+  text-align: center;
+  margin-top: var(--vsui-space-xl);
+  font-size: var(--vsui-text-sm);
+  opacity: 0.7;
+}
+
+.vsui-auth-card__switch button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.vsui-auth-card__message {
+  font-size: var(--vsui-text-sm);
+  opacity: 0.8;
+  margin-bottom: var(--vsui-space-xl);
+  line-height: 1.5;
+}

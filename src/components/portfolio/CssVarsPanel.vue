@@ -2,7 +2,8 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { X, Save, RotateCcw, Shuffle } from "lucide-vue-next"
-import { useSettings, useToast } from "vue-shared-ui"
+import { useSettings } from "../../composables/useSettings"
+import { useToast } from "../../composables/useToast"
 import { useCssVarsPanel } from "../../composables/useCssVarsPanel"
 
 //SIDE PANEL - groups every editable CSS variable by DOMAIN (Colors,

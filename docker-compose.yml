@@ -1,0 +1,101 @@
+#ONE Dokploy service, named "stack", holds the whole project: the app, the
+#production database and the dev database.
+#
+#Dokploy gives a compose stack its own network, so neither database is reachable
+#from another project - unlike a standalone "database" service, which sits on the
+#shared dokploy-network with every other app on the server. The database this
+#replaces published 0.0.0.0:5440, which put it on the internet.
+#
+#The app is wired to `db` and to nothing else. `db-dev` exists so local work has a
+#database on the same machine without a second Dokploy service: it is reached
+#through an SSH tunnel on its own host port, and nothing inside the stack
+#connects to it.
+#
+#Trade-off: Dokploy's managed database backups only apply to its own database
+#service type. Here the data lives in the volumes below, so set up a Volume
+#Backup on this compose service instead.
+name: stack
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - 3000
+    volumes:
+      #UPLOADED FILES. server.ts writes to /app/storage/files and serves the same
+      #directory under /media. This is the volume the old application service
+      #mounted at the same path, carried over: without it every image, model and
+      #HDRI goes away with the next deploy.
+      - storage:/app/storage/files
+    environment:
+      #production only. The app has no route to db-dev and must not get one:
+      #one running process, one database.
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      APP_NAME: ${APP_NAME}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+      NODE_ENV: production
+      PORT: 3000
+
+  db:
+    #postgres 18, matching the database this replaces: a dump taken from 18 does
+    #not restore into 17
+    image: postgres:18-alpine
+    restart: unless-stopped
+    ports:
+      #What keeps other projects out is the private compose network, not this
+      #line: they have no route to a database that is not on their network,
+      #whatever it publishes on the host. This port exists so db:studio:prod and
+      #TablePlus can reach it through an SSH tunnel, and the 127.0.0.1 prefix is
+      #what keeps the internet out - without it docker publishes on 0.0.0.0 and
+      #punches its own hole through ufw, which is what the old service did.
+      - "127.0.0.1:${DB_HOST_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+  db-dev:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    ports:
+      #same rule, a different host port. This is the one `bun run dev`, db:push
+      #and db:studio talk to through the tunnel. Nothing in the stack depends on
+      #it, so losing it takes production down with nothing.
+      - "127.0.0.1:${DB_DEV_HOST_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      #its own volume: a dev database sharing production's would not be one
+      - db-dev-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      #a different name from production, so a tunnel pointed at the wrong port
+      #fails on the database name instead of writing to the wrong place
+      POSTGRES_DB: ${POSTGRES_DB}_dev
+
+volumes:
+  storage: {}
+  db-data: {}
+  db-dev-data: {}
