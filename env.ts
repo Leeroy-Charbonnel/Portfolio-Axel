@@ -7,7 +7,7 @@
 const REQUIRED: Record<string, string> = {
   DATABASE_URL:       "db/index.ts opens the pool on it; nothing reads or writes without it",
   BETTER_AUTH_SECRET: "auth.ts signs sessions with it; missing, better-auth falls back to the constant \"better-auth-secret-1234...\" shipped in the library, and every cookie is signed with a key anyone can read",
-  BETTER_AUTH_URL:    "better-auth builds its callbacks on it, and defaults to http://localhost:3001 - the google round-trip would come back to the container",
+  BETTER_AUTH_URL:    "better-auth builds its callbacks on it, and defaults to http://localhost:3001, which would send every callback back into the container",
   PUBLIC_APP_URL:     "the address written into verification and reset links; defaults to http://localhost:5173, so production emails would point at a laptop",
   ALLOWED_ORIGINS:    "cors and trustedOrigins default to http://localhost:5173, so the real front end would be refused",
   APP_NAME:           "every letter is signed with it, and server/email.ts refuses to load without it",
@@ -15,8 +15,7 @@ const REQUIRED: Record<string, string> = {
 }
 
 //OPTIONAL ON PURPOSE, and each already says so where it is read: RESEND_API_KEY
-//(server/email.ts warns and logs the links instead), GOOGLE_CLIENT_ID and
-//GOOGLE_CLIENT_SECRET (no google provider), PORT, NODE_ENV.
+//(server/email.ts warns and logs the link instead), PORT, NODE_ENV.
 //PROD_DATABASE_URL is checked by drizzle.config.prod.ts, which is the only file
 //that reads it.
 //VITE_AUTH_MODE is gone with the auth modes: this site has one account and one

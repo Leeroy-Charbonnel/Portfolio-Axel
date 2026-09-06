@@ -3,8 +3,6 @@ module.exports = {
   content: [
     "./index.html",
     "./src/**/*.{vue,js,ts,jsx,tsx}",
-    //scan vue-shared-ui so its tailwind classes are included in the build
-    "./node_modules/vue-shared-ui/src/**/*.{vue,js,ts}",
   ],
   darkMode: "class",
   theme: {

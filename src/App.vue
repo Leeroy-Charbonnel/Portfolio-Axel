@@ -16,10 +16,10 @@ import LightboxCarousel from "./components/portfolio/LightboxCarousel.vue"
 
 const { toggleLang, lang } = useLang()
 
-//hide portfolio chrome on auth-related routes (login, settings, etc.) so
-//vue-shared-ui's pages render against the bare background
+//hide the portfolio chrome on the auth and admin screens, so those pages render
+//against the bare background instead of the black canvas and its side nav
 const route = useRoute()
-const chromeFreeRoutes = ["/login", "/settings", "/pending", "/banned", "/forgot-password", "/reset-password"]
+const chromeFreeRoutes = ["/login", "/settings", "/sketchfab-howto", "/forgot-password", "/reset-password"]
 //edit-3d uses a dynamic id so check by prefix in the template instead
 </script>
 

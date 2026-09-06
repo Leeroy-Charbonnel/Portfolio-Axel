@@ -1,5 +1,5 @@
 import { createApp } from "vue"
-//IMPORT vue-shared-ui structural variables BEFORE project style.css so projects can override
+//structural variables before style.css, so the project palette can override them
 //structural variables first, so style.css below can override them
 import "./tokens.css"
 import "./auth-card.css"

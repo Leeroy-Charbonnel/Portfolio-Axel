@@ -9,9 +9,11 @@ export function useAuth() {
   const user            = computed(() => session.value.data?.user ?? null)
   const isAuthenticated = computed(() => !!session.value.data?.user)
   const role            = computed(() => (session.value.data?.user as SessionUser | undefined)?.role ?? null)
-  const isPending       = computed(() => role.value === "pending")
   const isAdmin         = computed(() => role.value === "admin")
 
+  //Google, the sign-in link and the verification mail used to live here. auth.ts
+  //declares no social provider, no magic-link plugin and no verification mail:
+  //one account, one address, one password.
   async function signIn(email: string, password: string) {
     const { error } = await authClient.signIn.email({ email, password })
     if (error) throw new Error(error.message)
@@ -19,28 +21,6 @@ export function useAuth() {
 
   async function signUp(name: string, email: string, password: string) {
     const { error } = await authClient.signUp.email({ name, email, password })
-    if (error) throw new Error(error.message)
-  }
-
-  async function signInWithGoogle() {
-    //callbackURL must be absolute - relative paths resolve to BETTER_AUTH_URL
-    //(the API server) instead of the frontend origin, causing "Cannot GET /"
-    //after the OAuth roundtrip
-    const callbackURL = typeof window !== "undefined" ? `${window.location.origin}/` : "/"
-    const { error } = await (authClient as any).signIn.social({ provider: "google", callbackURL })
-    if (error) throw new Error(error.message)
-  }
-
-  //absolute for the same reason as Google above: the link is verified by the api,
-  //which resolves a relative path against its own origin and lands the browser
-  //on "Cannot GET /"
-  async function sendSignInLink(email: string) {
-    const origin = typeof window !== "undefined" ? window.location.origin : ""
-    const { error } = await authClient.signIn.magicLink({
-      email,
-      callbackURL:      `${origin}/`,
-      errorCallbackURL: `${origin}/login`,
-    })
     if (error) throw new Error(error.message)
   }
 
@@ -57,19 +37,14 @@ export function useAuth() {
     if (error) throw new Error(error.message)
   }
 
-  async function sendVerificationEmail(email: string) {
-    const { error } = await authClient.sendVerificationEmail({ email, callbackURL: "/" })
-    if (error) throw new Error(error.message)
-  }
-
   async function signOut() {
     await authClient.signOut()
     router.push("/login")
   }
 
   return {
-    session, user, isAuthenticated, role, isPending, isAdmin,
-    signIn, signUp, signInWithGoogle, sendSignInLink, signOut,
-    requestPasswordReset, resetPassword, sendVerificationEmail,
+    session, user, isAuthenticated, role, isAdmin,
+    signIn, signUp, signOut,
+    requestPasswordReset, resetPassword,
   }
 }

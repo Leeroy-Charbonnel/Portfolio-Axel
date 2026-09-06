@@ -12,7 +12,7 @@ export const translations = pgTable("translations", {
   pk: primaryKey({ columns: [t.id, t.lang] }),
 }))
 
-//SETTINGS TABLE - common shape across all projects (see vue-shared-ui SettingsPage)
+//SETTINGS TABLE - common shape across all projects (see SettingsPage.vue)
 //type drives the UI input: bool | string | number | color | select | list | json
 //options (JSON-encoded) is used by:
 //  - "select": [{ label, value }] or [string] - dropdown choices

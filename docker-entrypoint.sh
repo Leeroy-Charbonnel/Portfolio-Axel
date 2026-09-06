@@ -3,8 +3,9 @@
 #127.0.0.1 only, so it cannot be reached from a laptop without a tunnel. Schema
 #changes are applied here, at boot, rather than by running db:push by hand.
 #
-#Both steps are idempotent: migrate applies only the files it has not seen, and
-#seed-i18n upserts.
+#Both steps are idempotent and neither overwrites: migrate applies only the files
+#it has not seen, and seed-i18n inserts the missing keys, leaving edited labels
+#alone.
 set -e
 
 echo "[entrypoint] applying migrations"

@@ -6,7 +6,7 @@ import cors from "cors"
 import helmet from "helmet"
 import multer from "multer"
 import { join, extname, relative } from "path"
-import { mkdirSync, unlinkSync, readdirSync, copyFileSync, existsSync } from "fs"
+import { mkdirSync, unlinkSync, readdirSync } from "fs"
 import { fileURLToPath } from "url"
 import { randomUUID } from "crypto"
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node"
@@ -27,6 +27,11 @@ import {
 import { eq, and, asc, sql, type SQL } from "drizzle-orm"
 
 const app       = express()
+
+//ONE PROXY IN FRONT: Traefik. Without this, req.ip is the proxy's address for
+//every visitor, which is what better-auth rate-limits on and what a session row
+//records as ipAddress.
+app.set("trust proxy", 1)
 const isProd    = process.env.NODE_ENV === "production"
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
 
@@ -52,43 +57,19 @@ app.all("/api/auth/{*path}", toNodeHandler(auth))
 //model without changing intent (we still reject huge files via multer).
 app.use(express.json({ limit: "10mb" }))
 
-//FILES FORWARD - dev workflow: local Express never writes to its own
-//disk, all file ops are tunneled to prod's volume. When FILES_FORWARD_URL
-//is set, file routes pipe the request through to prod with a shared
-//secret header; prod accepts that secret as a substitute for the user's
-//session cookie (which doesn't cross domains).
+//FILES LIVE ONLY ON THE PRODUCTION VOLUME. Dev is read-only for files: reads hit
+//prod's /media through the vite proxy, and every upload or delete happens on the
+//prod site itself, in admin edit mode. A dev server therefore REFUSES file writes
+//rather than quietly dropping binaries on a local disk, which would desync the
+//rows from the volume they point at.
 //
-//Hard project rule: files live ONLY on prod's volume. There is no
-//"local file storage" branch in production; this tunnel is what makes
-//dev behave the same way (DB row created on prod, file written to
-//prod's volume).
-const FILES_FORWARD_URL    = (process.env.FILES_FORWARD_URL ?? "").replace(/\/$/, "")
-const FILES_FORWARD_SECRET = process.env.FILES_FORWARD_SECRET ?? ""
-
-//The bypass is scoped to the routes forwardFileOp actually targets - a
-//leaked secret must not grant the whole admin API (settings, translations,
-//portfolio mutations), only the file tunnel.
-function isForwardablePath(path: string): boolean {
-  return path === "/api/files" || path.startsWith("/api/files/")
-    || path === "/api/software" || path.startsWith("/api/software/")
-}
-
-function hasForwardSecret(req: express.Request): boolean {
-  if (!FILES_FORWARD_SECRET) return false
-  if (!isForwardablePath(req.path)) return false
-  const header = req.headers["x-files-forward-secret"]
-  return typeof header === "string" && header === FILES_FORWARD_SECRET
-}
-
-//HARD RULE: files live ONLY on the prod volume. Dev is READ-ONLY for
-//files (reads hit prod's /media via the vite proxy); every upload /
-//delete happens on the prod site directly, in admin edit mode. A dev
-//server without the optional forward tunnel therefore REFUSES file
-//writes instead of silently dropping binaries on the local disk (which
-//desyncs prod DB rows from the prod volume and 404s every /media URL).
-//Returns false after sending the error so handlers can just early-return.
+//The tunnel that used to forward those writes to production has been removed. It
+//carried a shared-secret header that stood in for an admin session, so a request
+//holding it was served as `{ id: null, role: "admin" }` without any session at
+//all. The compose file never passed either variable, so it was dead in
+//production and alive only as a way in.
 function requireProdStorage(res: express.Response): boolean {
-  if (isProd || FILES_FORWARD_URL) return true
+  if (isProd) return true
   console.error("[files] REFUSED local write - upload files from the PROD site (admin edit mode); dev never stores binaries locally")
   res.status(500).json({
     error: "uploads are disabled in dev",
@@ -107,10 +88,6 @@ async function requireAuth(
   //local Express (the user already passed local auth before the forward).
   //user.id is left null so the file table FK stays valid (uploaded_by has
   //onDelete: set null, so null is acceptable here).
-  if (hasForwardSecret(req)) {
-    ;(req as any).user = { id: null, role: "admin" } as unknown as SessionUser
-    return next()
-  }
   const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) })
   if (!session) {
     res.status(401).json({ error: "unauthorized" })
@@ -181,92 +158,22 @@ function rowsOf<T = any>(result: unknown): T[] {
 //crash the whole boot. If it fails, uploads will fail later with a 500 -
 //but at least the server starts and serves the rest of the app.
 const storageDir = join(__dirname, "storage", "files")
-const seedDir    = join(__dirname, "seed-files")
 
-//BOOT diagnostics - state captured at server startup so the /_diag endpoint
-//and the stdout logs both surface the same numbers.
-const bootDiag = {
-  startedAt:     new Date().toISOString(),
-  storageDir,
-  seedDir,
-  storageExisted:    existsSync(storageDir),
-  seedExisted:       existsSync(seedDir),
-  mkdirOk:           false,
-  mkdirError:        null as string | null,
-  storageFilesAfterMkdir: 0,
-  seedFileCount:     0,
-  seedCopied:        0,
-  seedSkippedReason: null as string | null,
-  seedErrors:        [] as string[],
-}
-
-console.log(`[boot] ============================`)
-console.log(`[boot] Portfolio-Axel server starting`)
-console.log(`[boot] NODE_ENV   = ${process.env.NODE_ENV}`)
-console.log(`[boot] storageDir = ${storageDir} (exists: ${bootDiag.storageExisted})`)
-console.log(`[boot] seedDir    = ${seedDir} (exists: ${bootDiag.seedExisted})`)
-
+//The bootstrap that used to copy pre-baked binaries from /app/seed-files on an
+//empty volume has been removed with the bootDiag object that reported on it:
+//seed-files/ is in .gitignore and the image is built from the repository, so the
+//directory was never there and the branch logged "doesn't exist in image" on
+//every boot. Uploads are what fills this volume.
+//
+//mkdir is wrapped so a permission problem on the mount cannot take the boot
+//down with it: uploads then fail one by one with a 500, and the rest is served.
+console.log(`[boot] Portfolio-Axel starting, NODE_ENV=${process.env.NODE_ENV}`)
 try {
   mkdirSync(storageDir, { recursive: true })
-  bootDiag.mkdirOk = true
-  console.log(`[boot] storage mkdir OK`)
-} catch (e: any) {
-  bootDiag.mkdirError = String(e?.message ?? e)
-  console.error(`[boot] storage mkdir FAILED: ${bootDiag.mkdirError}`)
-  console.error(`[boot] uploads + seed copy will both fail`)
-}
-
-//count what's currently in storage AFTER the mkdir attempt
-try {
-  bootDiag.storageFilesAfterMkdir = readdirSync(storageDir).length
+  console.log(`[boot] storage ready at ${storageDir}, ${readdirSync(storageDir).length} entry(ies)`)
 } catch (e) {
-  console.warn(`[boot] storage readdir failed (dir missing or unreadable):`, e)
+  console.error(`[boot] storage mkdir FAILED at ${storageDir} - every upload will 500:`, e)
 }
-console.log(`[boot] storage currently contains ${bootDiag.storageFilesAfterMkdir} file(s)`)
-
-//BOOTSTRAP SEED - if the storage volume is empty on first boot, copy the
-//pre-baked binaries from /app/seed-files (committed to git, baked into the
-//image). Idempotent: once the volume has anything in it, this skips.
-try {
-  if (!existsSync(seedDir)) {
-    bootDiag.seedSkippedReason = "seed dir doesn't exist in image"
-    console.log(`[boot] seed: ${bootDiag.seedSkippedReason}`)
-  } else {
-    const seedFiles = readdirSync(seedDir)
-    bootDiag.seedFileCount = seedFiles.length
-    console.log(`[boot] seed contains ${seedFiles.length} file(s) available`)
-
-    if (bootDiag.storageFilesAfterMkdir > 0) {
-      bootDiag.seedSkippedReason = `storage already has ${bootDiag.storageFilesAfterMkdir} file(s) - skipping seed`
-      console.log(`[boot] seed: ${bootDiag.seedSkippedReason}`)
-    } else {
-      console.log(`[boot] seed: storage is empty, copying ${seedFiles.length} file(s)...`)
-      for (const f of seedFiles) {
-        try {
-          copyFileSync(join(seedDir, f), join(storageDir, f))
-          bootDiag.seedCopied++
-        } catch (e: any) {
-          const msg = `${f}: ${e?.message ?? e}`
-          bootDiag.seedErrors.push(msg)
-          console.warn(`[boot] seed copy failed for ${msg}`)
-        }
-      }
-      console.log(`[boot] seed: done, copied ${bootDiag.seedCopied}/${seedFiles.length} file(s)`)
-    }
-  }
-} catch (e: any) {
-  bootDiag.seedSkippedReason = `unexpected error: ${e?.message ?? e}`
-  console.warn(`[boot] seed: ${bootDiag.seedSkippedReason}`)
-}
-
-console.log(`[boot] ============================`)
-
-//The public /diag page that used to sit here has been removed. It served the
-//server's absolute paths, a listing of the storage directory and which of
-//DATABASE_URL, BETTER_AUTH_SECRET, RESEND_API_KEY and GOOGLE_CLIENT_ID were
-//set, to anyone who asked for it. The boot log above carries the same numbers
-//for whoever can read the container's output, which is the only audience it
-//ever had.
 
 //UPLOAD ROUTING - uploads are sorted into sub-directories by extension so
 //the single storage volume stays organized:
@@ -351,38 +258,11 @@ function inferKind(mimeType: string): "image" | "video" | "other" {
   return "other"
 }
 
-//Pipe an Express request through to FILES_FORWARD_URL and stream the
-//response back to the client. Used by POST /api/files, DELETE /api/files
-//and POST /api/software so local dev never touches its own disk. The
-//shared secret is added so prod's requireAuth recognises the call.
-async function forwardFileOp(req: express.Request, res: express.Response, targetPath: string): Promise<boolean> {
-  if (!FILES_FORWARD_URL) return false
-  try {
-    const targetUrl = FILES_FORWARD_URL + targetPath
-    const fwdHeaders: Record<string, string> = {
-      "x-files-forward-secret": FILES_FORWARD_SECRET,
-    }
-    if (req.headers["content-type"])   fwdHeaders["content-type"]   = req.headers["content-type"] as string
-    if (req.headers["content-length"]) fwdHeaders["content-length"] = req.headers["content-length"] as string
-
-    const hasBody = req.method !== "GET" && req.method !== "HEAD"
-    const upstream = await fetch(targetUrl, {
-      method:  req.method,
-      headers: fwdHeaders,
-      body:    hasBody ? (req as unknown as ReadableStream) : undefined,
-      //@ts-ignore - node fetch needs duplex for streaming bodies
-      duplex:  hasBody ? "half" : undefined,
-    })
-    res.status(upstream.status)
-    const ct = upstream.headers.get("content-type")
-    if (ct) res.setHeader("content-type", ct)
-    const buf = Buffer.from(await upstream.arrayBuffer())
-    res.send(buf)
-  } catch (e) {
-    console.error(`[files-forward] ${req.method} ${targetPath} failed:`, e)
-    res.status(502).json({ error: "file forward failed", detail: e instanceof Error ? e.message : String(e) })
-  }
-  return true
+//a model row whose file has been deleted is a broken reference, not an empty
+//field: the viewer gets "" either way, the log is what makes it findable
+function logMissingFile(modelId: string, fileId: string): string {
+  console.error(`[models] model ${modelId} points at file ${fileId}, which has no row`)
+  return ""
 }
 
 //FILE REFERENCE COUNT - single source of truth for "which rows point at a
@@ -462,8 +342,7 @@ app.get("/api/files", requireAuth, requireAdmin, async (_req, res) => {
 //DELETE /api/files/orphans - admin only. Bulk-delete every row whose ref
 //count is 0. Returns the number actually removed. MUST be declared BEFORE
 //"/api/files/:id" so express doesn't match "orphans" as a uuid param.
-app.delete("/api/files/orphans", requireAuth, requireAdmin, async (req, res) => {
-  if (await forwardFileOp(req, res, "/api/files/orphans")) return
+app.delete("/api/files/orphans", requireAuth, requireAdmin, async (_req, res) => {
   if (!requireProdStorage(res)) return
   //HDRs (.hdr/.exr/.hdri) and 3D models (.glb/.gltf) are KEPT even when
   //unreferenced - the author swaps between them in the editor picker,
@@ -495,7 +374,6 @@ app.delete("/api/files/orphans", requireAuth, requireAdmin, async (req, res) => 
 //ref count so the admin always knows before clicking.
 //Declared AFTER /orphans so express's matcher doesn't claim "orphans" as a uuid.
 app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
-  if (await forwardFileOp(req, res, `/api/files/${encodeURIComponent(String(req.params.id ?? ""))}`)) return
   if (!requireProdStorage(res)) return
   //Garbage ids used to hit the ::uuid cast below and 500 - validate first.
   const id = parseUuidParam(req, "id", res)
@@ -523,7 +401,6 @@ app.delete("/api/files/:id", requireAuth, requireAdmin, async (req, res) => {
 
 //POST /api/files - admin only. Returns the new file row + ready-to-use url
 app.post("/api/files", requireAuth, requireAdmin, async (req, res, next) => {
-  if (await forwardFileOp(req, res, "/api/files")) return
   if (!requireProdStorage(res)) return
   upload.single("file")(req, res, async (err: unknown) => {
     if (err) return next(err)
@@ -675,7 +552,6 @@ app.delete("/api/experience/:id", requireAuth, requireAdmin, async (req, res) =>
 //The logo lands in the file table the same way a regular /api/files upload
 //does, then we insert the software row referencing it.
 app.post("/api/software", requireAuth, requireAdmin, async (req, res, next) => {
-  if (await forwardFileOp(req, res, "/api/software")) return
   if (!requireProdStorage(res)) return
   upload.single("logo")(req, res, async (err: unknown) => {
     if (err) return next(err)
@@ -738,7 +614,6 @@ app.put("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
 //drop the software row FIRST then the file. Junction rows in
 //main_project_software cascade automatically via their own ON DELETE.
 app.delete("/api/software/:id", requireAuth, requireAdmin, async (req, res) => {
-  if (await forwardFileOp(req, res, `/api/software/${encodeURIComponent(String(req.params.id ?? ""))}`)) return
   const id = parseIntParam(req, "id", res)
   if (id === null) return
   const [row] = await db.select().from(software).where(eq(software.id, id))
@@ -908,39 +783,11 @@ async function findModelUsages(modelId: string): Promise<Array<{ projectId: numb
   return out
 }
 
-//VIEWER SETTINGS - the entire editor snapshot (materials / lights / HDR /
-//wireframe state) as a single jsonb blob. Frontend posts its full payload
-//on Save and we just store it; the viewer applies it on load.
-app.put("/api/main-project/:id/viewer-settings", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseIntParam(req, "id", res)
-  if (id === null) return
-  const [row] = await db.update(mainProject)
-    .set({ viewerSettings: req.body, updatedAt: new Date() })
-    .where(eq(mainProject.id, id))
-    .returning({ id: mainProject.id })
-  if (!row) { res.status(404).json({ error: "not found" }); return }
-  respondOk(res)
-})
-
-//PARTIAL save - patches ONLY the startView / startViewMobile fields of
-//viewerSettings without touching materials / lights / HDR. The body opts
-//in to one or both fields; everything else in the existing viewerSettings
-//JSON is preserved.
-app.put("/api/main-project/:id/viewer-settings/start-view", requireAuth, requireAdmin, async (req, res) => {
-  const id = parseIntParam(req, "id", res)
-  if (id === null) return
-  const [row] = await db.select({ viewerSettings: mainProject.viewerSettings })
-    .from(mainProject).where(eq(mainProject.id, id))
-  if (!row) { res.status(404).json({ error: "not found" }); return }
-  const current = (row.viewerSettings as Record<string, unknown> | null) ?? {}
-  const next: Record<string, unknown> = { ...current }
-  if ("startView"       in (req.body ?? {})) next.startView       = req.body.startView       ?? null
-  if ("startViewMobile" in (req.body ?? {})) next.startViewMobile = req.body.startViewMobile ?? null
-  await db.update(mainProject)
-    .set({ viewerSettings: next, updatedAt: new Date() })
-    .where(eq(mainProject.id, id))
-  respondOk(res)
-})
+//The two /api/main-project/:id/viewer-settings routes that used to sit here are
+//gone: the editor saves through /api/models/:id/viewer-settings, and nothing in
+//the front end ever called these. The mainProject.viewerSettings column stays -
+//it still holds data for all four projects and useEffectiveViewerSettings reads
+//it as a fallback - so dropping it is a data migration, not a cleanup.
 
 //GET single project - returns the editor everything it needs without
 //pulling the whole portfolio. Used by the /edit-3d page.
@@ -1021,7 +868,7 @@ app.put("/api/translations/:id", requireAuth, requireAdmin, async (req, res) => 
 })
 
 //bulk upsert - admin only, accepts { lang: { id: value } } maps
-//used by the seed script + by vue-shared-ui composables that need to ensure
+//used by the seed script + by the composables that need to ensure
 //their description keys exist in the DB
 app.put("/api/translations", requireAuth, requireAdmin, async (req, res) => {
   const body = req.body as Record<string, Record<string, string>>
@@ -1050,17 +897,20 @@ app.put("/api/translations", requireAuth, requireAdmin, async (req, res) => {
 })
 
 
-//SETTINGS - common shape, consumed by vue-shared-ui SettingsPage
-app.get("/api/settings", requireAuth, async (req, res) => {
+//SETTINGS - common shape, consumed by SettingsPage.
+//Admin like every other mutating route: /settings is an admin screen, and these
+//were the only two that stopped at requireAuth. An account created before the
+//promotion lives until the next boot, and could write rows here in the meantime.
+app.get("/api/settings", requireAuth, requireAdmin, async (req, res) => {
   const userId = (req as any).user.id as string
   const rows = await db.select().from(settings).where(eq(settings.userId, userId))
   res.json(rows)
 })
 
 //PUT is an upsert - creates the row if missing (with type/description/group/options),
-//otherwise updates just the value. Lets vue-shared-ui composables seed their own
-//baseline settings (e.g., accent_color) without needing a separate /seed endpoint.
-app.put("/api/settings/:key", requireAuth, async (req, res) => {
+//otherwise updates just the value. Lets the composables seed their own baseline
+//settings without needing a separate /seed endpoint.
+app.put("/api/settings/:key", requireAuth, requireAdmin, async (req, res) => {
   const userId = (req as any).user.id as string
   const key = req.params.key as string
   const { value, description, type, group, options } = req.body
@@ -1261,7 +1111,10 @@ app.get("/api/portfolio", async (_req, res) => {
     id:              m.id,
     name:            m.name,
     glbFileId:       m.glbFileId,
-    glbUrl:          urlOf(m.glbFileId) ?? "",
+    //glbFileId is NOT NULL in the schema, so an empty url here means the file row
+    //it points at has gone: say so rather than shipping "" to a viewer that will
+    //fail on it without a reason
+    glbUrl:          urlOf(m.glbFileId) ?? logMissingFile(m.id, m.glbFileId),
     thumbnailFileId: m.thumbnailFileId,
     thumbnailUrl:    urlOf(m.thumbnailFileId),
     viewerSettings:  m.viewerSettings,

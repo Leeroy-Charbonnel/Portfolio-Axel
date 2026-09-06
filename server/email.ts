@@ -61,11 +61,11 @@ export type Message = {
 const SHELL = {
   fr: {
     paste:  "Ou collez ce lien dans votre navigateur",
-    reason: `Vous recevez ce message parce que cette adresse a été utilisée sur ${appName}. Nous n'envoyons que les messages nécessaires à un compte : confirmation d'adresse, connexion, mot de passe et suppression du compte.`,
+    reason: `Vous recevez ce message parce que cette adresse a été utilisée sur ${appName}. Le seul message que nous envoyons est la réinitialisation du mot de passe.`,
   },
   en: {
     paste:  "Or paste this link into your browser",
-    reason: `You are receiving this message because this address was used on ${appName}. We only send what an account needs: address confirmation, sign-in, password and account deletion.`,
+    reason: `You are receiving this message because this address was used on ${appName}. The only message we send is the password reset.`,
   },
 }
 
@@ -178,9 +178,6 @@ function text(message: Message) {
   ].join("\n")
 }
 
-//exported for the render check in scripts and for a project that swaps the transport
-export const render = { html, text }
-
 //with no transport the link still has to reach the developer, or a fresh account is trapped on /verify-email
 export async function sendMail(to: string, message: Message) {
   if (!resendApiKey) {
@@ -200,24 +197,6 @@ ${message.action.url}`)
   if (error) throw new Error(`email send failed: ${error.message}`)
 }
 
-export function verifyEmailMessage(link: string, lang: Lang): Message {
-  return lang === "en" ? {
-    lang,
-    subject: "Confirm your email address",
-    title:   "Confirm your email address",
-    lead:    ["One step left to activate your account: confirm that this address is yours."],
-    action:  { url: link, label: "Confirm my address" },
-    notes:   ["If you did not create an account, ignore this message: no account will be activated."],
-  } : {
-    lang,
-    subject: "Confirmez votre adresse e-mail",
-    title:   "Confirmez votre adresse e-mail",
-    lead:    ["Il ne reste qu'une étape pour activer votre compte : confirmez que cette adresse est bien la vôtre."],
-    action:  { url: link, label: "Confirmer mon adresse" },
-    notes:   ["Si vous n'avez pas créé de compte, ignorez ce message : aucun compte ne sera activé."],
-  }
-}
-
 export function resetPasswordMessage(link: string, lang: Lang): Message {
   return lang === "en" ? {
     lang,
@@ -233,104 +212,5 @@ export function resetPasswordMessage(link: string, lang: Lang): Message {
     lead:    ["Vous avez demandé un nouveau mot de passe. Le lien ci-dessous expire dans une heure."],
     action:  { url: link, label: "Choisir un nouveau mot de passe" },
     notes:   ["Si vous n'avez rien demandé, ignorez ce message : votre mot de passe actuel reste valable."],
-  }
-}
-
-export function signInLinkMessage(link: string, lang: Lang, minutes: number): Message {
-  return lang === "en" ? {
-    lang,
-    subject: "Your sign-in link",
-    title:   "Your sign-in link",
-    lead:    [`Here is your sign-in link. It expires in ${minutes} minutes and works only once.`],
-    action:  { url: link, label: "Sign in" },
-    notes:   ["If you did not ask for this, ignore this message: nobody can sign in without this link."],
-  } : {
-    lang,
-    subject: "Votre lien de connexion",
-    title:   "Votre lien de connexion",
-    lead:    [`Voici votre lien de connexion. Il expire dans ${minutes} minutes et ne fonctionne qu'une fois.`],
-    action:  { url: link, label: "Me connecter" },
-    notes:   ["Si vous n'avez rien demandé, ignorez ce message : personne ne peut se connecter sans ce lien."],
-  }
-}
-
-export function existingAccountMessage(lang: Lang): Message {
-  return lang === "en" ? {
-    lang,
-    subject: "Someone tried to create an account with your address",
-    title:   "Someone tried to create an account with your address",
-    lead:    [`A ${appName} account already exists for this address: nothing was created and nothing changed.`],
-    action:  { url: `${publicAppUrl}/login`, label: "Sign in" },
-    notes:   [
-      `Forgot your password? Ask for a new one here: ${publicAppUrl}/forgot-password`,
-      "If this was you, there is nothing to do.",
-    ],
-  } : {
-    lang,
-    subject: "Quelqu'un a tenté de créer un compte avec votre adresse",
-    title:   "Quelqu'un a tenté de créer un compte avec votre adresse",
-    lead:    [`Un compte ${appName} existe déjà pour cette adresse : rien n'a été créé et rien n'a changé.`],
-    action:  { url: `${publicAppUrl}/login`, label: "Me connecter" },
-    notes:   [
-      `Mot de passe oublié ? Demandez-en un nouveau ici : ${publicAppUrl}/forgot-password`,
-      "Si c'était vous, il n'y a rien à faire.",
-    ],
-  }
-}
-
-//DELETION - for a project that keeps a deleted account for a while before erasing
-//it. Both letters are statements and not requests, but signing in is exactly how
-//the account comes back, so the button says that instead of pointing at nothing
-export function accountDeletedMessage(lang: Lang, graceDays: number): Message {
-  return lang === "en" ? {
-    lang,
-    subject: "Your account has been deleted",
-    title:   "Your account has been deleted",
-    lead:    [
-      "Your account has left the app and your sessions are closed.",
-      `It is kept for ${graceDays} days. To come back, just sign in again: everything is there as you left it.`,
-      `After those ${graceDays} days it is erased for good, and nothing can bring it back.`,
-    ],
-    action:  { url: `${publicAppUrl}/login`, label: "Sign in again" },
-    notes:   ["If you did not ask for this deletion, sign in now: that alone restores your account."],
-    danger:  true,
-  } : {
-    lang,
-    subject: "Votre compte est supprimé",
-    title:   "Votre compte est supprimé",
-    lead:    [
-      "Votre compte quitte l'application immédiatement et vos sessions sont fermées.",
-      `Il est conservé ${graceDays} jours. Pour revenir, il suffit de vous reconnecter : tout est là tel que vous l'avez laissé.`,
-      `Passé ces ${graceDays} jours, il est effacé pour de bon et plus rien ne peut le ramener.`,
-    ],
-    action:  { url: `${publicAppUrl}/login`, label: "Me reconnecter" },
-    notes:   ["Si vous n'avez pas demandé cette suppression, reconnectez-vous maintenant : cela suffit à rétablir votre compte."],
-    danger:  true,
-  }
-}
-
-export function accountPurgeSoonMessage(lang: Lang, days: number): Message {
-  return lang === "en" ? {
-    lang,
-    subject: `Your account will be deleted for good in ${days} days`,
-    title:   `Your account will be deleted for good in ${days} days`,
-    lead:    [
-      `You deleted your account, and the time it is kept is almost over. In ${days} days it is erased for good, with everything in it. That cannot be undone.`,
-      "While there is still time, signing in again brings everything back as you left it.",
-    ],
-    action:  { url: `${publicAppUrl}/login`, label: "Sign in again" },
-    notes:   ["If you meant to leave, there is nothing to do: the deletion happens on its own."],
-    danger:  true,
-  } : {
-    lang,
-    subject: `Votre compte sera définitivement supprimé dans ${days} jours`,
-    title:   `Votre compte sera définitivement supprimé dans ${days} jours`,
-    lead:    [
-      `Vous avez supprimé votre compte et son délai de conservation touche à sa fin. Dans ${days} jours, il est effacé pour de bon, avec tout ce qu'il contient. C'est définitif.`,
-      "Tant qu'il est temps, il suffit de vous reconnecter pour tout retrouver tel que vous l'avez laissé.",
-    ],
-    action:  { url: `${publicAppUrl}/login`, label: "Me reconnecter" },
-    notes:   ["Si vous vouliez bien partir, il n'y a rien à faire : la suppression se fera toute seule."],
-    danger:  true,
   }
 }

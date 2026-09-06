@@ -103,8 +103,12 @@ The template stays minimal so cloning it for a new app means deleting nothing.
 
 # One account, one role
 
-This site has exactly one account and it is the admin. No registration form, no
-invite, no role granted through the app, no auth mode.
+This site has exactly one account and it is the admin. No invite, no role
+granted through the app, no auth mode.
+
+The sign-up form on /login stays: it is how the first account is created, once.
+It answers 400 to everyone from the moment an account exists, so it is a door
+that closes behind the person who walks through it.
 
 - `emailAndPassword` is on, but a `before` hook on `/sign-up/email` refuses the
   request as soon as one account exists. The first registration is the only one.

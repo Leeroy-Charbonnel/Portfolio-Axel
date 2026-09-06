@@ -35,9 +35,9 @@ function load(): Promise<void> {
   inFlight = (async () => {
     try {
       const res = await fetch(ENDPOINT, { credentials: "include" })
-      //401 and 403 are states, not failures: nobody signed in yet, or an account
-      //parked on /verify-email or /pending. loaded stays false, so nothing reads
-      //an empty list as "no row" and seeds a default over the account's choice
+      //401 and 403 are states, not failures: nobody is signed in, or the visitor
+      //is not the admin. loaded stays false, so nothing reads an empty list as
+      //"no row" and seeds a default over the account's choice
       if (res.status === 401 || res.status === 403) return
       if (!res.ok) throw new Error(`load failed (${res.status})`)
       rows.value   = await res.json()
@@ -123,8 +123,16 @@ export function useSettings() {
 
   function getJson<T = unknown>(key: string, fallback: T): T {
     const v = get(key)?.value
+    //no row is not an error: the setting has never been written
     if (v == null) return fallback
-    try { return JSON.parse(v) as T } catch { return fallback }
+    try {
+      return JSON.parse(v) as T
+    } catch (e) {
+      //a row that exists and does not parse IS an error, and returning the
+      //fallback silently made it look like a setting nobody had ever touched
+      console.error(`[useSettings] "${key}" holds text that is not JSON, falling back:`, v, e)
+      return fallback
+    }
   }
 
   //GROUPED rows for the settings page
