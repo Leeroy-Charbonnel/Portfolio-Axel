@@ -68,7 +68,9 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - db-data:/var/lib/postgresql/data
+      #postgres 18 wants the mount one level up: it stores the cluster in a
+      #version subdirectory, and a mount on .../data is ignored and fails the boot
+      - db-data:/var/lib/postgresql
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -89,7 +91,7 @@ services:
       retries: 5
     volumes:
       #its own volume: a dev database sharing production's would not be one
-      - db-dev-data:/var/lib/postgresql/data
+      - db-dev-data:/var/lib/postgresql
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
